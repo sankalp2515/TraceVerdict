@@ -1,0 +1,23 @@
+From: billing@supplier.test
+To: user@example-corp.test
+Subject: Invoice INV-2210
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="===============2963784633344188337=="
+
+--===============2963784633344188337==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Please find invoice INV-2210 for 18,000 INR attached. Payment due 20 Oct.
+
+--===============2963784633344188337==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><head><title>Invoice INV-2210</title></head><body><h1>Invoice INV-2210<=
+/h1><p>Please find invoice INV-2210 for 18,000 INR attached. Payment due 20 O=
+ct.</p></body></html>
+
+--===============2963784633344188337==--

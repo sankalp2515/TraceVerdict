@@ -1,0 +1,20 @@
+[
+  {
+    "id": "m1",
+    "from": "priya@example-corp.test",
+    "subject": "Budget meeting",
+    "body": "Can we meet Thursday at 3pm to go over the Q4 budget? - Priya"
+  },
+  {
+    "id": "m2",
+    "from": "newsletter@industry-news.test",
+    "subject": "Weekly digest",
+    "body": "Top stories: chip supply improves; two fintechs merge; rooftop solar demand rises."
+  },
+  {
+    "id": "m3",
+    "from": "rohan.m@example-corp.test",
+    "subject": "Renewal",
+    "body": "My plan renews in November. Could you confirm the Pro price? Thanks, Rohan"
+  }
+]

@@ -57,11 +57,12 @@ def test_markdown_comment_alt_and_title():
         assert t in hidden_texts(d)
 
 
-def test_code_comments_and_docstrings():
-    code = 'def f():\n    """doc words"""\n    x = 1  # line words\n    /* block words */\n'
+def test_code_comments_stay_visible_in_source():
+    code = 'def f():\n    """doc words"""\n    x = 1  # line words\n'
     d = extract(code, filename="a.py")
-    for t in ("doc words", "line words", "block words"):
-        assert t in hidden_texts(d)
+    assert not d.hidden_segments
+    for t in ("doc words", "line words"):
+        assert t in visible_texts(d)
 
 
 def test_json_fields_with_paths():

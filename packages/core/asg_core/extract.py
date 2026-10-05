@@ -153,20 +153,15 @@ def _markdown(data: bytes | str, doc: ExtractedDoc) -> None:
         _add(doc, visible, "markdown:body")
 
 
-_LINE_COMMENT = re.compile(r"(?:^|\s)(?:#|//)\s?(.*)$", re.M)
-_BLOCK_COMMENT = re.compile(r"/\*(.*?)\*/", re.S)
-_DOCSTRING = re.compile(r"(\"\"\"|''')(.*?)\1", re.S)
+
+
+
 
 
 def _code(data: bytes | str, doc: ExtractedDoc) -> None:
-    text = _as_text(data)
-    _add(doc, text, "code:source")
-    for m in _BLOCK_COMMENT.finditer(text):
-        _add(doc, m.group(1), "code:block-comment", visible=False)
-    for m in _LINE_COMMENT.finditer(text):
-        _add(doc, m.group(1), "code:line-comment", visible=False)
-    for m in _DOCSTRING.finditer(text):
-        _add(doc, m.group(2), "code:docstring", visible=False)
+    """Comments and docstrings are visible to anyone reading the file, so they stay in the source segment
+    (and are scored with it); they are not separate non-visible segments (D-020)."""
+    _add(doc, _as_text(data), "code:source")
 
 
 def _json(data: bytes | str, doc: ExtractedDoc) -> None:
@@ -358,7 +353,8 @@ def _email(data: bytes | str, doc: ExtractedDoc) -> None:
                 doc.segments.append(Segment(s.text, "email:html:" + s.origin, False))
             elif not plain or not in_plain:
                 # visible in the HTML view but missing from the plain-text view (or vice versa)
-                doc.segments.append(Segment(s.text, "email:html-only", visible=not plain))
+                # Shown to HTML mail readers; genuinely hidden HTML elements are caught above as non-visible.
+                doc.segments.append(Segment(s.text, "email:html-only", visible=True))
     for part in m.iter_attachments():
         name = part.get_filename() or "attachment"
         payload = part.get_payload(decode=True) or b""

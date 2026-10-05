@@ -1,0 +1,179 @@
+"""Python SDK (SDK-1…SDK-5): protect an existing agent with a few lines.
+
+    guard = Guard("research-agent")                       # SDK-1 embedded mode (engine in-process)
+    with guard.session(user_id="u1", task="Summarise my inbox", trusted={"customer_id": "C-1042"}):   # SDK-4
+        text = guard.inspect(raw_bytes, source="pdf", filename="report.pdf")                          # SDK-2
+        send_email(to=..., body=...)                       # decorated with @guard.tool()              # SDK-3
+
+Failure policy (SDK-5): if the engine itself fails, tools marked `failure: closed` in the policy (write/send)
+are blocked, and `failure: open` tools (read-only) proceed; both are logged.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextvars
+import functools
+import inspect
+import logging
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator
+
+from asg_core.engine import Engine
+from asg_core.policy import AgentPolicy, load_policy
+from asg_core.session import Session
+from asg_core.types import ActionResult, Decision, InspectResult
+
+log = logging.getLogger("asg.sdk")
+_current: contextvars.ContextVar[Session | None] = contextvars.ContextVar("asg_session", default=None)
+
+
+class ToolBlocked(Exception):
+    """Raised by a guarded tool when `on_block="raise"`."""
+
+    def __init__(self, result: ActionResult) -> None:
+        super().__init__(result.notice or result.reason)
+        self.result = result
+
+
+class Guard:
+    def __init__(self, agent_id: str, engine: Engine | None = None, mode: str | None = None,
+                 policy: AgentPolicy | None = None, secrets: list[str] | None = None) -> None:
+        self.agent_id = agent_id
+        self._policy = policy or load_policy(agent_id)
+        if mode:
+            self._policy.mode = mode
+        self.engine = engine or Engine(policy_loader=self._load)
+        if secrets:
+            self.engine.register_secrets(secrets)
+
+    def _load(self, agent_id: str) -> AgentPolicy:
+        return self._policy if agent_id == self.agent_id else load_policy(agent_id)
+
+    @property
+    def policy(self) -> AgentPolicy:
+        return self._policy
+
+    # ---- sessions (SDK-4) --------------------------------------------------------------------
+    @contextmanager
+    def session(self, user_id: str | None = None, task: str = "", trusted: dict[str, Any] | None = None) -> Iterator[Session]:
+        s = self.engine.start_session(self.agent_id, user_ref=user_id, task=task, trusted=trusted)
+        token = _current.set(s)
+        try:
+            yield s
+        finally:
+            _current.reset(token)
+
+    def start_session(self, user_id: str | None = None, task: str = "", trusted: dict[str, Any] | None = None) -> Session:
+        s = self.engine.start_session(self.agent_id, user_ref=user_id, task=task, trusted=trusted)
+        _current.set(s)
+        return s
+
+    @property
+    def current_session(self) -> Session | None:
+        return _current.get()
+
+    def _sid(self, session_id: str | None) -> str | None:
+        if session_id:
+            return session_id
+        s = _current.get()
+        return s.session_id if s else None
+
+    def register_secrets(self, values: list[str]) -> None:
+        self.engine.register_secrets(values)
+
+    # ---- inbound content (SDK-2) -------------------------------------------------------------
+    async def ainspect_result(self, content: bytes | str, source: str, filename: str | None = None,
+                              session_id: str | None = None) -> InspectResult:
+        return await self.engine.inspect(content, source, self.agent_id, session_id=self._sid(session_id),
+                                         filename=filename)
+
+    async def ainspect(self, content: bytes | str, source: str, filename: str | None = None,
+                       session_id: str | None = None) -> str:
+        """Return what the agent should see: cleaned content, or a safe notice when blocked."""
+        r = await self.ainspect_result(content, source, filename, session_id)
+        if r.enforced == Decision.BLOCK:
+            return f"[Content from {source} was withheld by the security policy: {r.reason}]"
+        if r.enforced == Decision.ESCALATE:
+            return f"[Content from {source} is held for human review: {r.reason}]"
+        return r.cleaned_content
+
+    def inspect(self, content: bytes | str, source: str, filename: str | None = None, session_id: str | None = None) -> str:
+        return _run(self.ainspect(content, source, filename, session_id))
+
+    def inspect_result(self, content: bytes | str, source: str, filename: str | None = None,
+                       session_id: str | None = None) -> InspectResult:
+        return _run(self.ainspect_result(content, source, filename, session_id))
+
+    # ---- actions (SDK-3, SDK-5) --------------------------------------------------------------
+    async def acheck(self, tool: str, args: dict[str, Any], session_id: str | None = None) -> ActionResult:
+        try:
+            return await self.engine.check_action(tool, args, self.agent_id, session_id=self._sid(session_id))
+        except Exception as e:  # engine failure: apply the tool's failure policy
+            tp = self._policy.tools.get(tool)
+            closed = (tp.failure if tp else "closed") == "closed"
+            log.warning("guard check failed for %s (%s); failing %s", tool, type(e).__name__, "closed" if closed else "open")
+            d = Decision.BLOCK if closed else Decision.ALLOW
+            return ActionResult(decision=d, enforced=d, final_args=None if closed else dict(args), degraded=True,
+                                policy_rule=f"guard-failure-fail-{'closed' if closed else 'open'}",
+                                reason=f"guard unavailable ({type(e).__name__})",
+                                notice=f"Action '{tool}' was not performed: the security check is unavailable." if closed else None)
+
+    def check(self, tool: str, args: dict[str, Any], session_id: str | None = None) -> ActionResult:
+        return _run(self.acheck(tool, args, session_id))
+
+    def tool(self, name: str | None = None, pinned: dict[str, Any] | None = None,
+             on_block: str = "notice") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Decorate a tool function. Arguments are checked (and pinned fields rewritten) before it runs.
+
+        pinned: extra trusted values for this tool's arguments, merged into the session's trusted context.
+        on_block: "notice" returns the guard's notice string; "raise" raises ToolBlocked.
+        """
+
+        def deco(fn: Callable[..., Any]) -> Callable[..., Any]:
+            tool_name = name or fn.__name__
+            sig = inspect.signature(fn)
+
+            def bind(args: tuple, kwargs: dict) -> dict[str, Any]:
+                b = sig.bind_partial(*args, **kwargs)
+                return dict(b.arguments)
+
+            def apply_pins() -> None:
+                s = _current.get()
+                if s is not None and pinned:
+                    s.trusted.update(pinned)
+                    s.note_trusted(" ".join(str(v) for v in pinned.values()))
+
+            def blocked(r: ActionResult) -> Any:
+                if on_block == "raise":
+                    raise ToolBlocked(r)
+                return r.notice or f"Action '{tool_name}' was blocked by the security policy."
+
+            if inspect.iscoroutinefunction(fn):
+                @functools.wraps(fn)
+                async def awrapper(*args: Any, **kwargs: Any) -> Any:
+                    apply_pins()
+                    r = await self.acheck(tool_name, bind(args, kwargs))
+                    if r.enforced != Decision.ALLOW:
+                        return blocked(r)
+                    return await fn(**(r.final_args or {}))
+                return awrapper
+
+            @functools.wraps(fn)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                apply_pins()
+                r = self.check(tool_name, bind(args, kwargs))
+                if r.enforced != Decision.ALLOW:
+                    return blocked(r)
+                return fn(**(r.final_args or {}))
+            return wrapper
+
+        return deco
+
+
+def _run(coro: Any) -> Any:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    raise RuntimeError("Guard sync methods cannot run inside an event loop; use the async variants (ainspect/acheck).")

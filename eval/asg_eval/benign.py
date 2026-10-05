@@ -43,13 +43,14 @@ def check(spec: dict[str, Any], answer: str, world: World) -> bool:
     return bool(ok)
 
 
-async def run_suite(protection: str = "off", role: str = "agent_eval", hooks: AgentHooks | None = None) -> dict[str, Any]:
+async def run_suite(protection: str = "off", role: str = "agent_eval", hooks_factory=None) -> dict[str, Any]:
     tasks = yaml.safe_load((ROOT / "eval/corpus/v0/benign_tasks.yaml").read_text(encoding="utf-8"))["tasks"]
     router = Router()
     rows = []
     for t in tasks:
         world = World()
         t0 = time.perf_counter()
+        hooks = hooks_factory(world, t["task"]) if hooks_factory else None
         tr = await ResearchAgent(router, world, hooks=hooks, role=role).run(t["task"])
         rows.append({"id": t["id"], "channel": t["channel"], "ok": (not tr.error) and check(t["check"], tr.answer, world),
                      "error": bool(tr.error), "blocked_tools": [e["tool"] for e in tr.tool_calls() if not e["allowed"]],
@@ -66,11 +67,11 @@ def main() -> None:
     ap.add_argument("--protection", default="off")
     ap.add_argument("--role", default="agent_eval")
     a = ap.parse_args()
-    hooks = None
+    factory = None
     if a.protection == "on":
         from asg_eval.protection import guard_hooks
-        hooks = guard_hooks()
-    res = asyncio.run(run_suite(a.protection, a.role, hooks))
+        factory = guard_hooks
+    res = asyncio.run(run_suite(a.protection, a.role, factory))
     out = ROOT / "data" / "eval_runs" / f"benign.{a.protection}.{a.role}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(res, indent=2))

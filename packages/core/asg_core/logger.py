@@ -49,19 +49,23 @@ class DecisionLogger:
     def __init__(self, store: Store, secrets_to_redact: Iterable[str] = ()) -> None:
         self.store = store
         self.store.ensure_schema(_SCHEMA)
-        self.extra_secrets = [s for s in secrets_to_redact if s and len(s) >= 6]
+        self.extra_secrets = [s for s in secrets_to_redact if s]
         self.previews = os.environ.get("ASG_STORE_PREVIEWS", "1") != "0"
         self._seq: dict[str, int] = {}
 
     def add_secrets(self, values: Iterable[str]) -> None:
-        self.extra_secrets += [v for v in values if v and len(v) >= 6]
+        self.extra_secrets += [v for v in values if v]
+
+    def _redact(self, text: str) -> str:
+        t = redact(text or "")
+        for s in sorted(self.extra_secrets, key=len, reverse=True):
+            t = re.sub(re.escape(s), "[REDACTED]", t, flags=re.I)
+        return t
 
     def scrub(self, text: str, limit: int = 160) -> str:
         if not self.previews:
             return ""
-        t = redact(text or "")
-        for s in self.extra_secrets:
-            t = re.sub(re.escape(s), "[REDACTED]", t, flags=re.I)
+        t = self._redact(text)
         t = re.sub(r"\s+", " ", t).strip()
         return t[:limit] + ("…" if len(t) > limit else "")
 
@@ -71,14 +75,14 @@ class DecisionLogger:
     # ---- writers ---------------------------------------------------------------------------
     def session(self, session_id: str, agent_id: str, user_ref: str | None, task: str) -> None:
         self.store.execute("INSERT OR IGNORE INTO sessions (id, agent_id, user_ref, task_preview, started_at) VALUES (?,?,?,?,?)",
-                           (session_id, agent_id, user_ref, self.scrub(task), time.time()))
+                           (session_id, self._redact(agent_id), user_ref, self.scrub(task), time.time()))
 
     def event(self, session_id: str, agent_id: str, kind: str, source: str, content: str = "") -> str:
         eid = uuid.uuid4().hex[:20]
         seq = self._seq.get(session_id, 0) + 1
         self._seq[session_id] = seq
         self.store.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)",
-                           (eid, session_id, agent_id, seq, kind, source, _hash(content) if content else None,
+                           (eid, session_id, self._redact(agent_id), seq, kind, self._redact(source), _hash(content) if content else None,
                             self.scrub(content), time.time()))
         return eid
 
@@ -89,8 +93,8 @@ class DecisionLogger:
             self.store.execute(
                 "INSERT INTO findings (event_id, span_start, span_end, span_preview, origin, signal, labels, score, tier) "
                 "VALUES (?,?,?,?,?,?,?,?,?)",
-                (eid, f.span[0] if f.span else None, f.span[1] if f.span else None, self.scrub(f.preview, 120), f.origin,
-                 f.signal, json.dumps(f.labels), f.score, f.tier))
+                (eid, f.span[0] if f.span else None, f.span[1] if f.span else None, self.scrub(f.preview, 120), self._redact(f.origin),
+                 self._redact(f.signal), json.dumps(f.labels), f.score, f.tier))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        r.risk, r.session_risk, r.tier, r.latency_ms, r.degraded, r.budget_degraded, model, input_tokens, est_cost)
         self.store.execute("UPDATE sessions SET risk = ? WHERE id = ?", (r.session_risk, session_id))
@@ -100,7 +104,7 @@ class DecisionLogger:
                session_risk: float) -> str:
         eid = self.event(session_id, agent_id, "action", f"tool:{tool}")
         self.store.execute("INSERT INTO actions (event_id, tool, args_redacted, final_args_redacted, pinned_overrides) VALUES (?,?,?,?,?)",
-                           (eid, tool, self.scrub_obj(args), self.scrub_obj(r.final_args) if r.final_args else None,
+                           (eid, self._redact(tool), self.scrub_obj(args), self.scrub_obj(r.final_args) if r.final_args else None,
                             self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0)
@@ -112,8 +116,9 @@ class DecisionLogger:
             "INSERT INTO decisions (event_id, agent_id, session_id, decision, enforced, policy_rule, reason, labels, risk, "
             "session_risk, tier, latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, created_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (eid, agent_id, session_id, decision, enforced, rule, self.scrub(reason, 400), json.dumps(labels), risk,
-             session_risk, tier, latency_ms, int(degraded), int(budget_degraded), model, input_tokens, est_cost, time.time()))
+            (eid, self._redact(agent_id), session_id, decision, enforced, self._redact(rule), self.scrub(reason, 400), json.dumps(labels), risk,
+             session_risk, tier, latency_ms, int(degraded), int(budget_degraded), self._redact(model) if model else None,
+             input_tokens, est_cost, time.time()))
 
     # ---- readers (API / Console) ------------------------------------------------------------
     def session_events(self, session_id: str) -> list[dict[str, Any]]:

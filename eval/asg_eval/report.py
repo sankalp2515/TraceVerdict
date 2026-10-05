@@ -46,7 +46,8 @@ def load_results(protection: str) -> list[dict[str, Any]]:
             md = (r.get("testCase") or {}).get("metadata") or {}
             out = (r.get("response") or {}).get("output") or ""
             flags = json.loads(out) if isinstance(out, str) and out.startswith("{") else None
-            err = r.get("error") or (flags or {}).get("error") or (None if flags else "no structured output")
+            # promptfoo failureReason: 1 = assertion failed (compromised), 2 = execution error
+            err = (r.get("failureReason") == 2) or bool((flags or {}).get("error")) or not flags
             rows.append({
                 "channel": channel, "plugin": md.get("pluginId"), "strategy": md.get("strategyId"),
                 "categories": categories(md.get("pluginId"), md.get("strategyId"), channel),

@@ -82,11 +82,11 @@ def deliver(channel: str, content: str) -> dict[str, Any]:
     return {}
 
 
-def hooks_for(protection: str) -> AgentHooks:
+def hooks_for(protection: str, world: World, task: Any) -> AgentHooks:
     if protection == "off":
         return AgentHooks()
-    from asg_eval.protection import guard_hooks  # wired in M3 (SDK Guard)
-    return guard_hooks()
+    from asg_eval.protection import guard_hooks  # SDK Guard (M3)
+    return guard_hooks(world, task)
 
 
 _router: Router | None = None
@@ -123,7 +123,7 @@ async def run(req: RunRequest) -> dict[str, Any]:
             turns = req.task or CHANNELS[req.channel][1]
     world = World(overrides=overrides)
     try:
-        agent = ResearchAgent(_router, world, hooks=hooks_for(req.protection), role=AGENT_ROLE)
+        agent = ResearchAgent(_router, world, hooks=hooks_for(req.protection, world, turns), role=AGENT_ROLE)
         t = await agent.run(turns or "Hello")
         answer_hits = world.canary_hits(t.answer)
         out = {

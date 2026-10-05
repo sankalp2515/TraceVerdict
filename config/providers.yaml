@@ -36,7 +36,7 @@ providers:
     keys: { env_prefix: GROQ_API_KEY, env_list: GROQ_API_KEYS }
     priority: 1
     timeout_s: 30
-    limits: { rpm: 30 }
+    limits: { rpm: 30, tpm: 8000 }   # Groq free tier: per model (also 1K req and 200K tokens per day)
 
   gemini:
     type: openai_compatible

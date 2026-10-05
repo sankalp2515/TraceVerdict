@@ -28,6 +28,15 @@ roles:
       - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
       - { provider: gemini,     model: gemini-3.1-flash-lite }
 
+  # Headline evaluation and demo video: a single model, no fallback, so numbers are attributable.
+  # Waits out Groq cooldowns rather than switching model (Groq free tier: 8K tokens/min, 200K/day).
+  agent_headline:
+    cache: false
+    wait_on_rate_limit_s: 180
+    defaults: { temperature: 0, max_tokens: 1024 }
+    models:
+      - { provider: groq, model: openai/gpt-oss-120b, price_per_mtok: { input: 0.15, output: 0.60 } }
+
   # Tier-2 AI judge (DecisionModel 'generative_free'). Never given tools.
   judge:
     cache: true

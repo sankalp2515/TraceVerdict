@@ -169,3 +169,49 @@ def test_redact_removes_registered_and_shaped_keys():
     registry.register("my-registered-secret-123")
     s = redact("a my-registered-secret-123 b gsk_" + "A" * 30)
     assert "my-registered" not in s and "gsk_" not in s
+
+
+@respx.mock
+async def test_tpm_throttle_waits_for_the_window():
+    p = prov("a", tpm=1000)
+    r, clock = make_router([p])
+    slept: list[float] = []
+
+    async def fake_sleep(s: float) -> None:
+        slept.append(s)
+        clock.t += s
+
+    r._sleep = fake_sleep
+    respx.post("https://a.test/v1/chat/completions").respond(200, json=OK)
+    big = ChatRequest(messages=[{"role": "user", "content": "x" * 2400}], max_tokens=300)   # ~900 tokens
+    await r.chat("judge", big)
+    await r.chat("judge", ChatRequest(messages=[{"role": "user", "content": "y" * 2400}], max_tokens=300))
+    assert not slept   # first call recorded its real usage (12 tokens), so the second fits
+    r._token_log["a/m"][-1] = (clock.t, 950)
+    await r.chat("judge", ChatRequest(messages=[{"role": "user", "content": "z" * 2400}], max_tokens=300))
+    assert slept and slept[0] > 50
+
+
+@respx.mock
+async def test_wait_on_rate_limit_retries_single_model_role():
+    p = prov("a")
+    r, clock = make_router([p])
+    r.settings.roles["judge"].wait_on_rate_limit_s = 60
+
+    async def fake_sleep(s: float) -> None:
+        clock.t += s
+
+    r._sleep = fake_sleep
+    route = respx.post("https://a.test/v1/chat/completions")
+    route.side_effect = [httpx.Response(429, headers={"retry-after": "20"}), httpx.Response(200, json=OK)]
+    res = await r.chat("judge", req())
+    assert res.provider == "a" and route.call_count == 2
+
+
+@respx.mock
+async def test_wait_on_rate_limit_gives_up_beyond_cap():
+    r, clock = make_router([prov("a")])
+    r.settings.roles["judge"].wait_on_rate_limit_s = 10
+    respx.post("https://a.test/v1/chat/completions").respond(429, headers={"retry-after": "30"})
+    with pytest.raises(AllProvidersFailed):
+        await r.chat("judge", req())

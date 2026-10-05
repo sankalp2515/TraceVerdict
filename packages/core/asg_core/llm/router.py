@@ -107,6 +107,7 @@ class Router:
             name: ProviderHealth() for name in self.settings.providers
         }
         self._throttle_locks: dict[str, asyncio.Lock] = {}
+        self._token_log: dict[str, list[tuple[float, int]]] = {}   # "provider/model" -> [(ts, tokens)]
 
     # ---- plumbing ------------------------------------------------------------------------
     @property
@@ -172,6 +173,37 @@ class Router:
                 await self._sleep(wait)
             h.next_slot = max(now, h.next_slot) + 60.0 / float(p.rpm)
 
+    async def _throttle_tokens(self, p: ProviderConfig, model: str, req: ChatRequest) -> None:
+        """Stay under a tokens-per-minute limit: wait until the last 60 s of usage leaves room."""
+        if not p.tpm:
+            return
+        est = len(json.dumps(req.messages, default=str)) // 4 + (req.max_tokens or 512)
+        est = min(est, int(p.tpm))
+        key = f"{p.name}/{model}"
+        lock = self._throttle_locks.setdefault("tpm:" + key, asyncio.Lock())
+        async with lock:
+            window = self._token_log.setdefault(key, [])
+            while True:
+                now = self._clock()
+                window[:] = [(t, n) for t, n in window if now - t < 60.0]
+                if sum(n for _, n in window) + est <= p.tpm or not window:
+                    break
+                await self._sleep(max(0.5, 60.0 - (now - window[0][0])))
+            window.append((self._clock(), est))
+
+    def _record_tokens(self, p: ProviderConfig, model: str, used: int) -> None:
+        window = self._token_log.get(f"{p.name}/{model}")
+        if window:   # replace the estimate with the real count
+            t, _ = window[-1]
+            window[-1] = (t, used)
+
+    def _shortest_cooldown(self, rc: RoleConfig) -> float | None:
+        now = self._clock()
+        waits = [self.provider_health[m.provider].cooldown_until - now for m in rc.models
+                 if m.provider in self.provider_health and self.settings.providers[m.provider].active]
+        waits = [w for w in waits if w > 0]
+        return min(waits) if waits else None
+
     def _backoff(self, p: ProviderConfig, n: int) -> float:
         return min(p.backoff_max_s, p.backoff_base_s * (2 ** max(0, n - 1))) * (0.8 + 0.4 * random.random())
 
@@ -193,18 +225,26 @@ class Router:
                 return ChatResult(**{**hit, "latency_ms": 0.0, "cached": True, "attempts": []})
 
         attempts: list[Attempt] = []
-        for ref in rc.models:
-            reason = self._skip_reason(ref)
-            if reason:
-                attempts.append(Attempt(ref.provider, ref.model, None, f"skipped:{reason}"))
-                continue
-            result = await self._try_provider(role, ref, req, attempts)
-            if result is not None:
-                if use_cache:
-                    payload = {k: v for k, v in result.__dict__.items() if k not in ("attempts", "cached", "latency_ms")}
-                    self.store.cache_put(ck, payload, rc.cache_ttl_s)
-                return result
-        raise AllProvidersFailed(role, attempts)
+        waited = 0.0
+        while True:
+            for ref in rc.models:
+                reason = self._skip_reason(ref)
+                if reason:
+                    attempts.append(Attempt(ref.provider, ref.model, None, f"skipped:{reason}"))
+                    continue
+                result = await self._try_provider(role, ref, req, attempts)
+                if result is not None:
+                    if use_cache:
+                        payload = {k: v for k, v in result.__dict__.items() if k not in ("attempts", "cached", "latency_ms")}
+                        self.store.cache_put(ck, payload, rc.cache_ttl_s)
+                    return result
+            # Every candidate failed. If the role allows it, wait out the shortest provider cooldown.
+            wait = self._shortest_cooldown(rc)
+            if wait is None or waited + wait > rc.wait_on_rate_limit_s:
+                raise AllProvidersFailed(role, attempts)
+            log.info("role %s: all providers cooling down; waiting %.1fs", role, wait)
+            await self._sleep(wait + 0.5)
+            waited += wait + 0.5
 
     async def _try_provider(self, role: str, ref: ModelRef, req: ChatRequest,
                             attempts: list[Attempt]) -> ChatResult | None:
@@ -218,6 +258,7 @@ class Router:
                 return None
             key = keys[0]
             await self._throttle(p)
+            await self._throttle_tokens(p, ref.model, req)
             t0 = time.perf_counter()
             try:
                 r: AdapterResponse = await adapter.chat(p, key, ref.model, req, self.client, ref.params)
@@ -260,6 +301,7 @@ class Router:
             h.rate_limit_streak = 0
             kh = self._kh(key)
             kh.last_status, kh.last_used = "ok", self._clock()
+            self._record_tokens(p, ref.model, r.input_tokens + r.output_tokens)
             cost = (r.input_tokens * ref.price_in + r.output_tokens * ref.price_out) / 1_000_000
             attempts.append(Attempt(p.name, ref.model, key.alias, "ok", ms))
             self.store.record_usage(role=role, provider=p.name, key_alias=key.alias, model=ref.model, status="ok",
@@ -278,6 +320,7 @@ class Router:
         key = key or self.healthy_keys(p)[0]
         adapter = get_adapter(p.type)
         await self._throttle(p)
+        await self._throttle_tokens(p, model, req)
         t0 = time.perf_counter()
         try:
             r = await adapter.chat(p, key, model, req, self.client)

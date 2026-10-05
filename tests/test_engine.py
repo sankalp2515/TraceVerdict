@@ -47,8 +47,9 @@ async def test_clean_fast_path_unchanged_and_logged(policy):
     content = "  Quarterly revenue was 4.2 million.\n"
     r = await e.inspect(content, "web", policy.agent)
     assert r.decision == r.enforced == Decision.ALLOW
-    assert r.cleaned_content == content and r.tier == 0 and not r.degraded
-    assert not e.classifiers[0].calls and e.decision_model.calls == 0
+    # Tier 1 scores all untrusted content (D-019); low scores never reach the judge and change nothing.
+    assert r.cleaned_content == content and r.tier == 1 and not r.degraded
+    assert e.classifiers[0].calls and e.decision_model.calls == 0
     rows = e.logger.decisions()
     assert len(rows) == 1 and rows[0]["event_id"] == r.event_id and rows[0]["policy_rule"] == "allow"
 
@@ -364,3 +365,17 @@ def test_constructor_rejects_invalid_limits(policy):
         engine(policy, segment_chars=0)
     with pytest.raises(ValueError):
         engine(policy, cache_size=-1)
+
+
+async def test_unflagged_plain_text_is_classified_and_escalated(policy):
+    """D-019: content with no structural signal still reaches Tier 1; a high score escalates to the judge."""
+    e = engine(policy, malicious=0.9, classifiers=[Scorer(0.99)])
+    r = await e.inspect("Ordinary words. " + MARKER + " more words.", "web", policy.agent, fmt="text")
+    assert e.classifiers[0].calls and e.decision_model.calls == 1
+    assert r.decision in (Decision.NEUTRALISE, Decision.BLOCK)
+
+
+async def test_unflagged_low_score_skips_judge(policy):
+    e = engine(policy, malicious=0.9, classifiers=[Scorer(0.1)])
+    r = await e.inspect("Ordinary words. " + MARKER, "web", policy.agent, fmt="text")
+    assert r.decision == Decision.ALLOW and e.decision_model.calls == 0

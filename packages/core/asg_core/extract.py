@@ -49,6 +49,11 @@ class ExtractedDoc:
         return self
 
 
+def _short_metadata(value: object) -> bool:
+    """Titles and author names are ordinary (shown in viewers); long metadata text is unusual, so flag it."""
+    return value is not None and len(str(value).split()) <= 12
+
+
 def _add(doc: ExtractedDoc, text: str | None, origin: str, visible: bool = True) -> None:
     if text is None:
         return
@@ -256,7 +261,7 @@ def _pdf(data: bytes | str, doc: ExtractedDoc) -> None:
     meta = reader.metadata or {}
     for k, v in meta.items():
         if k not in ("/Producer", "/CreationDate", "/ModDate", "/Creator"):
-            _add(doc, v, f"pdf:metadata:{k.strip('/')}", visible=False)
+            _add(doc, v, f"pdf:metadata:{k.strip('/')}", visible=_short_metadata(v))
     for pno, page in enumerate(reader.pages, 1):
         for a in page.get("/Annots") or []:
             try:
@@ -321,7 +326,8 @@ def _docx(data: bytes | str, doc: ExtractedDoc) -> None:
         _add(doc, hid, "docx:hidden-run", visible=False)
     cp = d.core_properties
     for k in ("title", "subject", "keywords", "comments", "author", "category"):
-        _add(doc, getattr(cp, k, None), f"docx:property:{k}", visible=False)
+        val = getattr(cp, k, None)
+        _add(doc, val, f"docx:property:{k}", visible=_short_metadata(val))
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         if "word/comments.xml" in z.namelist():
             from bs4 import BeautifulSoup

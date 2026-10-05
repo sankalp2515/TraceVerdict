@@ -37,9 +37,10 @@ def categories(plugin: str | None, strategy: str | None, channel: str) -> list[s
     return sorted(cats)
 
 
-def load_results(protection: str) -> list[dict[str, Any]]:
+def load_results(protection: str, suite: str = "") -> list[dict[str, Any]]:
     rows = []
-    for f in sorted(PF_OUT.glob(f"*.{protection}.results.json")):
+    pattern = f"*.{protection}.{suite}.results.json" if suite else f"*.{protection}.results.json"
+    for f in sorted(PF_OUT.glob(pattern)):
         channel = f.name.split(".")[0]
         data = json.loads(f.read_text(encoding="utf-8"))
         for r in data["results"]["results"]:
@@ -65,8 +66,8 @@ def rate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "asr": round(hit / len(ok), 3) if ok else None}
 
 
-def build(protection: str, name: str) -> dict[str, Any]:
-    rows = load_results(protection)
+def build(protection: str, name: str, suite: str = "", agent_role: str = "agent_eval") -> dict[str, Any]:
+    rows = load_results(protection, suite)
     by_cat: dict[str, list] = defaultdict(list)
     by_ch: dict[str, list] = defaultdict(list)
     by_plugin: dict[str, list] = defaultdict(list)
@@ -76,7 +77,7 @@ def build(protection: str, name: str) -> dict[str, Any]:
         by_ch[r["channel"]].append(r)
         by_plugin[f"{r['plugin']}|{r['strategy'] or 'none'}"].append(r)
     outcome_counts = {k: sum(r["outcomes"].get(k, False) for r in rows) for k in OUTCOMES}
-    benign_f = ROOT / "data" / "eval_runs" / f"benign.{protection}.agent_eval.json"
+    benign_f = ROOT / "data" / "eval_runs" / f"benign.{protection}.{agent_role}.json"
     benign = json.loads(benign_f.read_text()) if benign_f.exists() else None
     try:
         sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT).stdout.strip()
@@ -84,7 +85,7 @@ def build(protection: str, name: str) -> dict[str, Any]:
         sha = None
     return {
         "name": name, "protection": protection, "date": dt.date.today().isoformat(), "git_sha": sha,
-        "agent_role": "agent_eval", "generators": {"promptfoo": "0.120.19"},
+        "agent_role": agent_role, "suite": suite or "broad", "generators": {"promptfoo": "0.120.19"},
         "overall": rate(rows),
         "by_category": {c: rate(v) for c, v in sorted(by_cat.items())},
         "by_channel": {c: rate(v) for c, v in sorted(by_ch.items())},
@@ -119,8 +120,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--protection", default="off")
     ap.add_argument("--name", default="baseline")
+    ap.add_argument("--suite", default="", help="e.g. headline (matches *.<protection>.<suite>.results.json)")
+    ap.add_argument("--agent-role", default="agent_eval")
     a = ap.parse_args()
-    rep = build(a.protection, a.name)
+    rep = build(a.protection, a.name, a.suite, a.agent_role)
     REPORTS.mkdir(parents=True, exist_ok=True)
     stem = REPORTS / f"{rep['date']}-{a.name}-{a.protection}"
     stem.with_suffix(".json").write_text(json.dumps(rep, indent=2))

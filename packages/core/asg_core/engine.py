@@ -39,6 +39,7 @@ class _Scan:
     view: str
     findings: list[Finding]
     chunks: list[tuple[int, int, str, str]]
+    all_chunks: list[tuple[int, int, str, str]] | None = None   # every chunk, for Tier 1 on unflagged content
 
 
 def _probability(value: float) -> float:
@@ -139,7 +140,7 @@ class Engine:
 
     def _scan(self, content: str | bytes, source: str, filename: str | None, fmt: str | None) -> _Scan:
         doc = extract(content, fmt=fmt, filename=filename, source=source)
-        findings, chunks, views = [], [], []
+        findings, chunks, views, all_chunks = [], [], [], []
         for segment in doc.segments:
             views.append(normalise(segment.text).text)
             encoded = list(self._encoded.finditer(segment.text))
@@ -160,11 +161,13 @@ class Engine:
                     findings.append(Finding(span=span, preview=text, origin=segment.origin,
                                             signal="normalisation:" + json.dumps(norm.changes, sort_keys=True),
                                             labels=["Encoded Instructions"]))
-                if signals:
-                    for _, view in norm.views():
-                        for start in range(0, len(view), self.segment_chars):
-                            chunks.append((*span, segment.origin, view[start:start + self.segment_chars]))
-        return _Scan(doc, "\n".join(views), findings, chunks)
+                for _, view in norm.views():
+                    for start in range(0, len(view), self.segment_chars):
+                        chunk = (*span, segment.origin, view[start:start + self.segment_chars])
+                        all_chunks.append(chunk)
+                        if signals:
+                            chunks.append(chunk)
+        return _Scan(doc, "\n".join(views), findings, chunks, all_chunks)
 
     async def _scores(self, chunks: list[tuple[int, int, str, str]]) -> list[Finding]:
         scorers = self.classifiers
@@ -313,6 +316,29 @@ class Engine:
             tier = 2
             assessment, budget_degraded = await self._judge(scan, source, session.task or policy.task_scope, policy, agent_id)
             degraded |= assessment.degraded
+        elif scan.all_chunks and source != "system":
+            # No structural signal: Tier 1 scores every chunk; only chunks at or above the policy's
+            # escalation threshold go to the Tier 2 judge (D-011: the classifier never decides alone).
+            tier = 1
+            score_key = self._key("scores-all", key)
+            scored = self._get(score_key)
+            if scored is None:
+                try:
+                    scored = await asyncio.wait_for(self._scores(scan.all_chunks), self.tier1_timeout_s * 4)
+                    self._put(score_key, scored)
+                except Exception:
+                    degraded = True
+                    scored = []
+            low = policy.thresholds.escalate_band[0]
+            hot_spans = {(f.span, f.origin) for f in scored if f.score >= low}
+            if hot_spans:
+                findings.extend(f.model_copy(deep=True) for f in scored if f.score >= low)
+                scan.chunks = [c for c in scan.all_chunks if ((c[0], c[1]), c[2]) in hot_spans]
+                if source != "user":
+                    session.flagged_untrusted = True
+                tier = 2
+                assessment, budget_degraded = await self._judge(scan, source, session.task or policy.task_scope, policy, agent_id)
+                degraded |= assessment.degraded
         judge_labels = sorted(k for k, score in assessment.categories.items() if k in ATTACK_TYPES and score > 0)
         judge_labels = judge_labels or (["Instruction Override"] if source == "user" else ["Indirect Prompt Injection"])
         if assessment.malicious > 0 and not assessment.degraded:

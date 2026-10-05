@@ -45,6 +45,7 @@ class ProviderConfig:
     circuit_open_s: float = 60
     key_rotation: str = "on_auth_failure"
     rpm: float | None = None
+    tpm: float | None = None              # tokens per minute, per model (provider limits are per model)
     daily_token_budget: int | None = None
     extra_headers: dict[str, str] = field(default_factory=dict)
     options: dict[str, Any] = field(default_factory=dict)
@@ -78,6 +79,7 @@ class RoleConfig:
     cache: bool = True
     cache_ttl_s: int = 86400
     defaults: dict[str, Any] = field(default_factory=dict)
+    wait_on_rate_limit_s: float = 0.0   # >0: wait out a provider cooldown (up to this long) instead of failing
 
 
 @dataclass
@@ -123,6 +125,7 @@ def load_providers(path: Path | None = None) -> dict[str, ProviderConfig]:
             circuit_open_s=float(merged.get("circuit_open_s", 60)),
             key_rotation=str(merged.get("key_rotation", "on_auth_failure")),
             rpm=limits.get("rpm"),
+            tpm=limits.get("tpm"),
             daily_token_budget=budget.get("daily_tokens"),
             extra_headers=dict(merged.get("extra_headers") or {}),
             options={k: v for k, v in merged.items() if k not in known},
@@ -151,6 +154,7 @@ def load_roles(path: Path | None = None) -> dict[str, RoleConfig]:
             cache=bool(r.get("cache", True)),
             cache_ttl_s=int(r.get("cache_ttl_s", 86400)),
             defaults=dict(r.get("defaults") or {}),
+            wait_on_rate_limit_s=float(r.get("wait_on_rate_limit_s", 0.0)),
         )
     return out
 

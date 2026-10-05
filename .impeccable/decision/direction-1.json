@@ -1,0 +1,131 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned Chain of Custody. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Chain of Custody",
+      "kicker": "THE ROLL",
+      "lineage": "Forensic evidence handling: tamper-evident bags, exhibit tags, custody logs",
+      "thesis": "Every input the agent touches is booked in as an exhibit: tagged, inspected, sealed or released, with its custody trail on record.",
+      "palette": ["#EEF1F2", "#14171A", "#1F3A93", "#D9C08A", "#C8102E"],
+      "materials": ["printed polyethylene evidence bag with custody grid", "manila exhibit tags with punched eyelets", "tamper-evident seal tape", "carbon-copy custody log"],
+      "viewport": "The hero is a live evidence bag: an incoming document is booked in, its custody grid fills line by line as the gateway inspects it, the one hidden span is cut out under seal tape, and the bag's sign-off line is the action: Run the live demo.",
+      "risk": "Drifts into crime-drama theatre if seals and tape decorate instead of marking real decisions.",
+      "raised": [
+        {"from": "challenger-hypercard", "raise": "Every custody entry is addressable: each logged decision has its own link, and Back retraces the exact trail."},
+        {"from": "challenger-sixpack", "raise": "No bare numbers: every measured result is shown against its unprotected baseline."},
+        {"from": "challenger-miura", "raise": "One Protection switch propagates across the whole demo state, not a per-panel toggle."},
+        {"from": "challenger-noir", "raise": "Two-ink discipline: carbon and custody blue carry the page; seal red appears only where something was actually stopped."},
+        {"from": "challenger-ikebana", "raise": "The decisive moment, the removed span, sits alone in a held empty field."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Red and Green Channel",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Airport customs halls: green 'nothing to declare', red 'goods to declare'",
+      "thesis": "Every input walks the green or the red channel; most pass untouched, a few are laid out on the inspection table.",
+      "palette": ["#FFFFFF", "#2B2F33", "#0B6E4F", "#C62828", "#FFC72C"],
+      "materials": ["airport wayfinding signage", "stainless inspection table", "customs declaration form"],
+      "viewport": "A two-lane hall: content streams down the green channel while one item is pulled to the red-channel table, where its hidden span is laid out and confiscated.",
+      "risk": "The most literal reading of 'checkpoint'; signage worlds look familiar fast."
+    },
+    {
+      "id": "challenger-sixpack",
+      "label": "Night Instrument Six-Pack",
+      "verdict": "competitive",
+      "lineage": "Light-aircraft instrument panels flown at night",
+      "thesis": "The evidence as six calm instruments a reviewer cross-checks: attack success, false alarms, utility, latency, cost, leaks.",
+      "palette": ["#0A0C0E", "#F2F2F0", "#5BE38A", "#F2A93B", "#E5484D"],
+      "materials": ["matte black panel", "luminous dial markings", "damped needles"],
+      "viewport": "Six gauges with needles at the protected values and the unprotected baseline ghosted behind each.",
+      "case": "Holds product clarity for the scorecard; loses audience identification, since reviewers are not pilots.",
+      "risk": "Close to the dark security-dashboard default the brief rules out.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-night-flight-six-pack-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-night-flight-six-pack.webp"
+    },
+    {
+      "id": "challenger-hypercard",
+      "label": "HyperCard Stack",
+      "verdict": "declined",
+      "lineage": "1987 HyperCard stacks",
+      "thesis": "Sessions as a stack of linked cards you flip through.",
+      "palette": ["#FFFFFF", "#000000", "#8A8A8A"],
+      "materials": ["one-bit dither", "painted buttons"],
+      "viewport": "A replay card with painted buttons linking each step.",
+      "case": "Fuses poorly: retro-computing undercuts enterprise trust and investors do not identify with it.",
+      "kept": "Every step is addressable and Back retraces the exact trail.",
+      "risk": "Reads as nostalgia, not security.",
+      "hero": "https://impeccable.style/worlds/cards/medium-native-hypercard-stack-shoebox-hero.webp"
+    },
+    {
+      "id": "challenger-noir",
+      "label": "Noir One-Sheet",
+      "verdict": "declined",
+      "lineage": "Postwar crime-film posters in two inks",
+      "thesis": "The attack as a long shadow the gateway catches.",
+      "palette": ["#111111", "#E0A526", "#EFE6D2"],
+      "materials": ["duotone print", "cast shadow"],
+      "viewport": "A small agent figure with a huge hostile shadow across the page.",
+      "case": "Fuses poorly: dramatizes fear, which the brief rules out.",
+      "kept": "Total two-ink commitment.",
+      "risk": "Fear aesthetic.",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-noir-one-sheet-duotone-hero.webp"
+    },
+    {
+      "id": "challenger-miura",
+      "label": "Miura-Fold Sheet",
+      "verdict": "declined",
+      "lineage": "Deployable space-structure folding",
+      "thesis": "One pull deploys the whole protection field.",
+      "palette": ["#FAFAFA", "#C9A227", "#8C8C8C", "#9EC3E6", "#1A1A1A"],
+      "materials": ["scored paper", "gold foil packet"],
+      "viewport": "A folded packet that opens into the product's surfaces.",
+      "case": "Fuses poorly: elegant but says nothing about inspection or evidence.",
+      "kept": "One control propagates across the whole sheet.",
+      "risk": "Abstract; hides the offer.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-miura-orbit-sheet-hero.webp"
+    },
+    {
+      "id": "challenger-ikebana",
+      "label": "Ikebana Alcove",
+      "verdict": "declined",
+      "lineage": "Tokonoma arrangements and ma",
+      "thesis": "Protection as what is removed, leaving active emptiness.",
+      "palette": ["#ECE7DD", "#6B5E4B", "#3D5A99", "#4A3B2A"],
+      "materials": ["plaster", "pine", "bronze"],
+      "viewport": "One branch, three irises, a charged empty field.",
+      "case": "Fuses poorly: too quiet to persuade; no audience link.",
+      "kept": "The decisive element sits alone in held emptiness.",
+      "risk": "Reads as wellness, not security.",
+      "hero": "https://impeccable.style/worlds/cards/growth-metamorphosis-branching-ikebana-ma-arrangement-hero.webp"
+    },
+    {
+      "id": "challenger-secession",
+      "label": "Secession Review Page",
+      "verdict": "declined",
+      "lineage": "Kraków Młoda Polska periodicals",
+      "thesis": "Content as a clearing inside an ornamental border.",
+      "palette": ["#F3ECDD", "#5F7F4F", "#C98B8B", "#3B4452"],
+      "materials": ["flat-ink ornament", "hand-drawn lettering"],
+      "viewport": "A folk-flower border growing in around the promise.",
+      "case": "Fuses poorly: decorative heritage with no tie to agents or evidence.",
+      "kept": "One calm, unbroken reading column.",
+      "risk": "Ornament over usability.",
+      "hero": "https://impeccable.style/worlds/cards/design-canon-mloda-polska-secession-page-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": false },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What enterprise security vendors ship, executed impeccably.",
+    "palette": ["#0B1220", "#FFFFFF", "#2563EB", "#10B981"],
+    "materials": ["clean grid", "product screenshots", "logo row"],
+    "viewport": "Headline, subcopy and a demo button on the left, a product screenshot on the right, proof row below.",
+    "risk": "Indistinguishable from every other security vendor by design."
+  },
+  "steer": true
+}

@@ -25,3 +25,6 @@ eval/garak/runs/
 !apps/console/.env.development
 apps/console/node_modules/
 apps/console/dist/
+.claude/skills/
+.impeccable/questions/
+.impeccable/review/

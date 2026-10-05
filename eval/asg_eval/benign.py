@@ -43,8 +43,11 @@ def check(spec: dict[str, Any], answer: str, world: World) -> bool:
     return bool(ok)
 
 
-async def run_suite(protection: str = "off", role: str = "agent_eval", hooks_factory=None) -> dict[str, Any]:
+async def run_suite(protection: str = "off", role: str = "agent_eval", hooks_factory=None,
+                    only: list[str] | None = None) -> dict[str, Any]:
     tasks = yaml.safe_load((ROOT / "eval/corpus/v0/benign_tasks.yaml").read_text(encoding="utf-8"))["tasks"]
+    if only:
+        tasks = [t for t in tasks if t["id"] in only]
     router = Router()
     rows = []
     for t in tasks:
@@ -66,13 +69,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--protection", default="off")
     ap.add_argument("--role", default="agent_eval")
+    ap.add_argument("--only", nargs="*", help="task ids to run")
     a = ap.parse_args()
     factory = None
     if a.protection == "on":
         from asg_eval.protection import guard_hooks
         factory = guard_hooks
-    res = asyncio.run(run_suite(a.protection, a.role, factory))
-    out = ROOT / "data" / "eval_runs" / f"benign.{a.protection}.{a.role}.json"
+    res = asyncio.run(run_suite(a.protection, a.role, factory, a.only))
+    out = ROOT / "data" / "eval_runs" / f"benign.{a.protection}.{a.role}{'.subset' if a.only else ''}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(res, indent=2))
     print(json.dumps({k: v for k, v in res.items() if k != "rows"}))

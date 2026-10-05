@@ -20,6 +20,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
 from asg_core.engine import Engine
+from asg_core.llm.router import Router
 from asg_core.policy import AgentPolicy, load_policy
 from asg_core.session import Session
 from asg_core.types import ActionResult, Decision, InspectResult
@@ -38,14 +39,21 @@ class ToolBlocked(Exception):
 
 class Guard:
     def __init__(self, agent_id: str, engine: Engine | None = None, mode: str | None = None,
-                 policy: AgentPolicy | None = None, secrets: list[str] | None = None) -> None:
+                 policy: AgentPolicy | None = None, secrets: list[str] | None = None,
+                 engine_options: dict[str, Any] | None = None, warm_up: bool = True) -> None:
         self.agent_id = agent_id
         self._policy = policy or load_policy(agent_id)
         if mode:
             self._policy.mode = mode
-        self.engine = engine or Engine(policy_loader=self._load)
+        if engine is None:
+            router = Router()   # shares the persistent store (settings.db_path) for usage, cache and decisions
+            opts = {"tier0_timeout_s": 10.0, **(engine_options or {})}   # extraction incl. OCR on CPU
+            engine = Engine(policy_loader=self._load, router=router, store=router.store, **opts)
+        self.engine = engine
         if secrets:
             self.engine.register_secrets(secrets)
+        if warm_up:
+            _warm_up()
 
     def _load(self, agent_id: str) -> AgentPolicy:
         return self._policy if agent_id == self.agent_id else load_policy(agent_id)
@@ -92,6 +100,8 @@ class Guard:
                        session_id: str | None = None) -> str:
         """Return what the agent should see: cleaned content, or a safe notice when blocked."""
         r = await self.ainspect_result(content, source, filename, session_id)
+        if r.enforced == Decision.ALLOW and isinstance(content, str):
+            return content   # allowed text passes unchanged (G3b); files return their extracted view
         if r.enforced == Decision.BLOCK:
             return f"[Content from {source} was withheld by the security policy: {r.reason}]"
         if r.enforced == Decision.ESCALATE:
@@ -169,6 +179,26 @@ class Guard:
             return wrapper
 
         return deco
+
+
+def _warm_up() -> None:
+    """Load the local classifier and OCR once so the first real inspection is not slowed down."""
+    try:
+        import io
+
+        from PIL import Image, ImageDraw
+
+        from asg_core import extract as _extract
+        from asg_core.classifier import local_classifier
+
+        local_classifier()
+        img = Image.new("RGB", (160, 40), "white")
+        ImageDraw.Draw(img).text((5, 10), "warm up", fill="black")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        _extract.extract(buf.getvalue(), fmt="image")
+    except Exception as e:  # warm-up is best effort
+        log.info("warm-up skipped (%s)", type(e).__name__)
 
 
 def _run(coro: Any) -> Any:

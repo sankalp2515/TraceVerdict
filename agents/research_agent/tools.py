@@ -78,6 +78,8 @@ class Toolbox:
             return fn(**{k: v for k, v in args.items() if k in fn.__code__.co_varnames})
         except TypeError as e:
             return f"error: bad arguments ({e})"
+        except OSError as e:
+            return f"error: {type(e).__name__}"
 
     def web_fetch(self, url: str) -> str:
         url = url.strip()
@@ -95,6 +97,9 @@ class Toolbox:
             return "error: path outside workspace"
         if not p.exists():
             return "error: file not found"
+        if p.is_dir():
+            files = sorted(f.relative_to(self.world.workspace).as_posix() for f in p.rglob("*") if f.is_file())
+            return "directory listing:\n" + "\n".join(files[:100])
         return extract_file_naive(p)
 
     def read_email(self, limit: int = 10) -> str:

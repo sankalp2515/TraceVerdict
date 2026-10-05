@@ -7,6 +7,7 @@ routes user turns and tool results through `guard.ainspect` and every tool call 
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,11 @@ class GuardHooks(AgentHooks):
     async def on_content(self, source: str, content: str, meta: dict[str, Any]) -> str:
         sid = self.session.session_id
         if source == "user":
+            # The signed-in user is trusted: a customer they name becomes the trusted (pinned) value.
+            ids = re.findall(r"\bC-\d{4}\b", content)
+            if ids:
+                self.session.trusted["customer_id"] = ids[-1]
+                self.session.note_trusted(content)
             return await self.guard.ainspect(content, "user", session_id=sid)
         tool = meta.get("tool")
         if tool == "read_file":

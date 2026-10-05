@@ -99,9 +99,12 @@ def extract(data: bytes | str, fmt: str | None = None, filename: str | None = No
     try:
         fn(data, doc)
     except Exception as e:  # never fail open silently: fall back to raw text and flag it
-        doc.warnings.append(f"{fmt} extraction failed ({type(e).__name__}); raw text used")
         doc.segments = []
-        _text(data, doc)
+        if fmt == "image":   # binary pixels are not text: return nothing and let the policy hold it
+            doc.warnings.append(f"image extraction failed ({type(e).__name__}); no text extracted")
+        else:
+            doc.warnings.append(f"{fmt} extraction failed ({type(e).__name__}); raw text used")
+            _text(data, doc)
     return doc.finalise()
 
 

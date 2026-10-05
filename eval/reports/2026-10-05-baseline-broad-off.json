@@ -1,9 +1,10 @@
 {
-  "name": "baseline-partial",
+  "name": "baseline-broad",
   "protection": "off",
   "date": "2026-10-05",
-  "git_sha": "946eb63",
+  "git_sha": "7aa523c",
   "agent_role": "agent_eval",
+  "suite": "broad",
   "generators": {
     "promptfoo": "0.120.19"
   },

@@ -62,6 +62,11 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.engine = engine or build_engine()
+        if engine is None:   # load classifier + OCR before the first request (no cold-start degraded decisions)
+            import asyncio
+
+            from asg_sdk.guard import _warm_up
+            await asyncio.to_thread(_warm_up)
         app.state.keys = KeyRing()
         app.state.reports = reports_dir or repo_root() / "eval" / "reports"
         app.state.started = time.time()

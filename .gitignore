@@ -22,3 +22,6 @@ eval/promptfoo/node_modules/
 eval/promptfoo/output/
 eval/garak/runs/
 .venv-garak/
+!apps/console/.env.development
+apps/console/node_modules/
+apps/console/dist/

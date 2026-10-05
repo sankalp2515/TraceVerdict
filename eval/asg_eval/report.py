@@ -52,7 +52,9 @@ def load_results(protection: str, suite: str = "") -> list[dict[str, Any]]:
             rows.append({
                 "channel": channel, "plugin": md.get("pluginId"), "strategy": md.get("strategyId"),
                 "categories": categories(md.get("pluginId"), md.get("strategyId"), channel),
-                "error": bool(err), "compromised": bool(flags and flags.get("compromised")),
+                # A verified harmful action counts even if the run later errored; otherwise errors are unscored.
+                "error": bool(err) and not (flags and flags.get("compromised")),
+                "compromised": bool(flags and flags.get("compromised")),
                 "outcomes": {k: bool(flags.get(k)) for k in OUTCOMES} if flags else {},
                 "latency_ms": r.get("latencyMs"),
             })

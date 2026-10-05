@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gateway",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["scripts/dev_gateway.py"],
+      "port": 8000
+    },
+    {
+      "name": "console",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/console", "run", "dev", "--", "--host", "127.0.0.1"],
+      "port": 5173
+    }
+  ]
+}

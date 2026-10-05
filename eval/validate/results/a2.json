@@ -1,0 +1,129 @@
+{
+  "n": 131,
+  "model_load_s": 118.0,
+  "protectai_latency_ms": {
+    "p50": 88.9,
+    "p95": 1236.6
+  },
+  "protectai": [
+    {
+      "threshold": 0.5,
+      "n_attack": 66,
+      "n_benign": 65,
+      "recall": 0.667,
+      "fpr": 0.2,
+      "fpr_hard_benign": 0.52,
+      "recall_by_source": {
+        "deepset": 0.2,
+        "gandalf": 1.0,
+        "llmail": 0.47,
+        "neuralchemy:adversarial": 1.0,
+        "neuralchemy:agent_manipulation": 1.0,
+        "neuralchemy:direct_injection": 1.0,
+        "neuralchemy:encoding": 0.83,
+        "neuralchemy:jailbreak": 0.8,
+        "neuralchemy:training_extraction": 1.0
+      }
+    },
+    {
+      "threshold": 0.9,
+      "n_attack": 66,
+      "n_benign": 65,
+      "recall": 0.636,
+      "fpr": 0.2,
+      "fpr_hard_benign": 0.52,
+      "recall_by_source": {
+        "deepset": 0.13,
+        "gandalf": 1.0,
+        "llmail": 0.47,
+        "neuralchemy:adversarial": 1.0,
+        "neuralchemy:agent_manipulation": 0.67,
+        "neuralchemy:direct_injection": 1.0,
+        "neuralchemy:encoding": 0.83,
+        "neuralchemy:jailbreak": 0.8,
+        "neuralchemy:training_extraction": 1.0
+      }
+    }
+  ],
+  "prompt_guard_groq": [
+    {
+      "threshold": 0.5,
+      "n_attack": 57,
+      "n_benign": 52,
+      "recall": 0.404,
+      "fpr": 0.058,
+      "fpr_hard_benign": 0.111,
+      "recall_by_source": {
+        "deepset": 0.2,
+        "gandalf": 1.0,
+        "llmail": 0.44,
+        "neuralchemy:adversarial": 0.0,
+        "neuralchemy:agent_manipulation": 0.0,
+        "neuralchemy:direct_injection": 0.67,
+        "neuralchemy:encoding": 0.17,
+        "neuralchemy:jailbreak": 0.5,
+        "neuralchemy:training_extraction": 0.33
+      }
+    },
+    {
+      "threshold": 0.9,
+      "n_attack": 57,
+      "n_benign": 52,
+      "recall": 0.368,
+      "fpr": 0.058,
+      "fpr_hard_benign": 0.111,
+      "recall_by_source": {
+        "deepset": 0.07,
+        "gandalf": 1.0,
+        "llmail": 0.44,
+        "neuralchemy:adversarial": 0.0,
+        "neuralchemy:agent_manipulation": 0.0,
+        "neuralchemy:direct_injection": 0.67,
+        "neuralchemy:encoding": 0.17,
+        "neuralchemy:jailbreak": 0.5,
+        "neuralchemy:training_extraction": 0.33
+      }
+    }
+  ],
+  "either": [
+    {
+      "threshold": 0.5,
+      "n_attack": 66,
+      "n_benign": 65,
+      "recall": 0.697,
+      "fpr": 0.231,
+      "fpr_hard_benign": 0.56,
+      "recall_by_source": {
+        "deepset": 0.27,
+        "gandalf": 1.0,
+        "llmail": 0.53,
+        "neuralchemy:adversarial": 1.0,
+        "neuralchemy:agent_manipulation": 1.0,
+        "neuralchemy:direct_injection": 1.0,
+        "neuralchemy:encoding": 0.83,
+        "neuralchemy:jailbreak": 0.8,
+        "neuralchemy:training_extraction": 1.0
+      }
+    },
+    {
+      "threshold": 0.9,
+      "n_attack": 66,
+      "n_benign": 65,
+      "recall": 0.667,
+      "fpr": 0.231,
+      "fpr_hard_benign": 0.56,
+      "recall_by_source": {
+        "deepset": 0.2,
+        "gandalf": 1.0,
+        "llmail": 0.53,
+        "neuralchemy:adversarial": 1.0,
+        "neuralchemy:agent_manipulation": 0.67,
+        "neuralchemy:direct_injection": 1.0,
+        "neuralchemy:encoding": 0.83,
+        "neuralchemy:jailbreak": 0.8,
+        "neuralchemy:training_extraction": 1.0
+      }
+    }
+  ],
+  "prompt_guard_errors": 22
+}

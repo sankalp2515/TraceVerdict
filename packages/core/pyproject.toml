@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asg-core"
+version = "0.1.0"
+description = "Core Engine of the Agent Security Gateway (working name)"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.6",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+classifiers = ["onnxruntime>=1.17", "tokenizers>=0.15", "huggingface_hub>=0.23", "numpy>=1.26"]
+
+[project.scripts]
+asg = "asg_core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["asg_core*"]

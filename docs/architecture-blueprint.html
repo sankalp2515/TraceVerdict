@@ -1,0 +1,739 @@
+<title>Agent Security Gateway Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a technical blueprint — sticky section nav, a light "drawing sheet" for every diagram, legend-coded components. */
+:root {
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --fg: #141A22;
+  --muted: #5A6675;
+  --line: #D9DFE6;
+  --accent: #0E6A86;
+  --accent-soft: #E3F1F5;
+  --sheet: #FBFCFD;
+  --sheet-line: #DCE3EA;
+  --c-entry: #DCEBFB; --c-entry-b: #4A7FC0;
+  --c-core: #DDF2E3;  --c-core-b: #3F8F5A;
+  --c-ai: #FBF0D2;    --c-ai-b: #B98A1C;
+  --c-ext: #ECEEF1;   --c-ext-b: #7C8794;
+  --c-bad: #FBE0DE;   --c-bad-b: #C2473D;
+  --c-store: #EDE4F7; --c-store-b: #7B5AA6;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F141A; --surface: #161C24; --fg: #E4E9EF; --muted: #98A3B1; --line: #273140;
+    --accent: #5BB8D6; --accent-soft: #15303A; --sheet: #E9EEF3; --sheet-line: #C9D2DC;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F141A; --surface: #161C24; --fg: #E4E9EF; --muted: #98A3B1; --line: #273140;
+  --accent: #5BB8D6; --accent-soft: #15303A; --sheet: #E9EEF3; --sheet-line: #C9D2DC;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 28px; font-weight: 700; }
+h3 { font-size: 19px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: 13px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { color: var(--muted); font-size: 17px; }
+
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+nav.toc .row { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 10px; display: flex; gap: 6px; overflow-x: auto; }
+nav.toc a { flex: 0 0 auto; font-size: 13px; text-decoration: none; color: var(--muted); padding: 5px 10px; border-radius: 6px; white-space: nowrap; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--fg); background: var(--accent-soft); outline: none; }
+
+header.hero { display: grid; gap: 14px; padding-block: 10px 30px; border-bottom: 1px solid var(--line); }
+section { padding-block: 40px 8px; display: grid; gap: 18px; scroll-margin-top: 60px; }
+.section-head { display: grid; gap: 8px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+
+.sheet { background: var(--sheet); border: 1px solid var(--sheet-line); border-radius: 10px; padding: 18px; overflow-x: auto;
+  background-image: linear-gradient(var(--sheet-line) 1px, transparent 1px), linear-gradient(90deg, var(--sheet-line) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px; }
+.sheet pre.mermaid { margin: 0; background: transparent; color: #141A22; display: flex; justify-content: center; min-width: 560px; }
+
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.method div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 4px; min-width: 0; }
+.method b { font-family: var(--display); font-size: 16px; }
+.method p { color: var(--muted); font-size: 14px; }
+
+.steps { display: grid; gap: 26px; }
+.step { display: grid; gap: 10px; }
+.step-q { display: flex; gap: 12px; align-items: baseline; }
+.step-q .n { font-family: var(--mono); font-size: 13px; color: var(--accent); flex: 0 0 auto; }
+.step-q h3 { font-size: 20px; }
+.step .why { color: var(--muted); font-size: 14px; }
+.added { font-family: var(--mono); font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 4px; }
+
+.comp { border-top: 3px solid var(--comp-color, var(--accent)); background: var(--surface); border-radius: 0 0 10px 10px; border-inline: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px; display: grid; gap: 18px; }
+.comp-head { display: grid; gap: 6px; }
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card h4 { margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.card pre { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow-x: auto; white-space: pre; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; font-family: var(--mono); font-size: 11.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.mvp { color: var(--c-core-b); border-color: var(--c-core-b); }
+.later { color: var(--muted); }
+.walk { counter-reset: w; display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.walk li { counter-increment: w; display: grid; grid-template-columns: 28px 1fr; gap: 10px; font-size: 14.5px; }
+.walk li::before { content: counter(w); font-family: var(--mono); font-size: 12px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--surface); margin-top: 1px; }
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) { .comp { padding: 14px; } .sheet { padding: 12px; } }
+</style>
+
+<nav class="toc" aria-label="Sections"><div class="row">
+  <a href="#method">How to read</a>
+  <a href="#context">Problem</a>
+  <a href="#buildup">Build-up</a>
+  <a href="#core">Core Engine</a>
+  <a href="#sdk">Python SDK</a>
+  <a href="#api">Gateway API</a>
+  <a href="#proxy">LLM Proxy</a>
+  <a href="#console">Security Console</a>
+  <a href="#combined">Combined system</a>
+  <a href="#deploy">Deployment</a>
+</div></nav>
+
+<div class="wrap">
+<header class="hero">
+  <span class="eyebrow">System design · Draft for review · 4 Oct 2026</span>
+  <h1>Agent Security Gateway</h1>
+  <p class="lede">A security layer that sits around any AI agent: it inspects everything the agent reads, checks everything the agent tries to do, and records every decision so a security team can replay it. This page designs each of the five parts on its own, then shows how they become one system.</p>
+  <div class="legend" aria-label="Colour legend">
+    <span><i class="sw" style="background:var(--c-entry);border-color:var(--c-entry-b)"></i>Ways in (SDK, API, Proxy, Console)</span>
+    <span><i class="sw" style="background:var(--c-core);border-color:var(--c-core-b)"></i>Core Engine</span>
+    <span><i class="sw" style="background:var(--c-ai);border-color:var(--c-ai-b)"></i>AI models (free tiers / local)</span>
+    <span><i class="sw" style="background:var(--c-ext);border-color:var(--c-ext-b)"></i>Agent &amp; tools</span>
+    <span><i class="sw" style="background:var(--c-bad);border-color:var(--c-bad-b)"></i>Untrusted content</span>
+    <span><i class="sw" style="background:var(--c-store);border-color:var(--c-store-b)"></i>Storage</span>
+  </div>
+</header>
+
+<section id="method">
+  <div class="section-head">
+    <span class="eyebrow">How to read this page</span>
+    <h2>The presentation method</h2>
+    <p class="lede">Borrowed from the reference video's approach, adapted for a security product.</p>
+  </div>
+  <div class="method">
+    <div><b>Start from the business problem</b><p>Real pains and their cost come first, then a one-line solution, before any box is drawn.</p></div>
+    <div><b>Grow one diagram, one question at a time</b><p>Each step asks a production question and adds exactly one new part. You see why every box exists.</p></div>
+    <div><b>Same colours everywhere</b><p>A box keeps its colour from the first step to the final picture, so you can follow it across diagrams.</p></div>
+    <div><b>Then zoom into each part</b><p>Every component gets the same template: job, inside, interfaces, data, failure behaviour, and what it protects.</p></div>
+    <div><b>End on the combined system</b><p>All parts in one picture, with a numbered walkthrough of a single request.</p></div>
+  </div>
+</section>
+
+<section id="context">
+  <div class="section-head">
+    <span class="eyebrow">Business context</span>
+    <h2>The problem, in users' words</h2>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Real pain</th><th>What the design must do</th></tr></thead>
+    <tbody>
+      <tr><td>"Our prompt filter was watching the user input field, not the document upload."</td><td>Inspect every channel the agent reads</td></tr>
+      <tr><td>"If the scanner flags these, developers will disable it within a day."</td><td>Low false alarms; monitor mode before enforcing</td></tr>
+      <tr><td>"LLM-provided kwargs can still override partial_params."</td><td>Check every tool call; pin trusted fields</td></tr>
+      <tr><td>"On audit, 'we log tool calls' didn't survive contact."</td><td>Record every decision; replay whole sessions</td></tr>
+      <tr><td>"Users approve 93% of permission prompts."</td><td>Ask humans rarely, with a readable reason</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Proposed solution:</b> one security layer, shipped as an engine with four ways in, that catches what can be caught, limits what a hijacked agent can do, and proves what happened.</p>
+</section>
+
+<section id="buildup">
+  <div class="section-head">
+    <span class="eyebrow">Architecture build-up</span>
+    <h2>Seven questions, one growing diagram</h2>
+  </div>
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 1</span><h3>The unprotected agent</h3></div>
+      <p class="why">A research agent reads documents and web pages, asks a model what to do, and calls tools. Anything it reads can steer it.</p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  U([User]) --> A[Research Agent]
+  X[[Untrusted content<br/>docs · web · email · API]] --> A
+  A <--> M[LLM]
+  A --> T[Tools<br/>db · files · send]
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef bad fill:#FBE0DE,stroke:#C2473D,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  class A,T,U ext
+  class X bad
+  class M ai
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 2</span><h3>Who checks what the agent reads?</h3></div>
+      <p class="why">Every piece of incoming content passes one checkpoint. Hidden text is revealed, encodings undone, malicious spans quarantined, the rest passed on. <span class="added">+ Inbound checkpoint</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  U([User]) --> A[Research Agent]
+  X[[Untrusted content]] --> IN{{Inbound checkpoint<br/>extract · normalise · detect · neutralise}}
+  IN -->|cleaned| A
+  A <--> M[LLM]
+  A --> T[Tools]
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef bad fill:#FBE0DE,stroke:#C2473D,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  class A,T,U ext
+  class X bad
+  class M ai
+  class IN core
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 3</span><h3>What if the agent is fooled anyway?</h3></div>
+      <p class="why">Detection will miss things. Every tool call is checked against the agent's task, identity fields are pinned from trusted context, and secrets are stopped from leaving. <span class="added">+ Action checkpoint</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  U([User]) --> A[Research Agent]
+  X[[Untrusted content]] --> IN{{Inbound checkpoint}}
+  IN -->|cleaned| A
+  A <--> M[LLM]
+  A -->|proposed tool call| AC{{Action checkpoint<br/>task fit · pinned fields · secret check}}
+  AC -->|allowed| T[Tools]
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef bad fill:#FBE0DE,stroke:#C2473D,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  class A,T,U ext
+  class X bad
+  class M ai
+  class IN,AC core
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 4</span><h3>What if the attack is split across several turns?</h3></div>
+      <p class="why">Each message can look harmless on its own. Risk is remembered per session, and the final decision comes from fixed rules, never from an AI judge alone. <span class="added">+ Session memory · Policy engine</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  X[[Untrusted content]] --> IN{{Inbound checkpoint}}
+  A[Research Agent] -->|tool call| AC{{Action checkpoint}}
+  IN --> S[(Session risk)]
+  AC --> S
+  S --> P[Policy engine<br/>rules decide]
+  P --> IN
+  P --> AC
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef bad fill:#FBE0DE,stroke:#C2473D,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  class A ext
+  class X bad
+  class IN,AC,P core
+  class S store
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 5</span><h3>How does the security team see what happened?</h3></div>
+      <p class="why">Every decision is stored with its source, span, attack type and reason. The Console replays sessions and shows a per-agent scorecard. <span class="added">+ Event store · Security Console</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  IN{{Inbound checkpoint}} --> L[Decision logger]
+  AC{{Action checkpoint}} --> L
+  L --> E[(Event store)]
+  E --> C[Security Console<br/>replay · decisions · scorecard]
+  R([Security reviewer]) --> C
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  class IN,AC,L core
+  class E store
+  class C entry
+  class R ext
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 6</span><h3>How does an existing agent plug in?</h3></div>
+      <p class="why">The checkpoints become one Core Engine with three ways in: an SDK for deep protection, an API for any language, and a proxy that needs only a changed URL. <span class="added">+ SDK · Gateway API · LLM Proxy</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  A1[Python agent] --> SDK[Python SDK]
+  A2[Any-language app] --> API[Gateway API]
+  A3[Unchanged agent<br/>new base URL] --> PX[LLM Proxy]
+  SDK --> CORE[Core Engine]
+  API --> CORE
+  PX --> CORE
+  PX --> M[Upstream LLM]
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  class SDK,API,PX entry
+  class CORE core
+  class A1,A2,A3 ext
+  class M ai
+      </pre></div>
+    </div>
+
+    <div class="step">
+      <div class="step-q"><span class="n">Step 7</span><h3>How does it stay strong, on free models?</h3></div>
+      <p class="why">A router spreads AI calls across free providers with failover and caching. A red-team agent keeps attacking the gateway offline, and every miss becomes a permanent test. <span class="added">+ LLM router · Adversary loop</span></p>
+      <div class="sheet"><pre class="mermaid">
+flowchart LR
+  CORE[Core Engine] --> RT[LLM router<br/>failover · cache]
+  RT --> G[Groq] & GM[Gemini] & OR[OpenRouter] & MI[Mistral] & NV[NVIDIA]
+  ADV[Adversary agent] -->|new variants| CORE
+  CORE -->|misses| CO[(Regression corpus)]
+  CO --> ADV
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  class CORE,RT,ADV core
+  class G,GM,OR,MI,NV ai
+  class CO store
+      </pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- CORE ENGINE -->
+<section id="core">
+  <div class="comp" style="--comp-color: var(--c-core-b)">
+    <div class="comp-head">
+      <span class="eyebrow">Component 1 of 5</span>
+      <h2>Core Engine</h2>
+      <p class="lede">The one place every security decision is made. The other four parts are ways to reach it.</p>
+    </div>
+    <div class="sheet"><pre class="mermaid">
+flowchart TB
+  IN([content + source]) --> EXT[1 Extractor<br/>see what the model sees]
+  EXT --> NORM[2 Normaliser<br/>decode · unify · strip invisible]
+  NORM --> T0[3a Tier 0 rules<br/>every input · ms]
+  T0 -->|inconclusive / untrusted| T1[3b Tier 1 local classifiers]
+  T1 -->|suspicious| T2[3c Tier 2 LLM judge]
+  T0 --> LAB[4 Labeller<br/>9 attack types]
+  T1 --> LAB
+  T2 --> LAB
+  LAB --> SES[5 Session risk]
+  SES --> POL[6 Policy engine<br/>ALLOW · NEUTRALISE · BLOCK · ESCALATE]
+  ACTIN([tool call + task]) --> AG[8 Action guard<br/>task fit · pin fields · secret scan]
+  POL --> NEU[7 Neutraliser<br/>span quarantine]
+  POL --> AG
+  NEU --> LOG[9 Decision logger]
+  AG --> LOG
+  T2 -.-> RT[LLM router]
+  PCY[(Policies YAML)] --> POL
+  LOG --> EV[(Event store)]
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  class EXT,NORM,T0,LAB,SES,POL,NEU,AG,LOG core
+  class T1,T2,RT ai
+  class PCY,EV store
+  class IN,ACTIN ext
+    </pre></div>
+    <div class="comp-grid">
+      <div class="card"><h4>Job</h4><ul>
+        <li>Turn any content into a decision with a reason</li>
+        <li>Turn any proposed tool call into allow / block / rewritten arguments</li>
+        <li>Keep per-session risk and log every decision</li>
+      </ul></div>
+      <div class="card"><h4>Interface (Python)</h4><pre>engine.inspect(content, source,
+               agent_id, session_id)
+  → InspectResult(decision,
+      cleaned_content, findings[])
+
+engine.check_action(tool, args,
+               agent_id, session_id)
+  → ActionResult(decision,
+      args, reason)</pre></div>
+      <div class="card"><h4>Data it owns</h4><ul>
+        <li>Policies per agent: task, allowed tools, pinned fields, sensitive patterns, thresholds, mode</li>
+        <li>Session risk state</li>
+        <li>Decision events (source, span, labels, tier, reason, action)</li>
+      </ul></div>
+      <div class="card"><h4>Failure behaviour</h4><ul>
+        <li>AI tier slow or down → rules only, result marked <code>degraded</code></li>
+        <li>Per-tier time budget; never waits forever</li>
+        <li>High-risk content is never passed silently</li>
+      </ul></div>
+      <div class="card"><h4>Protects against</h4><ul>
+        <li>All 9 hackathon attack types (labelled on every finding)</li>
+        <li>Unwatched channels, reworded attacks, false alarms</li>
+      </ul></div>
+      <div class="card"><h4>Scope</h4><ul>
+        <li><span class="pill mvp">MVP</span> text, md, html, pdf, docx, email, json, code</li>
+        <li><span class="pill mvp">MVP</span> rules + 1–2 local classifiers + LLM judge</li>
+        <li><span class="pill later">Stretch</span> images via OCR</li>
+        <li><span class="pill later">Later</span> full data-flow (taint) tracking</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- SDK -->
+<section id="sdk">
+  <div class="comp" style="--comp-color: var(--c-entry-b)">
+    <div class="comp-head">
+      <span class="eyebrow">Component 2 of 5</span>
+      <h2>Python SDK</h2>
+      <p class="lede">The deepest protection, for teams that can change a few lines of their agent. It sees raw files before extraction and every tool call before it runs.</p>
+    </div>
+    <div class="sheet"><pre class="mermaid">
+flowchart LR
+  subgraph AGENT[Builder's agent process]
+    LD[Content loaders] --> G[Guard client]
+    TL["Tools wrapped with @guard.tool"] --> G
+    SC[Session context<br/>user · trusted fields] --> G
+  end
+  G -->|embedded mode| CORE[Core Engine in-process]
+  G -->|remote mode| API[Gateway API]
+  CORE --> EV[(Event store)]
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  class G,API entry
+  class CORE core
+  class LD,TL,SC ext
+  class EV store
+    </pre></div>
+    <div class="comp-grid">
+      <div class="card"><h4>Job</h4><ul>
+        <li>Wrap content loaders and tools with the fewest code changes</li>
+        <li>Supply trusted context (user, account) so pinned fields can't be changed by the model</li>
+      </ul></div>
+      <div class="card"><h4>Developer experience</h4><pre>guard = Guard(agent="research-agent",
+              policy="policy.yaml",
+              mode="monitor")
+
+with guard.session(user_id=uid):
+    doc = guard.inspect(raw, source="upload")
+
+@guard.tool(pinned={"customer_id": ctx.id})
+def query_db(customer_id, query): ...</pre></div>
+      <div class="card"><h4>Modes</h4><ul>
+        <li><b>Embedded:</b> engine runs inside the agent process (no network hop)</li>
+        <li><b>Remote:</b> calls the Gateway API (shared policies and logs across services)</li>
+        <li><b>Monitor / Enforce:</b> log only, or apply decisions</li>
+      </ul></div>
+      <div class="card"><h4>Failure behaviour</h4><ul>
+        <li>Per tool: fail closed for tools that write or send, fail open (logged) for read-only tools, set in policy</li>
+        <li>Remote API unreachable → embedded rules fallback, marked degraded</li>
+      </ul></div>
+      <div class="card"><h4>Protects against</h4><ul>
+        <li>Indirect injection in files before extraction (hidden text, metadata)</li>
+        <li>Tool abuse, credential theft, secret extraction at the tool boundary</li>
+      </ul></div>
+      <div class="card"><h4>Scope</h4><ul>
+        <li><span class="pill mvp">MVP</span> plain Python + LangGraph/LangChain tool wrapper</li>
+        <li><span class="pill later">Later</span> other frameworks, JS/TS SDK</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- API -->
+<section id="api">
+  <div class="comp" style="--comp-color: var(--c-entry-b)">
+    <div class="comp-head">
+      <span class="eyebrow">Component 3 of 5</span>
+      <h2>Gateway API</h2>
+      <p class="lede">The same engine as a self-hostable web service, for any language or platform. It is also the backend the Console reads from.</p>
+    </div>
+    <div class="sheet"><pre class="mermaid">
+flowchart LR
+  CL([Clients: SDK remote · other apps · Console]) --> MW[Auth + rate limit<br/>API key per project]
+  MW --> R1[/v1/inspect/]
+  MW --> R2[/v1/actions/check/]
+  MW --> R3[/v1/sessions · events/]
+  MW --> R4[/v1/policies · scorecard/]
+  R1 --> CORE[Core Engine]
+  R2 --> CORE
+  R3 --> EV[(Event store)]
+  R4 --> EV
+  R4 --> PCY[(Policies)]
+  CORE --> EV
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  class MW,R1,R2,R3,R4 entry
+  class CORE core
+  class EV,PCY store
+  class CL ext
+    </pre></div>
+    <div class="comp-grid">
+      <div class="card"><h4>Endpoints</h4><pre>POST /v1/inspect          → decision + cleaned content
+POST /v1/actions/check    → allow / block / pinned args
+POST /v1/sessions         → new session id
+GET  /v1/sessions/{id}/events
+GET  /v1/decisions?filter=…
+GET  /v1/policies/{agent} · PUT (admin)
+GET  /v1/scorecard/{agent}
+GET  /healthz</pre></div>
+      <div class="card"><h4>Job</h4><ul>
+        <li>Expose inspect and action-check over HTTP with a stable JSON contract</li>
+        <li>Serve sessions, decisions, policies and scorecards to the Console</li>
+      </ul></div>
+      <div class="card"><h4>Data it owns</h4><ul>
+        <li>Projects and API keys</li>
+        <li>Reads and writes the shared event store and policies</li>
+      </ul></div>
+      <div class="card"><h4>Failure behaviour</h4><ul>
+        <li>Every response carries <code>degraded: true/false</code></li>
+        <li>Timeouts per request; health endpoint for the host</li>
+        <li>Rate limits protect free-tier model quotas</li>
+      </ul></div>
+      <div class="card"><h4>Scope</h4><ul>
+        <li><span class="pill mvp">MVP</span> endpoints above, API-key auth, SQLite</li>
+        <li><span class="pill later">Later</span> Postgres, multi-tenant orgs, SIEM export</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROXY -->
+<section id="proxy">
+  <div class="comp" style="--comp-color: var(--c-entry-b)">
+    <div class="comp-head">
+      <span class="eyebrow">Component 4 of 5</span>
+      <h2>LLM Proxy</h2>
+      <p class="lede">Zero-code protection. An agent changes only its model API address; the proxy inspects what goes to the model and what tool calls come back.</p>
+    </div>
+    <div class="sheet"><pre class="mermaid">
+sequenceDiagram
+  participant A as Agent (unchanged)
+  participant P as LLM Proxy
+  participant C as Core Engine
+  participant M as Free upstream model
+  A->>P: POST /proxy/v1/chat/completions
+  P->>C: inspect user + tool messages
+  C-->>P: cleaned messages
+  P->>M: forward via LLM router
+  M-->>P: reply with tool calls
+  P->>C: check each tool call
+  C-->>P: allow · block · pinned args
+  P-->>A: safe reply (blocked calls → notice)
+    </pre></div>
+    <div class="comp-grid">
+      <div class="card"><h4>Job</h4><ul>
+        <li>Speak the OpenAI-compatible chat format most agents already use</li>
+        <li>Inspect inbound messages, check outbound tool calls, forward to a free provider</li>
+      </ul></div>
+      <div class="card"><h4>How a builder adopts it</h4><pre>base_url = "https://&lt;gateway&gt;/proxy/v1"
+headers  = {"X-Agent-Id": "research-agent",
+            "X-Session-Id": session_id}</pre></div>
+      <div class="card"><h4>Streaming</h4><ul>
+        <li>Tool-call pieces are held until complete, then checked, then released</li>
+        <li>Answers a real pain: a streaming path that skipped guardrails and leaked data</li>
+      </ul></div>
+      <div class="card"><h4>Honest limits</h4><ul>
+        <li>Sees text only: files were already extracted by the agent</li>
+        <li>Can't stop a tool the agent runs without asking the model</li>
+        <li>For both, use the SDK</li>
+      </ul></div>
+      <div class="card"><h4>Failure behaviour</h4><ul>
+        <li>Upstream provider fails → router tries the next free provider</li>
+        <li>Engine degraded → rules-only decisions, flagged in logs</li>
+      </ul></div>
+      <div class="card"><h4>Scope</h4><ul>
+        <li><span class="pill mvp">MVP</span> chat completions with tools, 2+ free providers</li>
+        <li><span class="pill later">Later</span> MCP traffic proxy, other API formats</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONSOLE -->
+<section id="console">
+  <div class="comp" style="--comp-color: var(--c-entry-b)">
+    <div class="comp-head">
+      <span class="eyebrow">Component 5 of 5</span>
+      <h2>Security Console</h2>
+      <p class="lede">The web app for the security reviewer and the builder, and the public demo link for judges.</p>
+    </div>
+    <div class="sheet"><pre class="mermaid">
+flowchart LR
+  subgraph WEB[Console · static web app]
+    PG[Playground<br/>protected vs unprotected]
+    DF[Decisions feed]
+    RP[Session replay]
+    SC[Scorecard]
+    PE[Policy editor]
+  end
+  PG -->|run scenario| DEMO[Reference research agent]
+  DF --> API[Gateway API]
+  RP --> API
+  SC --> API
+  PE --> API
+  DEMO --> CORE[Core Engine]
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  class PG,DF,RP,SC,PE,API entry
+  class CORE core
+  class DEMO ext
+    </pre></div>
+    <div class="comp-grid">
+      <div class="card"><h4>Screens</h4><ul>
+        <li><b>Playground:</b> run an attack scenario with protection off, then on</li>
+        <li><b>Decisions feed:</b> filter by block / neutralise / escalate</li>
+        <li><b>Session replay:</b> content in → finding → decision → action</li>
+        <li><b>Scorecard:</b> measured catch rate per attack type, false alarms, latency</li>
+        <li><b>Policy editor:</b> task, tools, pinned fields, monitor / enforce</li>
+      </ul></div>
+      <div class="card"><h4>Users and access</h4><ul>
+        <li>Public demo: read-only Playground, replay and scorecard</li>
+        <li>Admin key: policy edits, false-positive marking</li>
+      </ul></div>
+      <div class="card"><h4>Failure behaviour</h4><ul>
+        <li>API unreachable → clear status banner, last scorecard still shown</li>
+        <li>Playground scenarios use a sandboxed outbox, never real email</li>
+      </ul></div>
+      <div class="card"><h4>Scope</h4><ul>
+        <li><span class="pill mvp">MVP</span> Playground, replay, scorecard, decisions</li>
+        <li><span class="pill later">Stretch</span> policy editor UI (YAML file first)</li>
+        <li><span class="pill later">Later</span> approvals inbox, team accounts</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMBINED -->
+<section id="combined">
+  <div class="section-head">
+    <span class="eyebrow">Putting it together</span>
+    <h2>One system: Agent Security Gateway</h2>
+    <p class="lede">Four ways in, one engine, one event store. Numbers follow a single protected request.</p>
+  </div>
+  <div class="sheet"><pre class="mermaid">
+flowchart TB
+  U([User]) -->|1 ask| AG[Research Agent]
+  X[[Untrusted file / web / email]] -->|2 content| SDK[Python SDK]
+  AG --- SDK
+  OTHER[Other apps] --> API[Gateway API]
+  ANY[Unchanged agents] --> PX[LLM Proxy]
+  SDK -->|3 inspect| CORE[Core Engine<br/>extract · normalise · detect · label<br/>session · policy · neutralise · action guard]
+  API --> CORE
+  PX --> CORE
+  CORE -->|4 judge if suspicious| RT[LLM router] --> FREE[Free model providers]
+  CORE -->|5 cleaned content| AG
+  AG -->|6 tool call| SDK
+  SDK -->|7 check action| CORE
+  AG -->|8 allowed only| TOOLS[Tools: db · files · send]
+  CORE -->|9 log| EV[(Event store)]
+  CON[Security Console] --> API
+  API --> EV
+  REV([Security reviewer]) --> CON
+  ADV[Adversary loop] --> CORE
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef ext fill:#ECEEF1,stroke:#7C8794,color:#141A22
+  classDef bad fill:#FBE0DE,stroke:#C2473D,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  class SDK,API,PX,CON entry
+  class CORE,ADV core
+  class RT,FREE ai
+  class AG,TOOLS,U,OTHER,ANY,REV ext
+  class X bad
+  class EV store
+  </pre></div>
+  <ol class="walk">
+    <li>A user asks the research agent to summarise an uploaded report.</li>
+    <li>The SDK receives the raw file before the agent reads it.</li>
+    <li>The engine extracts everything the model would see, normalises it and runs the fast checks.</li>
+    <li>Only if something looks suspicious, a free model is asked for a second opinion.</li>
+    <li>The rules decide: the malicious span is quarantined and the rest goes to the agent, marked as untrusted data.</li>
+    <li>The model proposes a tool call, for example sending a message.</li>
+    <li>The engine checks it against the agent's task, pins trusted fields and scans for secrets.</li>
+    <li>Only an allowed call reaches the tool.</li>
+    <li>Every step is logged; the reviewer replays it in the Console.</li>
+  </ol>
+  <div class="tbl"><table>
+    <thead><tr><th>Part</th><th>Who uses it</th><th>Sees</th><th>Enforces</th></tr></thead>
+    <tbody>
+      <tr><td>Core Engine</td><td>Everything below</td><td>All content and actions sent to it</td><td>Every decision</td></tr>
+      <tr><td>Python SDK</td><td>Python agent builders</td><td>Raw files, every tool call, trusted context</td><td>Inbound, actions, pinned fields, outbound</td></tr>
+      <tr><td>Gateway API</td><td>Any language, Console</td><td>What callers send</td><td>Returns decisions; caller applies</td></tr>
+      <tr><td>LLM Proxy</td><td>Any agent, zero code</td><td>Model messages and tool calls</td><td>Inbound messages, tool calls in replies</td></tr>
+      <tr><td>Security Console</td><td>Reviewers, builders, judges</td><td>Events, policies, scorecards</td><td>Policy, monitor/enforce</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="deploy">
+  <div class="section-head">
+    <span class="eyebrow">Deployment · free tier</span>
+    <h2>Where it runs</h2>
+  </div>
+  <div class="sheet"><pre class="mermaid">
+flowchart LR
+  subgraph STATIC[Static host · Vercel / Netlify / Cloudflare Pages]
+    CON[Security Console]
+  end
+  subgraph SPACE[Hugging Face Space · one Docker container]
+    APP[FastAPI app<br/>/v1 API · /proxy/v1 · /demo agent]
+    CORE[Core Engine + local classifiers]
+    DB[(SQLite event store)]
+    APP --> CORE --> DB
+  end
+  subgraph JOBS[Offline jobs · laptop or CI]
+    EVAL[Eval runner]
+    ADV[Adversary loop]
+  end
+  CON -->|HTTPS| APP
+  CORE --> FREE[Groq · Gemini · OpenRouter · Mistral · NVIDIA]
+  EVAL --> APP
+  ADV --> APP
+  classDef entry fill:#DCEBFB,stroke:#4A7FC0,color:#141A22
+  classDef core fill:#DDF2E3,stroke:#3F8F5A,color:#141A22
+  classDef ai fill:#FBF0D2,stroke:#B98A1C,color:#141A22
+  classDef store fill:#EDE4F7,stroke:#7B5AA6,color:#141A22
+  class CON,APP entry
+  class CORE,EVAL,ADV core
+  class FREE ai
+  class DB store
+  </pre></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Repository folder</th><th>Holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>packages/core</code></td><td>Core Engine library</td></tr>
+      <tr><td><code>packages/sdk</code></td><td>Python SDK (embedded + remote modes)</td></tr>
+      <tr><td><code>services/gateway</code></td><td>FastAPI app: Gateway API + LLM Proxy + demo endpoint</td></tr>
+      <tr><td><code>apps/console</code></td><td>Security Console (React)</td></tr>
+      <tr><td><code>agents/research_agent</code></td><td>Reference research agent (LangGraph)</td></tr>
+      <tr><td><code>eval/</code></td><td>Corpus, eval runner, adversary loop, reports</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>Draft design for review before implementation. Source documents: docs/06 problem statement, docs/07 PRD, docs/09 system design.</footer>
+</div>

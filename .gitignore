@@ -1,0 +1,20 @@
+# secrets
+.env
+.env.*
+!.env.example
+# local data, caches, models
+data/
+*.db
+*.db-wal
+*.db-shm
+eval/validate/results/*.log
+# python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+# node
+node_modules/
+apps/console/dist/
+# hackathon brief (not ours to redistribute)
+*_problem_statements_branded.pdf

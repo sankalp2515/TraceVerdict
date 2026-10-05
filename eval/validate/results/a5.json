@@ -1,0 +1,112 @@
+[
+  {
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "ok": false,
+    "stage": "call1",
+    "error": "auth_failed"
+  },
+  {
+    "provider": "groq",
+    "model": "openai/gpt-oss-20b",
+    "latency_ms_1": 663,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 471,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "groq",
+    "model": "qwen/qwen3.8-27b",
+    "latency_ms_1": 194,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 148,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3.5-flash",
+    "latency_ms_1": 24791,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 24566,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-flash-latest",
+    "ok": false,
+    "stage": "call1",
+    "error": "server_error"
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-lite",
+    "latency_ms_1": 960,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 1212,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "nvidia",
+    "model": "openai/gpt-oss-20b",
+    "latency_ms_1": 922,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 701,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "nvidia",
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "latency_ms_1": 403,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 522,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "openrouter",
+    "model": "qwen/qwen3.8-27b:free",
+    "latency_ms_1": 1590,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 17625,
+    "round_trip_answer_correct": true,
+    "ok": true
+  },
+  {
+    "provider": "openrouter",
+    "model": "nvidia/nemotron-3-super-120b-a12b:free",
+    "latency_ms_1": 427,
+    "tool_call_well_formed": true,
+    "args": {
+      "customer_id": "C-1042"
+    },
+    "latency_ms_2": 645,
+    "round_trip_answer_correct": true,
+    "ok": true
+  }
+]

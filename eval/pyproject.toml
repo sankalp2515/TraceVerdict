@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asg-eval"
+version = "0.1.0"
+description = "Evaluation harness for the Agent Security Gateway"
+requires-python = ">=3.11"
+dependencies = ["asg-core", "asg-research-agent", "fastapi", "uvicorn", "pyyaml"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["asg_eval*", "targets*"]

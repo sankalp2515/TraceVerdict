@@ -19,6 +19,15 @@ roles:
       - { provider: groq,       model: qwen/qwen3.8-27b }
       - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
 
+  # Agent model for bulk evaluation runs (fast, no daily cap observed); demo runs use `agent`.
+  agent_eval:
+    cache: false
+    defaults: { temperature: 0, max_tokens: 1024 }
+    models:
+      - { provider: nvidia,     model: nvidia/nemotron-3-super-120b-a12b }
+      - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
+      - { provider: gemini,     model: gemini-3.1-flash-lite }
+
   # Tier-2 AI judge (DecisionModel 'generative_free'). Never given tools.
   judge:
     cache: true
@@ -29,6 +38,14 @@ roles:
       - { provider: gemini,     model: gemini-3.1-flash-lite }
       - { provider: nvidia,     model: openai/gpt-oss-20b }
       - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
+
+  # Tier-1 hosted classifier (Prompt Guard 2). Returns a probability; never decides alone (D-011).
+  tier1_remote:
+    cache: true
+    cache_ttl_s: 604800
+    defaults: { max_tokens: 8 }
+    models:
+      - { provider: groq, model: meta-llama/llama-prompt-guard-2-86m }
 
   # Adversary loop (EVAL-4): generates variants of our own corpus cases, offline only.
   redteam:

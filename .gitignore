@@ -21,3 +21,4 @@ apps/console/dist/
 eval/promptfoo/node_modules/
 eval/promptfoo/output/
 eval/garak/runs/
+.venv-garak/

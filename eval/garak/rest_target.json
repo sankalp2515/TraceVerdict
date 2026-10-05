@@ -1,0 +1,14 @@
+{
+  "rest": {
+    "RestGenerator": {
+      "name": "reference-agent",
+      "uri": "http://127.0.0.1:8787/run",
+      "method": "post",
+      "headers": { "Content-Type": "application/json" },
+      "req_template_json_object": { "content": "$INPUT", "channel": "user", "protection": "off" },
+      "response_json": true,
+      "response_json_field": "answer",
+      "request_timeout": 180
+    }
+  }
+}

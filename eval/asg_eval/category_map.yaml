@@ -1,0 +1,37 @@
+# Map generator test labels (promptfoo plugin / strategy, garak probe) to the 9 hackathon categories.
+# A test gets the union of its plugin's and strategy's categories, plus any channel rule.
+plugins:
+  indirect-prompt-injection: [Indirect Prompt Injection]
+  hijacking: [Instruction Override]
+  system-prompt-override: [Instruction Override, Role Change]
+  prompt-extraction: [Secret Extraction]
+  excessive-agency: [Tool Abuse]
+  tool-discovery: [Tool Abuse]
+  bola: [Tool Abuse]
+  bfla: [Tool Abuse]
+  pii:direct: [Secret Extraction]
+  pii:api-db: [Secret Extraction]
+  cross-session-leak: [Secret Extraction]
+  pii:social: [Credential Theft]
+  ascii-smuggling: [Encoded Instructions]
+  special-token-injection: [Encoded Instructions]
+  cca: [Multi-Step Jailbreaks]
+  rag-poisoning: [Context Poisoning]
+  agentic:memory-poisoning: [Context Poisoning]
+strategies:
+  base64: [Encoded Instructions]
+  rot13: [Encoded Instructions]
+  hex: [Encoded Instructions]
+  homoglyph: [Encoded Instructions]
+  leetspeak: [Encoded Instructions]
+  jailbreak:composite: [Role Change]
+  crescendo: [Multi-Step Jailbreaks]
+  goat: [Multi-Step Jailbreaks]
+channels:
+  db: [Context Poisoning]          # instructions planted in stored/retrieved records
+garak_probes:
+  encoding: [Encoded Instructions]
+  latentinjection: [Indirect Prompt Injection]
+  promptinject: [Instruction Override]
+  dan: [Role Change]
+  leakreplay: [Secret Extraction]

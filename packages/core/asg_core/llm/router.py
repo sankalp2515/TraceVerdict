@@ -173,10 +173,12 @@ class Router:
                 await self._sleep(wait)
             h.next_slot = max(now, h.next_slot) + 60.0 / float(p.rpm)
 
-    async def _throttle_tokens(self, p: ProviderConfig, model: str, req: ChatRequest) -> None:
-        """Stay under a tokens-per-minute limit: wait until the last 60 s of usage leaves room."""
+    async def _throttle_tokens(self, p: ProviderConfig, model: str, req: ChatRequest,
+                               max_wait_s: float | None = None) -> bool:
+        """Stay under a tokens-per-minute limit: wait until the last 60 s of usage leaves room.
+        Returns False (without waiting) when the wait would exceed max_wait_s: the caller fails over."""
         if not p.tpm:
-            return
+            return True
         est = len(json.dumps(req.messages, default=str)) // 4 + (req.max_tokens or 512)
         est = min(est, int(p.tpm))
         key = f"{p.name}/{model}"
@@ -188,8 +190,12 @@ class Router:
                 window[:] = [(t, n) for t, n in window if now - t < 60.0]
                 if sum(n for _, n in window) + est <= p.tpm or not window:
                     break
-                await self._sleep(max(0.5, 60.0 - (now - window[0][0])))
+                wait = max(0.5, 60.0 - (now - window[0][0]))
+                if max_wait_s is not None and wait > max_wait_s:
+                    return False
+                await self._sleep(wait)
             window.append((self._clock(), est))
+            return True
 
     def _record_tokens(self, p: ProviderConfig, model: str, used: int) -> None:
         window = self._token_log.get(f"{p.name}/{model}")
@@ -258,7 +264,10 @@ class Router:
                 return None
             key = keys[0]
             await self._throttle(p)
-            await self._throttle_tokens(p, ref.model, req)
+            rc = self.settings.roles.get(role)
+            if not await self._throttle_tokens(p, ref.model, req, rc.max_queue_s if rc else None):
+                attempts.append(Attempt(p.name, ref.model, key.alias, "skipped:throttled"))
+                return None   # would exceed this role's latency budget: try the next provider
             t0 = time.perf_counter()
             try:
                 r: AdapterResponse = await adapter.chat(p, key, ref.model, req, self.client, ref.params)

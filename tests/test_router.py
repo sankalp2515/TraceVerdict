@@ -215,3 +215,14 @@ async def test_wait_on_rate_limit_gives_up_beyond_cap():
     respx.post("https://a.test/v1/chat/completions").respond(429, headers={"retry-after": "30"})
     with pytest.raises(AllProvidersFailed):
         await r.chat("judge", req())
+
+
+@respx.mock
+async def test_max_queue_fails_over_instead_of_waiting():
+    a, b = prov("a", tpm=1000), prov("b")
+    r, clock = make_router([a, b])
+    r.settings.roles["judge"].max_queue_s = 2
+    r._token_log["a/m"] = [(clock.t, 990)]
+    respx.post("https://b.test/v1/chat/completions").respond(200, json=OK)
+    res = await r.chat("judge", req())
+    assert res.provider == "b" and any(x.outcome == "skipped:throttled" for x in res.attempts)

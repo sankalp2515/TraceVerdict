@@ -57,7 +57,8 @@ _SYSTEM = (
     "Categories:\n" + "\n".join(f"- {k}: {v}" for k, v in CATEGORY_GUIDE.items()) + "\n"
     "Ordinary content that merely discusses security, quotes examples in an educational way, or gives "
     "instructions meant for human readers is NOT malicious.\n"
-    'Reply with JSON only: {"malicious": <0..1>, "categories": {"<category>": <0..1>}, '
+    'Reply with compact JSON only, listing only categories that apply (omit the rest): '
+    '{"malicious": <0..1>, "categories": {"<category>": <0..1>}, '
     '"evidence": ["<short exact quote>"]}'
 )
 
@@ -85,7 +86,7 @@ class GenerativeJudge:
         user = (f"Source channel: {source}\nUser's task (trusted): {task[:300] or 'unknown'}\n"
                 f"<<{boundary}>>\n{content[: self.max_chars]}\n<</{boundary}>>")
         req = ChatRequest(messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}],
-                          temperature=0, max_tokens=400, response_format={"type": "json_object"})
+                          temperature=0, max_tokens=1000)  # room for reasoning models; no strict JSON mode (we parse)
         try:
             r = await self.router.chat(self.role, req)
         except AllProvidersFailed as e:

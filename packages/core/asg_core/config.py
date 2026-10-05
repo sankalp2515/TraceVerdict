@@ -80,6 +80,7 @@ class RoleConfig:
     cache_ttl_s: int = 86400
     defaults: dict[str, Any] = field(default_factory=dict)
     wait_on_rate_limit_s: float = 0.0   # >0: wait out a provider cooldown (up to this long) instead of failing
+    max_queue_s: float | None = None    # longest client-side throttle wait before failing over (latency-sensitive roles)
 
 
 @dataclass
@@ -155,6 +156,7 @@ def load_roles(path: Path | None = None) -> dict[str, RoleConfig]:
             cache_ttl_s=int(r.get("cache_ttl_s", 86400)),
             defaults=dict(r.get("defaults") or {}),
             wait_on_rate_limit_s=float(r.get("wait_on_rate_limit_s", 0.0)),
+            max_queue_s=r.get("max_queue_s"),
         )
     return out
 

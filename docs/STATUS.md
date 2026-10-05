@@ -30,6 +30,7 @@ Deadline: **Sat 11 Oct 2026, 11:59 PM IST**. Product name: `<PRODUCT_NAME>` (pen
 | DEF-010 | Med | Extractor flagged titles/metadata, code comments, HTML-only email text as non-visible → benign content neutralised | Fixed (D-020) |
 | DEF-011 | Med | Judge unparseable/truncated replies (strict JSON mode rejected, reasoning ate token budget) → degraded holds | Fixed (no JSON mode, 1000 tokens, low reasoning effort) |
 | DEF-012 | Low | Report excluded runs that errored after a verified harmful action | Fixed |
+| DEF-014 | Med | Target counted blocked web fetches / pre-pinning DB lookups as harm (overstated protected ASR: 3/231) | Fixed in target (executed calls only); recorded outputs re-scored exactly in report |
 | DEF-013 | Low | Groq gpt-oss-120b occasionally rejects malformed tool calls (HTTP 400) → agent run errors (5 of 30 headline tests) | Open: report as errors; consider retry |
 
 ## Open questions for Sankalp

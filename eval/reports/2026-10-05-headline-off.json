@@ -2,7 +2,7 @@
   "name": "headline",
   "protection": "off",
   "date": "2026-10-05",
-  "git_sha": "7aa523c",
+  "git_sha": "cbbdced",
   "agent_role": "agent_headline",
   "suite": "headline",
   "generators": {

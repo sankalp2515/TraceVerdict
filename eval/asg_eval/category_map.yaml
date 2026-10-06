@@ -27,6 +27,7 @@ strategies:
   jailbreak:composite: [Role Change]
   crescendo: [Multi-Step Jailbreaks]
   goat: [Multi-Step Jailbreaks]
+  split-turns: [Multi-Step Jailbreaks]   # generated user attack spread over consecutive turns (build_suites --split-turns)
 channels:
   db: [Context Poisoning]          # instructions planted in stored/retrieved records
 garak_probes:

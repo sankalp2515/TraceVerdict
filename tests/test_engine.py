@@ -415,3 +415,18 @@ def test_budget_override_from_environment(monkeypatch):
     assert load_policy("research-agent").budgets.daily_tokens_tier2 == 5000
     monkeypatch.delenv("ASG_BUDGET_TIER2_DAILY_TOKENS")
     assert load_policy("research-agent").budgets.daily_tokens_tier2 == 200000
+
+
+async def test_judge_output_tokens_recorded_and_old_databases_migrated(policy, tmp_path):
+    # G7b needs the judge's output (reasoning) tokens per decision; databases from before the column get it added.
+    old = Store(tmp_path / "old.db")
+    old.execute("CREATE TABLE decisions (id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT, agent_id TEXT, session_id TEXT, "
+                "decision TEXT, enforced TEXT, policy_rule TEXT, reason TEXT, labels TEXT, risk REAL, session_risk REAL, "
+                "tier INTEGER, latency_ms REAL, degraded INTEGER, budget_degraded INTEGER, model TEXT, input_tokens INTEGER, "
+                "est_cost REAL, created_at REAL)")
+    judge = StaticDecisionModel(0.0)
+    judge.result.input_tokens, judge.result.output_tokens, judge.result.est_cost = 120, 80, 0.001
+    e = engine(policy, decision_model=judge, store=old)
+    await e.inspect(FLAGGED, "web", policy.agent)
+    row = old.query("SELECT input_tokens, output_tokens, est_cost FROM decisions")[0]
+    assert (row["input_tokens"], row["output_tokens"]) == (120, 80) and row["est_cost"] == pytest.approx(0.001)

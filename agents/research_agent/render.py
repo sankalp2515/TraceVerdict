@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass
+from pathlib import Path
 from email.message import EmailMessage
 from html import escape
 
@@ -39,26 +40,55 @@ def to_markdown(content: str | list[Block], title: str = "Document") -> str:
     return "\n".join(out)
 
 
+_FONT_CANDIDATES = [
+    "C:/Windows/Fonts/arial.ttf",                                  # Windows
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",             # Debian/Ubuntu
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",                      # Fedora/RHEL
+    "/Library/Fonts/Arial Unicode.ttf",                            # macOS
+]
+
+
+def _pdf_font() -> tuple[str, str]:
+    """A Unicode TrueType font when one is installed, so non-Latin and look-alike letters render as themselves
+    (the built-in Helvetica has no Cyrillic glyphs: such text reached readers as boxes, D-031). Falls back to
+    Helvetica when no font is found."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    if "IS-Unicode" in pdfmetrics.getRegisteredFontNames():
+        return "IS-Unicode", "IS-Unicode"
+    for path in _FONT_CANDIDATES:
+        if Path(path).exists():
+            try:
+                pdfmetrics.registerFont(TTFont("IS-Unicode", path))
+                return "IS-Unicode", "IS-Unicode"
+            except Exception:
+                continue
+    return "Helvetica", "Helvetica-Bold"
+
+
 def to_pdf(content: str | list[Block], title: str = "Document") -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
+
+    body_font, title_font = _pdf_font()
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     c.setTitle(title)
     w, h = A4
     y = h - 60
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont(title_font, 14)
     c.drawString(50, y, title)
     y -= 28
     for b in _blocks(content):
         if b.visible:
             c.setFillColorRGB(0, 0, 0)
-            c.setFont("Helvetica", 10)
+            c.setFont(body_font, 10)
             size = 10
         else:
             c.setFillColorRGB(1, 1, 1)
-            c.setFont("Helvetica", 1)
+            c.setFont(body_font, 1)
             size = 1
         for line in _wrap(b.text, 95):
             if y < 50:

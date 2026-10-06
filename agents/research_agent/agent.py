@@ -53,6 +53,8 @@ class Transcript:
     model_calls: int = 0
     error: str | None = None
     providers: list[str] = field(default_factory=list)
+    agent_tokens: int = 0                  # agent model input + output tokens (cost overhead, G7b)
+    agent_cost: float = 0.0                # list-price equivalent (0 for models without a listed price)
 
     def tool_calls(self) -> list[dict[str, Any]]:
         return [e for e in self.events if e["kind"] == "tool_call"]
@@ -85,6 +87,8 @@ class ResearchAgent:
         self.t.model_calls += 1
         r = await self.router.chat(self.role, ChatRequest(messages=state["messages"], tools=SCHEMAS))
         self.t.providers.append(f"{r.provider}/{r.model}")
+        self.t.agent_tokens += (r.input_tokens or 0) + (r.output_tokens or 0)
+        self.t.agent_cost += r.est_cost_usd or 0.0
         msg: dict[str, Any] = {"role": "assistant", "content": r.content or ""}
         if r.tool_calls:
             msg["tool_calls"] = r.tool_calls

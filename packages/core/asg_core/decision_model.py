@@ -26,6 +26,7 @@ class Assessment:
     evidence: list[str] = field(default_factory=list) # short quotes the judge points at
     model: str | None = None
     input_tokens: int = 0
+    output_tokens: int = 0                            # judge reasoning + answer (cost overhead, G7b)
     est_cost: float = 0.0
     degraded: bool = False                            # judge unavailable / unparseable
     error: str | None = None
@@ -95,7 +96,7 @@ class GenerativeJudge:
         data = _parse(r.content or "")
         if data is None:
             return Assessment(0.0, model=f"{r.provider}/{r.model}", degraded=True, error="unparseable judge output",
-                              input_tokens=r.input_tokens, est_cost=r.est_cost_usd)
+                              input_tokens=r.input_tokens, output_tokens=r.output_tokens, est_cost=r.est_cost_usd)
         cats = {k: float(v) for k, v in (data.get("categories") or {}).items()
                 if k in ATTACK_TYPES and isinstance(v, (int, float))}
         try:
@@ -104,7 +105,7 @@ class GenerativeJudge:
             mal = 0.0
         ev = [str(e)[:200] for e in (data.get("evidence") or []) if isinstance(e, str)][:5]
         return Assessment(mal, cats, ev, model=f"{r.provider}/{r.model}", input_tokens=r.input_tokens,
-                          est_cost=r.est_cost_usd)
+                          output_tokens=r.output_tokens, est_cost=r.est_cost_usd)
 
 
 class JevDecisionModel:

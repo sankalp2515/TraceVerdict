@@ -22,8 +22,8 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements.lock
-      - name: System libraries (OpenCV, used by the OCR extractor)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+      - name: System libraries (OpenCV for the OCR extractor; DejaVu font for Unicode PDF fixtures)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 fonts-dejavu-core
       - name: Install (pinned)
         run: |
           python -m pip install --upgrade pip

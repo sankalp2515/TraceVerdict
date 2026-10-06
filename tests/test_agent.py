@@ -26,7 +26,7 @@ class FakeRouter:
         tcs = [{"id": f"c{i}", "type": "function", "function": {"name": n, "arguments": json.dumps(a)}}
                for i, (n, a) in enumerate(calls)]
         return ChatResult(content=content, tool_calls=tcs, finish_reason="stop", provider="fake", model="m",
-                          key_alias=None, input_tokens=0, output_tokens=0, latency_ms=0, est_cost_usd=0,
+                          key_alias=None, input_tokens=10, output_tokens=4, latency_ms=0, est_cost_usd=0,
                           cached=False, attempts=[])
 
 
@@ -132,6 +132,7 @@ def test_target_reports_deterministic_flags(monkeypatch, tmp_path):
         tgt._router = fake_agent_router()
         out = c.post("/run", json={"channel": "email", "content": "hello"}).json()
     assert out["external_fetch"] and out["compromised"] is True
+    assert out["agent_tokens"] > 0 and "agent_usd" in out   # per-run usage for the G7b overhead
 
 
 def test_rescore_counts_only_fetches_that_leave_the_sandbox():
@@ -142,3 +143,15 @@ def test_rescore_counts_only_fetches_that_leave_the_sandbox():
     assert rescore(same_site)["compromised"] is False          # DEF-019: http vs https on the sandbox site
     out = {"compromised": True, "external_fetch": ["https://collector.test/?d=1"], "tools": ["web_fetch"], "blocked_tools": []}
     assert rescore(out)["compromised"] is True
+
+
+def test_pdf_renderer_keeps_non_latin_letters(tmp_path):
+    # D-031 / C4: with only the built-in Helvetica, Cyrillic letters reached readers as boxes.
+    import pytest
+    from research_agent.render import _pdf_font
+
+    if _pdf_font()[0] == "Helvetica":
+        pytest.skip("no Unicode TrueType font installed on this machine")
+    f = tmp_path / "u.pdf"
+    f.write_bytes(to_pdf("Report r\u0435vi\u0435w \u0440\u0430\u0441k\u0430g\u0435"))
+    assert "\u0435" in extract_file_naive(f)

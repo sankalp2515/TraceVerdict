@@ -226,7 +226,7 @@ class Engine:
         key = self._key("judge", scan.view, source, task, agent_id, policy.model_dump())
         cached = self._get(key)
         if cached is not None:
-            return Assessment(**{**cached.__dict__, "input_tokens": 0, "est_cost": 0.0}), False
+            return Assessment(**{**cached.__dict__, "input_tokens": 0, "output_tokens": 0, "est_cost": 0.0}), False
         cap = policy.budgets.daily_tokens_tier2
         if cap is not None and self._tokens_today(agent_id) >= cap:
             return Assessment(0, degraded=True), True
@@ -448,7 +448,8 @@ class Engine:
                                tier=tier, degraded=degraded, budget_degraded=budget_degraded,
                                latency_ms=round((time.perf_counter() - t0) * 1000, 2))
         result.event_id = self.logger.inspection(session.session_id, agent_id, source, scan.doc.text, result,
-                                                  assessment.model, assessment.input_tokens, assessment.est_cost)
+                                                  assessment.model, assessment.input_tokens, assessment.est_cost,
+                                                  assessment.output_tokens)
         self._remember_recent(result.event_id, agent_id, scan.doc.text)
         return result
 

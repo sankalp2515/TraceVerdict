@@ -33,7 +33,7 @@ _SCHEMA = [
         id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT, agent_id TEXT, session_id TEXT, decision TEXT,
         enforced TEXT, policy_rule TEXT, reason TEXT, labels TEXT, risk REAL, session_risk REAL, tier INTEGER,
         latency_ms REAL, degraded INTEGER, budget_degraded INTEGER, model TEXT, input_tokens INTEGER,
-        est_cost REAL, created_at REAL)""",
+        est_cost REAL, created_at REAL, output_tokens INTEGER DEFAULT 0)""",
     "CREATE INDEX IF NOT EXISTS ix_decisions_time ON decisions(created_at)",
     """CREATE TABLE IF NOT EXISTS actions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT, tool TEXT, args_redacted TEXT,
@@ -59,6 +59,10 @@ class DecisionLogger:
     def __init__(self, store: Store, secrets_to_redact: Iterable[str] = ()) -> None:
         self.store = store
         self.store.ensure_schema(_SCHEMA)
+        try:   # databases created before judge output tokens were recorded (G7b)
+            self.store.execute("ALTER TABLE decisions ADD COLUMN output_tokens INTEGER DEFAULT 0")
+        except Exception:
+            pass   # column already present
         self.extra_secrets = [s for s in secrets_to_redact if s]
         self.previews = os.environ.get("ASG_STORE_PREVIEWS", "1") != "0"
         self._seq: dict[str, int] = {}
@@ -97,7 +101,7 @@ class DecisionLogger:
         return eid
 
     def inspection(self, session_id: str, agent_id: str, source: str, content: str, r: InspectResult,
-                   model: str | None = None, input_tokens: int = 0, est_cost: float = 0.0) -> str:
+                   model: str | None = None, input_tokens: int = 0, est_cost: float = 0.0, output_tokens: int = 0) -> str:
         eid = self.event(session_id, agent_id, "content_in", source, content)
         for f in r.findings:
             self.store.execute(
@@ -106,7 +110,8 @@ class DecisionLogger:
                 (eid, f.span[0] if f.span else None, f.span[1] if f.span else None, self.scrub(f.preview, 120), self._redact(f.origin),
                  self._redact(f.signal), json.dumps(f.labels), f.score, f.tier))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
-                       r.risk, r.session_risk, r.tier, r.latency_ms, r.degraded, r.budget_degraded, model, input_tokens, est_cost)
+                       r.risk, r.session_risk, r.tier, r.latency_ms, r.degraded, r.budget_degraded, model, input_tokens, est_cost,
+                       output_tokens)
         self.store.execute("UPDATE sessions SET risk = ? WHERE id = ?", (r.session_risk, session_id))
         return eid
 
@@ -158,14 +163,14 @@ class DecisionLogger:
         return rows[0]["event_id"]
 
     def _decision(self, eid, agent_id, session_id, decision, enforced, rule, reason, labels, risk, session_risk, tier,
-                  latency_ms, degraded, budget_degraded, model, input_tokens, est_cost) -> None:
+                  latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, output_tokens=0) -> None:
         self.store.execute(
             "INSERT INTO decisions (event_id, agent_id, session_id, decision, enforced, policy_rule, reason, labels, risk, "
-            "session_risk, tier, latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "session_risk, tier, latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, created_at, output_tokens) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (eid, self._redact(agent_id), session_id, decision, enforced, self._redact(rule), self.scrub(reason, 400), json.dumps(labels), risk,
              session_risk, tier, latency_ms, int(degraded), int(budget_degraded), self._redact(model) if model else None,
-             input_tokens, est_cost, time.time()))
+             input_tokens, est_cost, time.time(), output_tokens))
 
     # ---- readers (API / Console) ------------------------------------------------------------
     def session_events(self, session_id: str) -> list[dict[str, Any]]:
@@ -182,7 +187,7 @@ class DecisionLogger:
         return rows
 
     def decisions(self, decision: str | None = None, label: str | None = None, agent: str | None = None,
-                  since: float | None = None, limit: int = 200) -> list[dict[str, Any]]:
+                  since: float | None = None, limit: int = 200, before: float | None = None) -> list[dict[str, Any]]:
         q, p = "SELECT d.*, e.source, e.kind, e.preview FROM decisions d JOIN events e ON e.id = d.event_id WHERE 1=1", []
         if decision:
             q += " AND d.decision = ?"; p.append(decision)
@@ -190,6 +195,8 @@ class DecisionLogger:
             q += " AND d.agent_id = ?"; p.append(agent)
         if since:
             q += " AND d.created_at >= ?"; p.append(since)
+        if before:   # keyset pagination: pass the oldest created_at of the previous page
+            q += " AND d.created_at < ?"; p.append(before)
         if label:
             q += " AND d.labels LIKE ?"; p.append(f'%"{label}"%')
         q += " ORDER BY d.created_at DESC LIMIT ?"; p.append(limit)

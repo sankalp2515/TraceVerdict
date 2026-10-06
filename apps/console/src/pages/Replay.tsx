@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, type EventRow } from "../api";
-import { Empty, Section } from "../components/ui";
 import { Timeline } from "../components/Timeline";
+import { Card, Empty, ErrorNote, PageHeader, Stat } from "../components/ui";
 
 export function Replay() {
   const [params, setParams] = useSearchParams();
@@ -33,25 +33,33 @@ export function Replay() {
 
   const risk = events?.reduce((m, e) => Math.max(m, e.session_risk ?? 0), 0) ?? 0;
   const stopped = events?.filter((e) => e.decision && e.decision !== "ALLOW").length ?? 0;
+  const actions = events?.filter((e) => e.kind === "action").length ?? 0;
 
   return (
-    <Section title="Session replay" subtitle="Reconstruct a session end to end: content in, finding, decision, action.">
-      <form className="mb-4 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); load(sessionId.trim()); }}>
-        <label className="sr-only" htmlFor="sid">Session ID</label>
-        <input id="sid" className="input mono min-w-0 flex-1" placeholder="Session ID (from the Playground or the Decisions feed)" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
-        <button className="btn btn-primary" disabled={!sessionId.trim() || loading}>{loading ? "Loading…" : "Replay"}</button>
-      </form>
-      {error && <p className="mb-3 text-sm" style={{ color: "var(--block)" }}>{error}</p>}
+    <div className="space-y-10">
+      <PageHeader index="02" label="Prove" title={<>Leave nothing<br />unexplained.</>}
+        lede="Replay a session end to end: what came in, what was found, which rule decided, and what the agent was allowed to do." />
+      <Card>
+        <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(e) => { e.preventDefault(); load(sessionId.trim()); }}>
+          <label className="sr-only" htmlFor="sid">Session ID</label>
+          <input id="sid" className="input mono min-w-0 flex-1" placeholder="Session ID (from the Playground or the Decisions feed)" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
+          <button className="pill pill-primary" disabled={!sessionId.trim() || loading}>{loading ? "Loading…" : "Replay session"}</button>
+        </form>
+        {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+      </Card>
       {events === null ? (
-        <Empty>Enter a session ID to replay it.</Empty>
+        <Empty>Enter a session ID to replay it. Every Playground run links here.</Empty>
       ) : (
-        <>
-          <p className="muted mb-3 text-sm">
-            {events.length} events · {stopped} decisions other than allow · peak session risk {risk.toFixed(2)}
-          </p>
+        <Card>
+          <div className="mb-7 grid grid-cols-2 gap-6 sm:grid-cols-4">
+            <Stat value={events.length} label="Events in order" />
+            <Stat value={actions} label="Tool calls checked" />
+            <Stat value={stopped} label="Decisions other than allow" tone={stopped ? "var(--block)" : undefined} />
+            <Stat value={risk.toFixed(2)} label="Peak session risk" />
+          </div>
           <Timeline events={events} />
-        </>
+        </Card>
       )}
-    </Section>
+    </div>
   );
 }

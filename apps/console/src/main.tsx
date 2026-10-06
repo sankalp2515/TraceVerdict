@@ -1,20 +1,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./index.css";
 import { Layout } from "./components/Layout";
 import { Decisions } from "./pages/Decisions";
+import { Overview } from "./pages/Overview";
 import { Playground } from "./pages/Playground";
+import { Policy } from "./pages/Policy";
 import { Replay } from "./pages/Replay";
-import { Scorecard } from "./pages/Scorecard";
+import { Results } from "./pages/Results";
+import { Review } from "./pages/Review";
 
-// Apply the saved/system theme before first paint.
+// Dark is the primary IntentSeal theme; an explicit choice is remembered. Applied before first paint.
 try {
-  const saved = localStorage.getItem("theme");
-  const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.classList.toggle("dark", localStorage.getItem("theme") !== "light");
 } catch {
-  /* storage unavailable */
+  document.documentElement.classList.add("dark");
 }
 
 createRoot(document.getElementById("root")!).render(
@@ -23,10 +24,15 @@ createRoot(document.getElementById("root")!).render(
     <HashRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Playground />} />
+          <Route path="/" element={<Overview />} />
+          <Route path="/playground" element={<Playground />} />
           <Route path="/replay" element={<Replay />} />
-          <Route path="/scorecard" element={<Scorecard />} />
+          <Route path="/results" element={<Results />} />
+          <Route path="/scorecard" element={<Navigate to="/results" replace />} />
           <Route path="/decisions" element={<Decisions />} />
+          <Route path="/review" element={<Review />} />
+          <Route path="/policy" element={<Policy />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </HashRouter>

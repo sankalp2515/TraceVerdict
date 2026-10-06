@@ -1,8 +1,10 @@
-// Typed client for the Gateway API. Uses the public read-only key (never an admin key in the browser).
+// Typed client for the IntentSeal Gateway API. Uses the public read-only key (never an admin key in the browser).
 
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 const API_KEY: string = (import.meta.env.VITE_API_KEY as string | undefined) ?? "";
-export const PRODUCT_NAME: string = (import.meta.env.VITE_PRODUCT_NAME as string | undefined) ?? "[Product Name]";
+export const PRODUCT_NAME: string = (import.meta.env.VITE_PRODUCT_NAME as string | undefined) ?? "IntentSeal";
+export const TAGLINE = "Keep AI agents inside the user’s intent.";
+export const AGENT = "research-agent";
 
 export type Decision = "ALLOW" | "NEUTRALISE" | "BLOCK" | "ESCALATE";
 
@@ -13,6 +15,8 @@ export interface Scenario {
   channel?: string;
   task?: string;
   expected?: Record<string, string>;
+  surface?: "proxy";
+  source?: string;
 }
 
 export interface Step {
@@ -56,10 +60,12 @@ export interface EventRow {
 export interface DemoResult {
   scenario_id: string;
   protection: "on" | "off";
+  surface?: "proxy";
+  agent_id?: string;
   answer: string;
   error: string | null;
-  model: string | null;
-  steps: Step[];
+  model?: string | null;
+  steps?: Step[];
   outbox: Record<string, string>[];
   canary_leaked: boolean;
   external_sends: number;
@@ -85,26 +91,73 @@ export interface DecisionRow {
   preview: string;
 }
 
-export interface RateRow {
-  n: number;
-  scored: number;
-  errors: number;
-  compromised: number;
-  asr: number | null;
+export interface Rate { n: number; detected?: number; recall: number | null }
+export interface AsrRow { n: number; scored: number; compromised: number; asr: number | null }
+export interface Fpr {
+  n: number; held: number; false_alarms: number; fpr: number | null; disruptive: number; fpr_disruptive: number | null;
+  escalation_rate: number | null; alarms: string[];
 }
-
-export interface Report {
+export interface E2E {
+  suite: string; models: string[]; off: AsrRow; on: AsrRow; relative_reduction: number | null; canary_leaks_on: number;
+  caught: { n: number; caught: number; recall: number | null };
+}
+export interface Summary {
+  kind: "summary";
   file: string;
-  name: string;
-  protection: "on" | "off";
   date: string;
   git_sha: string | null;
-  agent_role: string;
-  suite: string;
-  overall: RateRow;
-  by_category: Record<string, RateRow>;
-  by_channel: Record<string, RateRow>;
-  benign: { success_rate: number; n: number; errors: number } | null;
+  corpus_version: string;
+  settings: { engine_versions: Record<string, Record<string, number>> };
+  content_detection: {
+    scored: number; held: number; recall: number | null; raw_recall_incl_not_delivered: number | null;
+    not_delivered: Record<string, { n: number; detected: number; reason: string }>;
+    by_type: Record<string, Rate>; by_channel: Record<string, Rate>;
+    matrix: Record<string, Record<string, number | null>>; matrix_n: Record<string, Record<string, number>>;
+  };
+  fpr: { dev: Fpr | null; holdout: Fpr | null; all_channel_stress: { dev: Fpr | null; holdout: Fpr | null } };
+  latency_isolated: { n: number; p50_ms: number; p95_ms: number; note: string } | null;
+  e2e: E2E[];
+  utility: { off: number; on: number; n: number; retention: number | null } | null;
+  claim: {
+    F: string; D: string; types_meeting: number; fpr_used: number | null; rule: string;
+    types: { type: string; checkpoint: string; n: number; recall: number | null; status: string }[];
+    text_channels: Record<string, boolean>; rich_channels: Record<string, boolean>;
+  };
+}
+
+export interface Approval {
+  event_id: string; session_id: string; agent_id: string; tool: string; reason: string; status: string;
+  reviewer: string | null; note: string | null; created_at: number; resolved_at: number | null; used_at: number | null;
+  args_redacted: string | null; policy_rule: string | null; labels: string[];
+}
+
+export interface MemoryEntry {
+  id: string; kind: "attack" | "benign"; agent_id: string; labels: string[]; n: number; origin: string; note: string; created_at: number;
+}
+
+export interface ToolPolicy {
+  risk: string; failure: string; pinned: string[]; allowed_recipients: string[]; allowed_domains: string[];
+  escalate_if_uncertain: boolean;
+}
+export interface Policy {
+  agent: string; mode: string; version: string; task_scope: string; unknown_tools: string; decision_model: string;
+  tools: Record<string, ToolPolicy>;
+  thresholds: { neutralise: number; block: number; escalate_band: [number, number]; judge_untrusted: string };
+  session: { risk_decay_per_turn: number; block_at: number; escalate_at: number };
+  sensitive_data: { patterns: string[]; drop_non_visible: boolean };
+  budgets: { daily_tokens_tier2: number | null };
+}
+
+export interface Metrics {
+  window_hours: number; decisions: number; by_decision: Record<string, number>; by_rule: Record<string, number>;
+  by_label: Record<string, number>;
+  inspections: { n: number; escalated_to_judge: number; escalation_rate: number | null; degraded: number };
+  latency_ms: {
+    fast_path: { n: number; p50: number | null; p95: number | null };
+    judge_path: { n: number; p50: number | null; p95: number | null };
+  };
+  memory: Record<string, number>;
+  approvals_pending: number;
 }
 
 export class ApiError extends Error {
@@ -145,5 +198,10 @@ export const api = {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== ""));
     return call<DecisionRow[]>(`/v1/decisions?${q.toString()}`);
   },
-  scorecard: (agent: string) => call<{ agent: string; reports: Record<string, Report> }>(`/v1/scorecard/${agent}`),
+  scorecard: (agent: string) =>
+    call<{ agent: string; summary: Summary | null; reports: Record<string, unknown> }>(`/v1/scorecard/${agent}`),
+  approvals: (status = "pending") => call<Approval[]>(`/v1/approvals?status=${status}`),
+  memory: () => call<{ stats: Record<string, number>; entries: MemoryEntry[] }>("/v1/memory"),
+  policy: (agent: string) => call<Policy>(`/v1/policies/${encodeURIComponent(agent)}`),
+  metrics: (hours = 24) => call<Metrics>(`/v1/metrics?hours=${hours}`),
 };

@@ -20,6 +20,7 @@ thresholds:
   neutralise: 0.6
   block: 0.85
   escalate_band: [0.5, 0.85]
+  judge_untrusted: always      # high-risk tools (send_message): every untrusted document gets a judge assessment
 session:
   risk_decay_per_turn: 0.2
   block_at: 1.5

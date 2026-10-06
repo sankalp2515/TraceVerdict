@@ -38,11 +38,21 @@ _SCHEMA = [
     """CREATE TABLE IF NOT EXISTS actions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT, tool TEXT, args_redacted TEXT,
         final_args_redacted TEXT, pinned_overrides TEXT)""",
+    # CON-9: ESCALATE decisions wait here for a human. An approval is one-shot and only for the same
+    # session + tool + arguments (args_hash); it can resolve an ESCALATE, never a BLOCK.
+    """CREATE TABLE IF NOT EXISTS approvals (
+        event_id TEXT PRIMARY KEY, session_id TEXT, agent_id TEXT, tool TEXT, args_hash TEXT, reason TEXT,
+        status TEXT DEFAULT 'pending', reviewer TEXT, note TEXT, created_at REAL, resolved_at REAL, used_at REAL)""",
+    "CREATE INDEX IF NOT EXISTS ix_approvals_key ON approvals(session_id, tool, args_hash, status)",
 ]
 
 
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "ignore")).hexdigest()[:24]
+
+
+def args_hash(tool: str, args: dict[str, Any]) -> str:
+    return _hash(tool + "\n" + json.dumps(args or {}, sort_keys=True, default=str))
 
 
 class DecisionLogger:
@@ -108,7 +118,44 @@ class DecisionLogger:
                             self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0)
+        if r.decision.value == "ESCALATE":
+            self.store.execute("INSERT INTO approvals (event_id, session_id, agent_id, tool, args_hash, reason, created_at) "
+                               "VALUES (?,?,?,?,?,?,?)", (eid, session_id, self._redact(agent_id), self._redact(tool),
+                                                          args_hash(tool, args), self.scrub(r.reason, 400), time.time()))
         return eid
+
+    # ---- approvals (CON-9) -------------------------------------------------------------------
+    def approvals(self, status: str | None = "pending", agent: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        q = ("SELECT a.event_id, a.session_id, a.agent_id, a.tool, a.reason, a.status, a.reviewer, a.note, a.created_at, "
+             "a.resolved_at, a.used_at, x.args_redacted, d.policy_rule, d.labels FROM approvals a "
+             "LEFT JOIN actions x ON x.event_id = a.event_id LEFT JOIN decisions d ON d.event_id = a.event_id WHERE 1=1")
+        p: list[Any] = []
+        if status:
+            q += " AND a.status = ?"; p.append(status)
+        if agent:
+            q += " AND a.agent_id = ?"; p.append(agent)
+        q += " ORDER BY a.created_at DESC LIMIT ?"; p.append(limit)
+        rows = self.store.query(q, tuple(p))
+        for r in rows:
+            r["labels"] = json.loads(r["labels"] or "[]")
+        return rows
+
+    def resolve_approval(self, event_id: str, approve: bool, reviewer: str, note: str = "") -> bool:
+        cur = self.store.execute("UPDATE approvals SET status = ?, reviewer = ?, note = ?, resolved_at = ? "
+                                 "WHERE event_id = ? AND status = 'pending'",
+                                 ("approved" if approve else "denied", self._redact(reviewer), self.scrub(note, 400),
+                                  time.time(), event_id))
+        return bool(cur.rowcount)
+
+    def take_approval(self, session_id: str, tool: str, args: dict[str, Any]) -> str | None:
+        """Consume one approved, unused approval for exactly this call; returns its event id."""
+        rows = self.store.query("SELECT event_id FROM approvals WHERE session_id = ? AND tool = ? AND args_hash = ? "
+                                "AND status = 'approved' AND used_at IS NULL ORDER BY resolved_at LIMIT 1",
+                                (session_id, tool, args_hash(tool, args)))
+        if not rows:
+            return None
+        self.store.execute("UPDATE approvals SET used_at = ? WHERE event_id = ?", (time.time(), rows[0]["event_id"]))
+        return rows[0]["event_id"]
 
     def _decision(self, eid, agent_id, session_id, decision, enforced, rule, reason, labels, risk, session_risk, tier,
                   latency_ms, degraded, budget_degraded, model, input_tokens, est_cost) -> None:

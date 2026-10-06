@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 import ftfy
 from anyascii import anyascii
@@ -22,12 +23,33 @@ class Normalised:
     ascii_view: str                             # transliterated to ASCII (anyascii)
     changes: dict[str, int] = field(default_factory=dict)
     flags: set[str] = field(default_factory=set)
+    skeleton: str | None = None                 # look-alike letters folded to the Latin letter they imitate
 
     def views(self) -> list[tuple[str, str]]:
         out = [("normalised", self.text)]
         if self.ascii_view != self.text:
             out.append(("ascii", self.ascii_view))
+        if self.skeleton and self.skeleton not in (self.text, self.ascii_view):
+            out.append(("skeleton", self.skeleton))
         return out
+
+
+@lru_cache(maxsize=4096)
+def _latin_lookalike(ch: str) -> str:
+    """The ASCII letter a character visually imitates (Unicode confusables data), else its transliteration.
+    anyascii transliterates by sound (Cyrillic 'р' -> 'r'); detection needs shape ('р' -> 'p')."""
+    if ord(ch) < 128 or not ch.isalpha():
+        return ch
+    hit = confusables.is_confusable(ch, preferred_aliases=["latin"], greedy=True) or []
+    for entry in hit:
+        for h in entry.get("homoglyphs", []):
+            if len(h["c"]) == 1 and ord(h["c"]) < 128:
+                return h["c"]
+    return anyascii(ch)
+
+
+def latin_skeleton(text: str) -> str:
+    return "".join(_latin_lookalike(c) for c in text)
 
 
 def normalise(text: str) -> Normalised:
@@ -55,4 +77,5 @@ def normalise(text: str) -> Normalised:
                 flags.add("confusable_characters")
             break
 
-    return Normalised(original=text, text=fixed, ascii_view=folded, changes=changes, flags=flags)
+    skeleton = latin_skeleton(fixed) if flags & {"mixed_script", "confusable_characters"} else None
+    return Normalised(original=text, text=fixed, ascii_view=folded, changes=changes, flags=flags, skeleton=skeleton)

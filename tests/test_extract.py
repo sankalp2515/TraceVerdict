@@ -88,3 +88,16 @@ def test_sniff_and_failure_fallback():
     assert sniff_format("plain words") == "text"
     d = extract(b"%PDF-broken", fmt="pdf")
     assert d.warnings and "PDF-broken" in d.text
+
+
+def test_bare_email_body_is_text_not_an_empty_message():
+    # DEF-016: a plain body sent with source="email" used to parse as an RFC 822 message with no body -> empty view
+    body = "Hi team, the offsite moved to Thursday. Agenda attached later."
+    doc = extract(body, source="email")
+    assert doc.format == "text" and body in doc.text
+    assert extract("From: a@b.test\nSubject: Hi\n\nBody line.", source="email").format == "email"
+
+
+def test_empty_structured_parse_falls_back_to_raw_text():
+    doc = extract("<div data-x='only attributes here'></div>", fmt="html")
+    assert doc.text.strip()   # the tiers always see something for non-empty text input

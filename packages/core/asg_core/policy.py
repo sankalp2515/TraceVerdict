@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,11 @@ class Thresholds(BaseModel):
     neutralise: float = 0.6
     block: float = 0.85
     escalate_band: tuple[float, float] = (0.5, 0.85)
+    # Untrusted third-party content (not user turns) goes to the Tier 2 judge when:
+    #   "classifier" - Tier 1 scores it at or above escalate_band[0] (fast path for everything else), or
+    #   "always"     - always (for agents with high-risk tools; Tier 1 alone misses paraphrased injections, DEF-017)
+    judge_untrusted: str = "classifier"
+    judge_min_chars: int = 40                           # shorter tool output (e.g. "sent") stays on the fast path
 
 
 class SessionPolicy(BaseModel):
@@ -47,6 +53,11 @@ class SensitiveData(BaseModel):
     drop_non_visible: bool = True                       # untrusted docs: the model sees what a human sees
 
 
+class MemoryPolicy(BaseModel):
+    enabled: bool = True                                # reviewer-confirmed attacks / false positives (memory.py)
+    match_threshold: float = 0.6                        # containment of a stored attack fingerprint
+
+
 class AgentPolicy(BaseModel):
     agent: str
     mode: str = "monitor"                               # monitor | enforce
@@ -57,6 +68,7 @@ class AgentPolicy(BaseModel):
     thresholds: Thresholds = Field(default_factory=Thresholds)
     session: SessionPolicy = Field(default_factory=SessionPolicy)
     budgets: Budgets = Field(default_factory=Budgets)
+    memory: MemoryPolicy = Field(default_factory=MemoryPolicy)
     decision_model: str = "generative_free"
     version: str = "1"
 
@@ -70,9 +82,33 @@ class AgentPolicy(BaseModel):
         return out
 
 
+AGENT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+
+
+def policy_path(agent: str, directory: Path | None = None) -> Path:
+    """policies/<agent>.yaml; agent ids are restricted so a request can never name a file outside the directory."""
+    if not AGENT_ID.match(agent or "") or ".." in agent:
+        raise ValueError("invalid agent id")
+    return (directory or Path(os.environ.get("ASG_POLICY_DIR") or repo_root() / "policies")) / f"{agent}.yaml"
+
+
+def save_policy(policy: AgentPolicy, directory: Path | None = None) -> Path:
+    path = policy_path(policy.agent, directory)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".yaml.tmp")
+    tmp.write_text(yaml.safe_dump(policy.model_dump(mode="json"), sort_keys=False), encoding="utf-8")
+    tmp.replace(path)   # atomic on the same volume
+    return path
+
+
 def load_policy(agent: str, directory: Path | None = None) -> AgentPolicy:
-    d = directory or repo_root() / "policies"
-    path = d / f"{agent}.yaml"
+    path = policy_path(agent, directory)
     raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {"agent": agent}
     raw.setdefault("agent", agent)
-    return AgentPolicy.model_validate(raw)
+    policy = AgentPolicy.model_validate(raw)
+    # Operational override (12-factor): e.g. evaluation runs, which exceed a production daily cap by design.
+    # "none" lifts the cap; the evaluation summary records the value used.
+    override = os.environ.get("ASG_BUDGET_TIER2_DAILY_TOKENS")
+    if override:
+        policy.budgets.daily_tokens_tier2 = None if override.lower() == "none" else int(override)
+    return policy

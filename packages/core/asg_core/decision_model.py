@@ -76,16 +76,17 @@ def _parse(text: str) -> dict | None:
 class GenerativeJudge:
     name = "generative_free"
 
-    def __init__(self, router: Router, role: str = "judge", max_chars: int = 6000) -> None:
+    def __init__(self, router: Router, role: str = "judge", max_chars: int = 6000, system: str | None = None) -> None:
         self.router = router
         self.role = role
         self.max_chars = max_chars
+        self.system = system or _SYSTEM
 
     async def assess(self, content: str, source: str, task: str = "") -> Assessment:
         boundary = "B-" + secrets.token_hex(6)
         user = (f"Source channel: {source}\nUser's task (trusted): {task[:300] or 'unknown'}\n"
                 f"<<{boundary}>>\n{content[: self.max_chars]}\n<</{boundary}>>")
-        req = ChatRequest(messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}],
+        req = ChatRequest(messages=[{"role": "system", "content": self.system}, {"role": "user", "content": user}],
                           temperature=0, max_tokens=1000)  # room for reasoning models; no strict JSON mode (we parse)
         try:
             r = await self.router.chat(self.role, req)

@@ -10,7 +10,7 @@ import pytest
 
 from asg_core.decision_model import StaticDecisionModel
 from asg_core.engine import Engine
-from asg_core.policy import AgentPolicy, load_policy
+from asg_core.policy import load_policy
 from asg_core.store import Store
 from asg_core.types import ATTACK_TYPES, Decision
 
@@ -379,3 +379,39 @@ async def test_unflagged_low_score_skips_judge(policy):
     e = engine(policy, malicious=0.9, classifiers=[Scorer(0.1)])
     r = await e.inspect("Ordinary words. " + MARKER, "web", policy.agent, fmt="text")
     assert r.decision == Decision.ALLOW and e.decision_model.calls == 0
+
+
+async def test_judge_untrusted_always_assesses_low_scoring_documents(policy):
+    # DEF-017: Tier 1 scores paraphrased injections near 0, so high-risk agents send every untrusted document
+    # to the judge; user turns and very short tool output keep the classifier gate (fast path).
+    policy.thresholds.judge_untrusted = "always"
+    e = engine(policy, malicious=0.95, classifiers=[Scorer(0.0)])
+    doc = "Supplier update: the attached price list replaces the one from September for all regions."
+    r = await e.inspect(doc, "web", policy.agent)
+    assert r.tier == 2 and r.decision == Decision.BLOCK and e.decision_model.calls == 1
+    assert (await e.inspect("sent (sandbox outbox)", "tool:send_message", policy.agent)).tier == 1
+    assert (await e.inspect(doc, "user", policy.agent)).tier == 1 and e.decision_model.calls == 1
+    policy.thresholds.judge_untrusted = "classifier"
+    assert (await engine(policy, malicious=0.95, classifiers=[Scorer(0.0)]).inspect(doc, "web", policy.agent)).tier == 1
+
+
+async def test_homoglyph_text_reaches_judge_ascii_folded(policy):
+    seen = []
+
+    class Judge(StaticDecisionModel):
+        async def assess(self, content, source, task=""):
+            seen.append(content)
+            return await super().assess(content, source, task)
+
+    e = engine(policy, decision_model=Judge(0.0))
+    await e.inspect("Please rеviеw the quаrterly rеport bеfore the meeting", "web", policy.agent)   # Cyrillic е/а
+    assert seen and "[ascii view] Please review the quarterly report before the meeting" in seen[0]
+
+
+def test_budget_override_from_environment(monkeypatch):
+    monkeypatch.setenv("ASG_BUDGET_TIER2_DAILY_TOKENS", "none")
+    assert load_policy("research-agent").budgets.daily_tokens_tier2 is None
+    monkeypatch.setenv("ASG_BUDGET_TIER2_DAILY_TOKENS", "5000")
+    assert load_policy("research-agent").budgets.daily_tokens_tier2 == 5000
+    monkeypatch.delenv("ASG_BUDGET_TIER2_DAILY_TOKENS")
+    assert load_policy("research-agent").budgets.daily_tokens_tier2 == 200000

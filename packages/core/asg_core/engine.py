@@ -22,9 +22,11 @@ from typing import Any, Callable, Iterable
 from . import action_guard
 from .classifier import local_classifier
 from .decision_model import Assessment, DecisionModel, make_decision_model
+from .decode import decode_views
 from .extract import ExtractedDoc, extract
 from .llm.router import Router
 from .logger import DecisionLogger
+from .memory import AttackMemory, Match
 from .normalise import normalise
 from .policy import AgentPolicy, load_policy
 from .secrets import registry
@@ -62,6 +64,7 @@ class Engine:
                  decision_model: DecisionModel | None = None, classifiers: Iterable[Any] | None = None,
                  router: Router | None = None, store: Store | None = None,
                  logger: DecisionLogger | None = None, sessions: SessionStore | None = None,
+                 memory: AttackMemory | None = None,
                  policy_directory: Path | None = None, tier0_timeout_s: float = 2.0,
                  tier1_timeout_s: float = 1.0, tier2_timeout_s: float = 15.0,
                  segment_chars: int = 1000, encoded_min_chars: int = 48,
@@ -76,6 +79,11 @@ class Engine:
         self.router = router
         self.store = logger.store if logger else (store or (router.store if router else Store(":memory:")))
         self.logger = logger or DecisionLogger(self.store)
+        self.memory = memory or AttackMemory(self.store)
+        # Recent extracted text by event id (in process only, never persisted) so a reviewer can confirm an
+        # attack or mark a false positive on a fresh decision; the memory itself keeps fingerprints only.
+        self._recent: OrderedDict[str, tuple[str, str]] = OrderedDict()
+        self.recent_size = 500
         self.sessions = sessions or SessionStore()
         self.policy_loader = (lambda agent: load_policy(agent, policy_directory)) if policy_directory else policy_loader
         self.decision_model = decision_model
@@ -142,7 +150,10 @@ class Engine:
         doc = extract(content, fmt=fmt, filename=filename, source=source)
         findings, chunks, views, all_chunks = [], [], [], []
         for segment in doc.segments:
-            views.append(normalise(segment.text).text)
+            seg_norm = normalise(segment.text)
+            views.append(seg_norm.text)
+            if seg_norm.flags & {"mixed_script", "confusable_characters"}:
+                views.append("[ascii view] " + (seg_norm.skeleton or seg_norm.ascii_view))   # look-alikes folded by shape
             encoded = list(self._encoded.finditer(segment.text))
             for offset in range(0, len(segment.text), self.segment_chars):
                 text = segment.text[offset:offset + self.segment_chars]
@@ -167,6 +178,17 @@ class Engine:
                         all_chunks.append(chunk)
                         if signals:
                             chunks.append(chunk)
+            # CORE-3: decode before scoring. Decoded text is an extra view (always escalated); spans point at the
+            # encoded run in the original, so a neutralise quarantines the encoded text itself.
+            for d in decode_views(segment.text):
+                span = (segment.start + d.span[0], segment.start + d.span[1])
+                findings.append(Finding(span=span, preview=d.text, origin=segment.origin, signal="decoded:" + d.kind,
+                                        labels=["Encoded Instructions"]))
+                views.append(f"[decoded {d.kind}] {normalise(d.text).text}")
+                for start in range(0, len(d.text), self.segment_chars):
+                    chunk = (*span, segment.origin, normalise(d.text[start:start + self.segment_chars]).ascii_view)
+                    chunks.append(chunk)
+                    all_chunks.append(chunk)
         return _Scan(doc, "\n".join(views), findings, chunks, all_chunks)
 
     async def _scores(self, chunks: list[tuple[int, int, str, str]]) -> list[Finding]:
@@ -263,6 +285,30 @@ class Engine:
         boundary = "UNTRUSTED-" + secrets.token_hex(8)
         return f"<<{boundary}>>\n{text}\n<</{boundary}>>"
 
+    def _remember_recent(self, event_id: str | None, agent_id: str, text: str) -> None:
+        if event_id and self.recent_size:
+            self._recent[event_id] = (agent_id, text)
+            while len(self._recent) > self.recent_size:
+                self._recent.popitem(last=False)
+
+    def feedback(self, verdict: str, *, event_id: str | None = None, content: str | bytes | None = None,
+                 agent_id: str = "*", labels: Iterable[str] = (), origin: str = "reviewer", note: str = "",
+                 source: str = "", filename: str | None = None, fmt: str | None = None) -> str | None:
+        """Record a reviewer verdict (CON-8) or an adversary-loop miss (EVAL-4) in the memory.
+
+        verdict: "attack" (confirmed attack) or "false_positive". Content comes from `content` (extracted the same
+        way inspect() extracts it) or from the recent in-process text of `event_id`; only fingerprints are stored."""
+        if content is not None:
+            content = extract(content, fmt=fmt, filename=filename, source=source).text
+        else:
+            hit = self._recent.get(event_id or "")
+            if hit is None:
+                raise KeyError("event not in recent memory; pass the content instead")
+            agent_id = hit[0] if agent_id == "*" and verdict == "false_positive" else agent_id
+            content = hit[1]
+        kind = {"attack": "attack", "false_positive": "benign"}[verdict]
+        return self.memory.add(content, kind, labels, agent_id=agent_id, origin=origin, note=note)
+
     async def inspect(self, content: str | bytes, source: str, agent_id: str, session_id: str | None = None,
                       filename: str | None = None, fmt: str | None = None, task: str | None = None) -> InspectResult:
         # Serialise agent decisions through accounting/logging, including concurrent sessions.
@@ -300,7 +346,18 @@ class Engine:
         else:
             session.note_untrusted(scan.doc.text)
             session.flagged_untrusted |= bool(scan.chunks or scan.doc.warnings)
-        if scan.chunks:
+        known: Match | None = None
+        if policy.memory.enabled and source != "system" and scan.doc.text:
+            known = self.memory.match(scan.doc.text, agent_id, policy.memory.match_threshold)
+        if known is not None and known.kind == "attack":
+            # Reviewer-confirmed attack: decided by rules at Tier 0, no AI call needed.
+            findings.append(Finding(signal="known-attack:" + known.id, labels=known.labels or (
+                ["Instruction Override"] if source == "user" else ["Indirect Prompt Injection"]), score=known.score))
+            if source != "user":
+                session.flagged_untrusted = True
+        elif known is not None:
+            pass   # reviewer-marked false positive: skip the AI tiers; structural rules below still apply
+        elif scan.chunks:
             tier = 1
             score_key = self._key("scores", key)
             scored = self._get(score_key)
@@ -330,6 +387,9 @@ class Engine:
                     degraded = True
                     scored = []
             low = policy.thresholds.escalate_band[0]
+            if (policy.thresholds.judge_untrusted == "always" and source != "user"
+                    and len(scan.doc.text.strip()) >= policy.thresholds.judge_min_chars):
+                low = 0.0   # policy: every untrusted document is assessed by the judge (scores still logged)
             hot_spans = {(f.span, f.origin) for f in scored if f.score >= low}
             if hot_spans:
                 findings.extend(f.model_copy(deep=True) for f in scored if f.score >= low)
@@ -346,11 +406,15 @@ class Engine:
         hidden = [(f.span[0], f.span[1]) for f in findings
                   if f.signal == "non-visible-content" and f.span and policy.sensitive_data.drop_non_visible]
         risk = max(assessment.malicious if not assessment.degraded else 0.0,
-                   policy.thresholds.neutralise if hidden else 0.0)
+                   policy.thresholds.neutralise if hidden else 0.0,
+                   policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
         labels = sorted({label for f in findings for label in f.labels})
         session.add_risk(risk, labels)
         if scan.doc.warnings:
             decision, rule, reason = Decision.BLOCK, "extraction-failed", "Content could not be fully inspected"
+        elif known is not None and known.kind == "attack":
+            decision, rule, reason = (Decision.BLOCK, "known-attack-match",
+                                      f"Matches a confirmed attack in memory (similarity {known.score:.2f})")
         elif risk >= policy.thresholds.block:
             decision, rule, reason = Decision.BLOCK, "content-risk-block", "Content risk reached the policy block threshold"
         elif session.risk >= policy.session.block_at:
@@ -385,6 +449,7 @@ class Engine:
                                latency_ms=round((time.perf_counter() - t0) * 1000, 2))
         result.event_id = self.logger.inspection(session.session_id, agent_id, source, scan.doc.text, result,
                                                   assessment.model, assessment.input_tokens, assessment.est_cost)
+        self._remember_recent(result.event_id, agent_id, scan.doc.text)
         return result
 
     async def check_action(self, tool: str, args: dict[str, Any], agent_id: str,
@@ -392,6 +457,16 @@ class Engine:
         async with self._agent_locks.setdefault(agent_id, asyncio.Lock()):
             policy, session = self._policy(agent_id), self._session(agent_id, session_id)
             result = action_guard.check_action(tool, args, policy, session, self._secrets)
+            if result.decision == Decision.ESCALATE:
+                approved = self.logger.take_approval(session.session_id, tool, args)
+                if approved:   # a human approved this exact call (CON-9); approvals never override a BLOCK
+                    pinned = action_guard.check_action(tool, args, policy.model_copy(update={"mode": "monitor"}),
+                                                       Session(agent_id=agent_id, trusted=dict(session.trusted)),
+                                                       self._secrets)
+                    result = result.model_copy(update={
+                        "decision": Decision.ALLOW, "enforced": Decision.ALLOW, "final_args": pinned.final_args,
+                        "policy_rule": "human-approved", "notice": None,
+                        "reason": f"approved by a reviewer (approval {approved}); was: {result.reason}"})
             result.event_id = self.logger.action(session.session_id, agent_id, tool, args, result, session.risk)
             self.store.execute("UPDATE sessions SET risk = ? WHERE id = ?", (session.risk, session.session_id))
             return result

@@ -88,10 +88,9 @@ def sniff_format(data: bytes | str, filename: str | None = None, source: str | N
             pass
     if "<html" in head or "<body" in head or re.search(r"<(div|p|span|a|table)\b", head):
         return "html"
-    if re.match(r"^(from|to|subject|received|return-path|mime-version):", head):
+    if re.match(r"^(from|to|subject|received|return-path|mime-version|date|reply-to|message-id|content-type):", head):
         return "email"
-    if source in ("email",):
-        return "email"
+    # A bare body sent with source="email" (no RFC 822 headers) is plain text, not a message to parse.
     return "text"
 
 
@@ -110,6 +109,11 @@ def extract(data: bytes | str, fmt: str | None = None, filename: str | None = No
         else:
             doc.warnings.append(f"{fmt} extraction failed ({type(e).__name__}); raw text used")
             _text(data, doc)
+    if not doc.segments and fmt not in ("image", "pdf", "docx"):
+        # Never hand the tiers an empty view of non-empty text: inspect the raw input instead.
+        raw = _as_text(data)
+        if raw.strip():
+            _add(doc, raw, f"{fmt}:raw-fallback")
     return doc.finalise()
 
 

@@ -7,7 +7,7 @@ name = "asg-research-agent"
 version = "0.1.0"
 description = "Sandboxed reference research agent used for demos and evaluation"
 requires-python = ">=3.11"
-dependencies = ["asg-core", "langgraph>=0.2", "pypdf>=4", "python-docx>=1.1"]
+dependencies = ["asg-core", "langgraph>=0.2", "pypdf>=4", "python-docx>=1.1", "reportlab>=4", "pillow>=10"]
 
 [tool.setuptools.packages.find]
 where = ["."]

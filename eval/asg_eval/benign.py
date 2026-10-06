@@ -16,7 +16,7 @@ from typing import Any
 import yaml
 
 from asg_core.llm.router import Router
-from research_agent import AgentHooks, ResearchAgent, World
+from research_agent import ResearchAgent, World
 
 ROOT = Path(__file__).resolve().parents[2]
 logging.getLogger("httpx").setLevel(logging.WARNING)

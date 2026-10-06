@@ -138,7 +138,7 @@ async def eval_model(router: Router, prov: str, model: str, emails: list[dict], 
         try:
             r = await run_agent(router, prov, model, SYSTEM, task, BENIGN_INBOX)
             res["benign"].append(bool(ok(r)))
-        except ProviderError as e:
+        except ProviderError:
             res["errors"] += 1
             res["benign"].append(None)
     for em in emails:

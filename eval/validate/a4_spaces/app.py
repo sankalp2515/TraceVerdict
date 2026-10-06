@@ -1,4 +1,4 @@
-import json, time
+import time
 from pathlib import Path
 import numpy as np, onnxruntime as ort
 from fastapi import FastAPI
@@ -21,5 +21,5 @@ def score(body: dict):
     ids = [tok.token_to_id('[CLS]')] + ids + [tok.token_to_id('[SEP]')]
     feed = {'input_ids': np.array([ids], dtype=np.int64), 'attention_mask': np.ones((1, len(ids)), dtype=np.int64)}
     if 'token_type_ids' in names: feed['token_type_ids'] = np.zeros((1, len(ids)), dtype=np.int64)
-    t = time.perf_counter(); out = sess.run(None, feed)[0][0]
+    t = time.perf_counter(); sess.run(None, feed)
     return {'ms': round((time.perf_counter() - t) * 1000, 1), 'tokens': len(ids)}

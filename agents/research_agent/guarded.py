@@ -6,7 +6,6 @@ routes user turns and tool results through `guard.ainspect` and every tool call 
 
 from __future__ import annotations
 
-import json
 import re
 from functools import lru_cache
 from pathlib import Path

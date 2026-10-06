@@ -20,6 +20,7 @@ Checked 5 Oct 2026 via the Hugging Face and GitHub APIs. Data is downloaded at r
 | protectai/deberta-v3-base-prompt-injection-v2 | Tier 1 classifier (ONNX) | Apache-2.0 |
 | meta-llama/llama-prompt-guard-2-86m via Groq API | Tier 1 hosted signal | Llama 4 Community Licence (hosted use) |
 | `eval/corpus/v0/hard_benign.yaml` | Our hard-benign set | CC-BY-4.0 (this project) |
+| `eval/corpus/v1/hard_benign_holdout.yaml` | Our held-out hard-benign set (written before tuning) | CC-BY-4.0 (this project) |
 
 Excluded: non-commercial (qualifire benchmark), unclear licence (BIPIA, several unlicensed sets), gated
 downloads (Prompt Guard 2 weights, hackaprompt).

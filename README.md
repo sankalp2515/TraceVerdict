@@ -9,12 +9,14 @@ runs; and every decision is recorded so a security team can replay it.
 ET AI Hackathon 2026 · Problem 2 (prompt injection). We do not claim to solve prompt injection: we catch what can
 be caught, limit what a hijacked agent can do, and prove what happened.
 
+![IntentSeal Console: overview with live evaluation figures](docs/media/console-overview.webp)
+
 - Demo (Security Console): _link added at deployment_
 - Video: _link added at submission_
 - Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md) (generated from raw results) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 <!-- RESULTS:START -->
-### Results (2026-10-07, commit `b5b7590-dirty`, generated)
+### Results (2026-10-07, commit `b4bbcb9-dirty`, generated)
 
 **Grid position by the PRD §15 rule: none / none** (0 of 9 attack types at recall ≥ 85% with FPR ≤ 5%). The self-declaration is the team's decision, made from these numbers.
 
@@ -25,9 +27,11 @@ be caught, limit what a hijacked agent can do, and prove what happened.
 | False-positive rate, held-out hard-benign set (39 cases) | 10.3% |
 | Fast-path latency p95 (isolated) | 108.8 ms |
 | Attack success on the reference agent, `headline` suite (27 / 30 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `mt3` suite (40 / 40 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
 | Attack success on the reference agent, `v2e` suite (144 / 144 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
 | Attack success on the reference agent, `broad` suite (219 / 219 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) · protected run from the 5 Oct engine (before fingerprinting); rerun pending |
 | Benign task utility retained | 100.0% |
+| Security cost per agent cost, `headline` suite (30 protected runs, list prices) | 35% (security tokens per agent token: 1.02) |
 
 Per-type and per-channel numbers, false alarms and method: [docs/EVALUATION.md](docs/EVALUATION.md).
 <!-- RESULTS:END -->

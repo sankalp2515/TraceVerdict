@@ -36,3 +36,6 @@ design/preview/
 docs/wireframe-evidence/
 docs/high-fidelity-wireframe-directions.html
 *.tsbuildinfo
+
+# full-size Console screenshots for the deck/video (regenerate with headless Edge; see docs/BACKLOG.md D5)
+docs/media/*.png

@@ -1,7 +1,7 @@
 # Status
 
 Updated: **Tue 7 Oct 2026 (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
-Tests: **142 passing** offline (`.venv/Scripts/python -m pytest -q`) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
+Tests: **148 passing** offline (`.venv/Scripts/python -m pytest -q`) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
 
 ## 1. Headline numbers
 
@@ -17,9 +17,11 @@ Generated, never hand-typed: `docs/EVALUATION.md` and the README results block c
 | False-positive rate, held-out hard-benign set (39 cases) | 10.3% |
 | Fast-path latency p95 (isolated) | 108.8 ms |
 | Attack success on the reference agent, `headline` suite (27 / 30 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `mt3` suite (40 / 40 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
 | Attack success on the reference agent, `v2e` suite (144 / 144 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
 | Attack success on the reference agent, `broad` suite (219 / 219 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) · protected run from the 5 Oct engine (before fingerprinting); rerun pending |
 | Benign task utility retained | 100.0% |
+| Security cost per agent cost, `headline` suite (30 protected runs, list prices) | 35% (security tokens per agent token: 1.02) |
 
 What these numbers mean (details and method in `docs/EVALUATION.md`):
 - **Strong:** indirect injection in documents and data is detected at 91–100% per channel (PDF, DOCX, HTML, hidden text,
@@ -28,7 +30,7 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 - **Below target:** direct user-turn attacks (60.4%: user turns keep the classifier gate for latency) and held-out FPR
   10.3% (4/39: three judge errors on a code prompt template, an assistant style guide and a role-change audit event,
   plus one by-design hidden-comment quarantine; 7.7% counting only blocks). With these, the §15 rule gives no F/D level.
-- **Not yet valid:** G7b cost overhead (window mixes detection-only runs); Multi-Step has only 5 end-to-end cases.
+- **Measured 7 Oct:** G7b cost overhead per protected run (headline: security cost 35% of agent cost); Multi-Step on 29 cases (82.8%, below target); garak's own detectors as a second opinion (`docs/EVALUATION.md`).
 - Options for the owner (each needs a rerun): judge user turns for high-risk agents (`judge_untrusted`-style policy
   for the user channel), a second judge opinion before blocking unflagged content, a larger held-out benign set.
 
@@ -76,7 +78,7 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 ### Gateway API / proxy
 | ID | State | Evidence |
 |---|---|---|
-| API-1…5, 7…11 | ✅ | `tests/test_gateway.py` (18 tests); scorecard serves the summary + grid claim |
+| API-1…5, 7…11 | ✅ | `tests/test_gateway.py` (21 tests); scorecard serves the summary + grid claim |
 | API-6 | ✅ | GET + admin PUT (validated, versioned, atomic write) |
 | API-12 (P2) | ❌ | |
 | PRX-1…5 | ✅ | Unmodified OpenAI-SDK agent protected by `OPENAI_BASE_URL` alone (`examples/openai_agent`, test with the real `openai` client) |
@@ -95,7 +97,7 @@ CON-6 cost data ✅ (`/v1/costs`, `/v1/costs/{agent}`) · CON-7 policy view/edit
 | EVAL-6 (P2) | ❌ | Jev deferred |
 
 ### Demo scenarios (§16)
-S1–S9 files present (`eval/scenarios/`). S1–S7 and S9 take generator cases via `select.py`; each file states whether
+S1–S9 files present (`eval/scenarios/`). S1–S7 and S9 take generator cases via `pick_scenarios.py`; each file states whether
 its case was verified to compromise the unprotected agent (S7 verified; others unverified on today's models).
 S9 runs the unmodified OpenAI-SDK agent through the gateway's own proxy (OFF = monitor mode, ON = enforce).
 

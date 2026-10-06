@@ -133,6 +133,11 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     async def healthz(request: Request) -> dict[str, Any]:
         return {"ok": True, "uptime_s": round(time.time() - request.app.state.started, 1)}
 
+    @app.get("/v1/whoami", tags=["ops"])
+    async def whoami(p: Principal = require("public")) -> dict[str, str]:
+        """Which key is this? Lets the Console confirm a reviewer key is admin-scoped before showing reviewer actions."""
+        return {"name": p.name, "scope": p.scope}
+
     # ---- API-1 inspect ------------------------------------------------------------------------
     @app.post("/v1/inspect", tags=["engine"])
     async def inspect(body: InspectRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
@@ -165,9 +170,10 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     # ---- API-4 decisions feed -----------------------------------------------------------------
     @app.get("/v1/decisions", tags=["evidence"])
     async def decisions(request: Request, decision: str | None = None, label: str | None = None,
-                        agent: str | None = None, since: float | None = None,
-                        limit: int = Query(100, le=500), p: Principal = require("public")) -> list[dict[str, Any]]:
-        return request.app.state.engine.logger.decisions(decision=decision, label=label, agent=agent, since=since, limit=limit)
+                        agent: str | None = None, since: float | None = None, before: float | None = None,
+                        limit: int = Query(100, ge=1, le=500), p: Principal = require("public")) -> list[dict[str, Any]]:
+        return request.app.state.engine.logger.decisions(decision=decision, label=label, agent=agent, since=since,
+                                                         limit=limit, before=before)
 
     # ---- API-5 scorecard ----------------------------------------------------------------------
     @app.get("/v1/scorecard/{agent}", tags=["evidence"])
@@ -214,11 +220,17 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     @app.put("/v1/policies/{agent}", tags=["policy"])
     async def put_policy(agent: str, body: dict[str, Any], p: Principal = require("admin")) -> dict[str, Any]:
         """Replace an agent's policy. Validated against the policy schema, version bumped, written atomically."""
+        old = load_policy(agent)
+        # GET returns literal canaries as "[REDACTED]"; a round-tripped policy keeps the stored values, never the mask.
+        sd = dict(body.get("sensitive_data") or {})
+        if "[REDACTED]" in (sd.get("canaries") or []):
+            literal = [c for c in old.sensitive_data.canaries if c != "from_env"]
+            sd["canaries"] = [c for c in sd["canaries"] if c != "[REDACTED]"] + [c for c in literal if c not in sd["canaries"]]
+            body = {**body, "sensitive_data": sd}
         try:
             new = AgentPolicy.model_validate({**body, "agent": agent})
         except ValidationError as e:
             raise HTTPException(422, json.loads(e.json(include_url=False))[:5]) from None
-        old = load_policy(agent)
         new.version = str(int(old.version) + 1) if old.version.isdigit() else old.version + ".1"
         save_policy(new)
         access.info(json.dumps({"event": "policy_updated", "agent": agent, "version": new.version, "by": p.name}))

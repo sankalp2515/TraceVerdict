@@ -346,3 +346,39 @@ def test_empty_env_values_mean_defaults(env, monkeypatch):
     with make_client(env) as c:
         assert c.get("/healthz").status_code == 200
         assert c.get("/v1/decisions", headers=H(PUBLIC)).status_code == 200
+
+
+def test_decisions_feed_pages_with_before_cursor(env):
+    with make_client(env) as c:
+        for i in range(5):
+            c.post("/v1/inspect", json={"content": f"Revenue grew {i}%.", "source": "web", "agent_id": "research-agent"}, headers=H(PROJECT))
+        first = c.get("/v1/decisions?limit=2", headers=H(PUBLIC)).json()
+        second = c.get(f"/v1/decisions?limit=2&before={first[-1]['created_at']}", headers=H(PUBLIC)).json()
+        assert len(first) == 2 and len(second) == 2
+        assert {r["event_id"] for r in first}.isdisjoint(r["event_id"] for r in second)
+        assert all(r["created_at"] < first[-1]["created_at"] for r in second)
+        assert c.get("/v1/decisions?limit=0", headers=H(PUBLIC)).status_code == 422
+
+
+def test_whoami_reports_scope_for_console_sign_in(env):
+    with make_client(env) as c:
+        assert c.get("/v1/whoami", headers=H(ADMIN)).json() == {"name": "admin", "scope": "admin"}
+        assert c.get("/v1/whoami", headers=H(PUBLIC)).json()["scope"] == "public"
+        assert c.get("/v1/whoami", headers=H("nope")).status_code == 401
+
+
+def test_policy_round_trip_keeps_redacted_canaries(env, monkeypatch):
+    import yaml as _yaml
+
+    pdir = env / "policies"
+    pdir.mkdir()
+    (pdir / "demo-agent.yaml").write_text(_yaml.safe_dump({"agent": "demo-agent", "mode": "enforce",
+                                                             "sensitive_data": {"canaries": ["from_env", "sk-literal-canary-0001"]}}))
+    monkeypatch.setenv("ASG_POLICY_DIR", str(pdir))
+    with make_client(env) as c:
+        got = c.get("/v1/policies/demo-agent", headers=H(PUBLIC)).json()
+        assert got["sensitive_data"]["canaries"] == ["from_env", "[REDACTED]"]
+        got["mode"] = "monitor"
+        assert c.put("/v1/policies/demo-agent", json=got, headers=H(ADMIN)).status_code == 200
+    saved = _yaml.safe_load((pdir / "demo-agent.yaml").read_text())
+    assert saved["mode"] == "monitor" and saved["sensitive_data"]["canaries"] == ["from_env", "sk-literal-canary-0001"]

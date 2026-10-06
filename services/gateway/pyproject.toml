@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "asg-gateway"
 version = "0.1.0"
-description = "Gateway API + OpenAI-compatible LLM proxy for the Agent Security Gateway (working name)"
+description = "IntentSeal Gateway API + OpenAI-compatible LLM proxy"
 requires-python = ">=3.11"
 dependencies = ["asg-core", "asg-sdk", "asg-research-agent", "fastapi>=0.110", "uvicorn[standard]", "pyyaml"]
 

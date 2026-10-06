@@ -43,8 +43,12 @@ class KeyRing:
         if pub:
             self._keys[_h(pub)] = Principal("public", "public")
         self._buckets: dict[str, list[float]] = {}
-        self.limit = int(os.environ.get("ASG_RATE_LIMIT_PER_MIN", "120"))
-        self.public_limit = int(os.environ.get("ASG_PUBLIC_RATE_LIMIT_PER_MIN", "20"))
+        self.limit = int(os.environ.get("ASG_RATE_LIMIT_PER_MIN") or "120")
+        self.public_limit = int(os.environ.get("ASG_PUBLIC_RATE_LIMIT_PER_MIN") or "20")
+
+    def add(self, key: str, principal: Principal) -> None:
+        """Register an in-process key (e.g. the demo runner's ephemeral key for calling its own proxy)."""
+        self._keys[_h(key)] = principal
 
     def lookup(self, key: str | None) -> Principal | None:
         if not key:
@@ -92,7 +96,7 @@ def require(scope: str):
 class BodySizeLimit(BaseHTTPMiddleware):
     def __init__(self, app, max_bytes: int | None = None) -> None:
         super().__init__(app)
-        self.max = max_bytes or int(os.environ.get("ASG_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
+        self.max = max_bytes or int(os.environ.get("ASG_MAX_BODY_BYTES") or 2 * 1024 * 1024)
 
     async def dispatch(self, request: Request, call_next):
         cl = request.headers.get("content-length")

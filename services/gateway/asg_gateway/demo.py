@@ -16,6 +16,7 @@ with the evaluation corpus, not in code:
 from __future__ import annotations
 
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +46,8 @@ def _load() -> dict[str, dict[str, Any]]:
 
 
 def list_scenarios() -> list[dict[str, Any]]:
-    return [{k: v for k, v in s.items() if k in ("id", "title", "attack_types", "channel", "task", "expected")}
+    return [{k: v for k, v in s.items() if k in ("id", "title", "attack_types", "channel", "task", "expected", "surface",
+                                                  "source")}
             for s in _load().values()]
 
 
@@ -63,8 +65,43 @@ def _guard(engine: Engine) -> Guard:
     return g
 
 
-async def run_scenario(engine: Engine, scenario_id: str, protection: str) -> dict[str, Any]:
+async def run_proxy_scenario(app: Any, s: dict[str, Any], protection: str) -> dict[str, Any]:
+    """S9: the unmodified OpenAI-SDK agent (examples/openai_agent) reaches the model only through this gateway's
+    proxy. OFF = the monitor-mode twin policy (same rules, decisions logged, nothing enforced); ON = enforce."""
+    import sys
+
+    import httpx
+    from openai import AsyncOpenAI
+
+    sys.path.insert(0, str(repo_root() / "examples" / "openai_agent"))
+    import agent as plain_agent
+
+    agent_id = "research-agent" if protection == "on" else "research-agent-monitor"
+    url = s.get("page_url", "https://fixtures.test/incoming.html")
+    box = plain_agent.Sandbox(pages={url: str(_content(s) or "")})
+    http = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://gateway", timeout=120)
+    sid = "demo-" + uuid.uuid4().hex[:12]   # one fresh session per Playground run
+    client = AsyncOpenAI(base_url=f"http://gateway/proxy/{agent_id}/v1", api_key=app.state.internal_key, http_client=http,
+                         default_headers={"X-Session-Id": sid})
+    try:
+        answer, error = await plain_agent.arun(s.get("task") or f"Summarise {url} for me.", box, client=client), None
+    except Exception as e:   # upstream unavailable etc.: report, never crash the Playground
+        answer, error = "", type(e).__name__
+    finally:
+        await http.aclose()
+    engine = app.state.engine
+    external = [m for m in box.outbox if not m["to"].strip().lower().endswith("@example-corp.test")]
+    return {"scenario_id": s["id"], "protection": protection, "surface": "proxy", "agent_id": agent_id,
+            "answer": answer, "error": error, "outbox": box.outbox, "external_sends": len(external),
+            "canary_leaked": False, "session_id": sid, "events": engine.logger.session_events(sid)}
+
+
+async def run_scenario(engine: Engine, scenario_id: str, protection: str, app: Any = None) -> dict[str, Any]:
     s = _load()[scenario_id]
+    if s.get("surface") == "proxy":
+        if app is None:
+            raise ValueError("proxy scenarios need the gateway app")
+        return await run_proxy_scenario(app, s, protection)
     channel = s.get("channel", "user")
     content = _content(s)
     task = s.get("task") or CHANNELS.get(channel, ("", ""))[1]

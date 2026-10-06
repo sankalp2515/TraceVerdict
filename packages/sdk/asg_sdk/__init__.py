@@ -1,4 +1,4 @@
-"""Python SDK for the Agent Security Gateway (working name)."""
+"""IntentSeal Python SDK."""
 
 from asg_core.types import ActionResult, Decision, InspectResult
 

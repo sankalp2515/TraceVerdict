@@ -1,6 +1,8 @@
 """Python SDK (SDK-1…SDK-5): protect an existing agent with a few lines.
 
     guard = Guard("research-agent")                       # SDK-1 embedded mode (engine in-process)
+    guard = Guard("research-agent", remote="https://gw", api_key=...)   # SDK-6 remote mode (Gateway API)
+    tools = guard.protect_tools(langchain_tools)          # SDK-7 LangChain / LangGraph tools
     with guard.session(user_id="u1", task="Summarise my inbox", trusted={"customer_id": "C-1042"}):   # SDK-4
         text = guard.inspect(raw_bytes, source="pdf", filename="report.pdf")                          # SDK-2
         send_email(to=..., body=...)                       # decorated with @guard.tool()              # SDK-3
@@ -40,8 +42,14 @@ class ToolBlocked(Exception):
 class Guard:
     def __init__(self, agent_id: str, engine: Engine | None = None, mode: str | None = None,
                  policy: AgentPolicy | None = None, secrets: list[str] | None = None,
-                 engine_options: dict[str, Any] | None = None, warm_up: bool = True) -> None:
+                 engine_options: dict[str, Any] | None = None, warm_up: bool = True,
+                 remote: str | None = None, api_key: str | None = None, http_client: Any = None) -> None:
         self.agent_id = agent_id
+        if remote or http_client is not None:   # SDK-6: decisions come from the Gateway API
+            from .remote import RemoteEngine
+            engine = RemoteEngine(remote or "http://gateway", api_key or "", client=http_client)
+            policy = policy or engine.policy(agent_id)   # failure policy (SDK-5) uses the gateway's tool settings
+            warm_up = False
         self._policy = policy or load_policy(agent_id)
         if mode:
             self._policy.mode = mode
@@ -99,7 +107,11 @@ class Guard:
     async def ainspect(self, content: bytes | str, source: str, filename: str | None = None,
                        session_id: str | None = None) -> str:
         """Return what the agent should see: cleaned content, or a safe notice when blocked."""
-        r = await self.ainspect_result(content, source, filename, session_id)
+        try:
+            r = await self.ainspect_result(content, source, filename, session_id)
+        except Exception as e:  # inspection unavailable (e.g. remote gateway down): never pass content unseen
+            log.warning("inspection failed for %s (%s); content withheld", source, type(e).__name__)
+            return f"[Content from {source} was withheld: the security check is unavailable]"
         if r.enforced == Decision.ALLOW and isinstance(content, str):
             return content   # allowed text passes unchanged (G3b); files return their extracted view
         if r.enforced == Decision.BLOCK:
@@ -179,6 +191,12 @@ class Guard:
             return wrapper
 
         return deco
+
+
+    def protect_tools(self, tools: Any, inspect_outputs: bool = True) -> list[Any]:
+        """SDK-7: wrap LangChain / LangGraph tools (see asg_sdk.langchain)."""
+        from .langchain import protect_tools
+        return protect_tools(self, tools, inspect_outputs)
 
 
 def _warm_up() -> None:

@@ -20,7 +20,7 @@
   --muted: #5d5377;
   --subtle: #6f648a;
   --accent: #5b3df5;
-  --accent-soft: #7b5cff;
+  --accent-soft: #6847f0;           /* 5.0:1 on light surfaces (WCAG AA for small text) */
   --accent-text: #4a2fd6;
   --allow: #13795a;
   --neutralise: #8f5a00;

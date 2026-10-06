@@ -1,19 +1,52 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api, PRODUCT_NAME } from "../api";
+import { admin, api, PRODUCT_NAME, type Approval } from "../api";
+import { useReviewer } from "../reviewer";
 import { ago, Card, CardTitle, Empty, ErrorNote, Loading, PageHeader, Stat, Tag, useAsync } from "../components/ui";
 
 const STATUSES = ["pending", "approved", "denied"] as const;
 
+function Decide({ a, onDone }: { a: Approval; onDone: () => void }) {
+  const reviewer = useReviewer();
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!reviewer || a.status !== "pending") return null;
+  async function decide(approve: boolean) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await admin.resolve(reviewer!.key, a.event_id, approve, note);
+      onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-4 flex flex-col gap-3">
+      <label className="flex flex-col gap-2 text-xs"><span className="section-label">Note (optional)</span>
+        <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why you approved or denied" /></label>
+      <div className="flex flex-wrap gap-2">
+        <button className="pill pill-primary pill-sm" disabled={busy} onClick={() => decide(true)}>Approve once</button>
+        <button className="pill pill-sm" disabled={busy} onClick={() => decide(false)}>Deny</button>
+      </div>
+      {err && <ErrorNote>{err}</ErrorNote>}
+    </div>
+  );
+}
+
 function Approvals() {
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("pending");
-  const { data, error, loading } = useAsync(() => api.approvals(status), [status]);
+  const reviewer = useReviewer();
+  const { data, error, loading, reload } = useAsync(() => api.approvals(status), [status]);
   return (
     <Card>
       <CardTitle meta="An approval lets the same call in the same session run once. It can never override a block.">Approvals inbox</CardTitle>
-      <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Approval status">
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Approval status">
         {STATUSES.map((s) => (
-          <button key={s} role="tab" aria-selected={status === s} className={`pill pill-sm ${status === s ? "pill-primary" : ""}`} onClick={() => setStatus(s)}>
+          <button key={s} aria-pressed={status === s} className={`pill pill-sm ${status === s ? "pill-primary" : ""}`} onClick={() => setStatus(s)}>
             {s[0].toUpperCase() + s.slice(1)}
           </button>
         ))}
@@ -37,21 +70,35 @@ function Approvals() {
                 {a.status !== "pending" && (
                   <p className="subtle m-0 mt-2 text-xs">{a.status} by {a.reviewer ?? "—"}{a.note ? ` · “${a.note}”` : ""}{a.used_at ? " · used once" : ""}</p>
                 )}
+                <Decide a={a} onDone={reload} />
               </div>
             </li>
           ))}
         </ul>
       )}
-      <p className="subtle mt-5 text-xs leading-6">
-        Approving or denying needs an admin key and is done through <span className="mono">POST /v1/approvals/&lt;event_id&gt;</span>.
-        This Console only holds a public read-only key.
-      </p>
+      {!reviewer && (
+        <p className="subtle mt-5 text-xs leading-6">
+          Approving or denying needs a reviewer key: use <b>Reviewer sign-in</b> at the top. Without it this page is read-only.
+        </p>
+      )}
     </Card>
   );
 }
 
 function Memory() {
-  const { data, error, loading } = useAsync(() => api.memory(), []);
+  const reviewer = useReviewer();
+  const { data, error, loading, reload } = useAsync(() => api.memory(), []);
+  const [err, setErr] = useState<string | null>(null);
+  async function forget(id: string) {
+    if (!reviewer || !window.confirm("Forget this entry? Matching content will go through the normal checks again.")) return;
+    setErr(null);
+    try {
+      await admin.forget(reviewer.key, id);
+      reload();
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
   return (
     <Card>
       <CardTitle meta="Stored as fingerprints only, never as text.">Learned from review</CardTitle>
@@ -63,10 +110,11 @@ function Memory() {
             <Stat value={data.stats.attack ?? 0} label="Confirmed attacks: blocked by rules on sight, no AI call" />
             <Stat value={data.stats.benign ?? 0} label="Reviewed false alarms: exact content, per agent" />
           </div>
-          {data.entries.length === 0 ? <Empty>Nothing confirmed yet. Reviewers mark decisions with POST /v1/feedback (admin).</Empty> : (
+          {err && <div className="mb-4"><ErrorNote>{err}</ErrorNote></div>}
+          {data.entries.length === 0 ? <Empty>Nothing confirmed yet. Signed-in reviewers can confirm attacks or false alarms from the Decisions page.</Empty> : (
             <div className="overflow-x-auto">
               <table className="table min-w-[560px]">
-                <thead><tr><th>Kind</th><th>Labels</th><th>Agent</th><th>Origin</th><th>Added</th></tr></thead>
+                <thead><tr><th>Kind</th><th>Labels</th><th>Agent</th><th>Origin</th><th>Added</th>{reviewer && <th><span className="sr-only">Actions</span></th>}</tr></thead>
                 <tbody>
                   {data.entries.map((m) => (
                     <tr key={m.id}>
@@ -75,6 +123,7 @@ function Memory() {
                       <td className="text-xs">{m.agent_id === "*" ? "all agents" : m.agent_id}</td>
                       <td className="subtle text-xs">{m.origin}</td>
                       <td className="subtle text-xs">{ago(m.created_at)}</td>
+                      {reviewer && <td><button className="pill pill-sm" onClick={() => forget(m.id)}>Forget</button></td>}
                     </tr>
                   ))}
                 </tbody>

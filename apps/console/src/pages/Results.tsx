@@ -1,4 +1,5 @@
 import { AGENT, api, type Fpr, type Summary } from "../api";
+import { LiveOperations, Spend } from "../components/LivePanels";
 import { Bar, Card, CardTitle, Empty, ErrorNote, Loading, PageHeader, pct, Stat, Tag, useAsync } from "../components/ui";
 
 const TARGET_RECALL = 0.85;
@@ -9,7 +10,7 @@ const CHANNEL_LABEL: Record<string, string> = {
 };
 
 function statusTone(status: string) {
-  return status === "meets" ? "var(--allow)" : status === "below target" ? "var(--block)" : "var(--subtle)";
+  return status === "meets" ? "var(--allow)" : status.startsWith("below target") ? "var(--block)" : "var(--subtle)";
 }
 
 function Claim({ s }: { s: Summary }) {
@@ -203,8 +204,10 @@ export function Results() {
           <FalseAlarms s={data} />
           <CoverageMap s={data} />
           <Operations s={data} />
+          <Spend e2e={data.e2e} />
         </>
       )}
+      <LiveOperations />
     </div>
   );
 }

@@ -97,9 +97,22 @@ export interface Fpr {
   n: number; held: number; false_alarms: number; fpr: number | null; disruptive: number; fpr_disruptive: number | null;
   escalation_rate: number | null; alarms: string[];
 }
+export interface Overhead {
+  runs: number; agent_tokens: number; security_tokens: number; token_ratio: number | null;
+  agent_usd: number; security_usd: number; cost_ratio: number | null;
+}
 export interface E2E {
   suite: string; models: string[]; off: AsrRow; on: AsrRow; relative_reduction: number | null; canary_leaks_on: number;
   caught: { n: number; caught: number; recall: number | null };
+  overhead?: Overhead | null;
+}
+export interface CostRow {
+  role: string; provider: string; model: string; calls: number; cached: number | null; input_tokens: number | null;
+  output_tokens: number | null; est_cost_usd: number | null; avg_latency_ms: number | null; errors?: number | null;
+}
+export interface Costs {
+  days: number; by_model: CostRow[];
+  overhead: { security_tokens: number; agent_tokens: number; token_ratio: number | null; cost_ratio: number | null; unpriced_models: string[] };
 }
 export interface Summary {
   kind: "summary";
@@ -158,6 +171,7 @@ export interface Metrics {
   };
   memory: Record<string, number>;
   approvals_pending: number;
+  providers: { provider: string; status: string; n: number }[];
 }
 
 export class ApiError extends Error {
@@ -166,12 +180,12 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+async function call<T>(path: string, init?: RequestInit, key: string = API_KEY): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}), ...(init?.headers ?? {}) },
+      headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}), ...(init?.headers ?? {}) },
     });
   } catch {
     throw new ApiError(0, "Backend unreachable");
@@ -179,7 +193,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     let detail = res.statusText;
     try {
-      detail = (await res.json()).detail ?? detail;
+      const body = await res.json();
+      detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail ?? body);
     } catch {
       /* not JSON */
     }
@@ -204,4 +219,18 @@ export const api = {
   memory: () => call<{ stats: Record<string, number>; entries: MemoryEntry[] }>("/v1/memory"),
   policy: (agent: string) => call<Policy>(`/v1/policies/${encodeURIComponent(agent)}`),
   metrics: (hours = 24) => call<Metrics>(`/v1/metrics?hours=${hours}`),
+  costs: (days = 7) => call<Costs>(`/v1/costs?days=${days}`),
+  whoami: (key: string) => call<{ name: string; scope: string }>("/v1/whoami", undefined, key),
+};
+
+/** Reviewer (admin-key) actions. The key is the reviewer's own, typed at sign-in; it is never part of the build. */
+export const admin = {
+  resolve: (key: string, eventId: string, approve: boolean, note = "") =>
+    call<{ status: string }>(`/v1/approvals/${encodeURIComponent(eventId)}`, { method: "POST", body: JSON.stringify({ approve, note }) }, key),
+  feedback: (key: string, verdict: "attack" | "false_positive", eventId: string, labels: string[] = [], note = "") =>
+    call<{ memory_id: string }>("/v1/feedback", { method: "POST", body: JSON.stringify({ verdict, event_id: eventId, labels, note }) }, key),
+  forget: (key: string, memoryId: string) =>
+    call<{ removed: boolean }>(`/v1/memory/${encodeURIComponent(memoryId)}`, { method: "DELETE" }, key),
+  putPolicy: (key: string, agent: string, body: unknown) =>
+    call<{ version: string; mode: string }>(`/v1/policies/${encodeURIComponent(agent)}`, { method: "PUT", body: JSON.stringify(body) }, key),
 };

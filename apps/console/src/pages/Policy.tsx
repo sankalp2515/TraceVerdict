@@ -1,13 +1,65 @@
 import { useState } from "react";
-import { AGENT, api } from "../api";
+import { admin, AGENT, api, type Policy as PolicyT } from "../api";
+import { useReviewer } from "../reviewer";
 import { Card, CardTitle, ErrorNote, Loading, PageHeader, Stat, Tag, useAsync } from "../components/ui";
 
 const RISK_TONE: Record<string, string> = { low: "var(--allow)", medium: "var(--neutralise)", high: "var(--block)" };
 
+function Editor({ policy, onSaved }: { policy: PolicyT; onSaved: () => void }) {
+  const reviewer = useReviewer();
+  const [text, setText] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!reviewer) {
+    return <p className="subtle text-xs">Editing needs a reviewer key (<b>Reviewer sign-in</b> at the top). Saves are validated, versioned and written atomically.</p>;
+  }
+  async function save(body: unknown) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await admin.putPolicy(reviewer!.key, policy.agent, body);
+      setMsg({ ok: true, text: `Saved as version ${r.version} (${r.mode}).` });
+      setText(null);
+      onSaved();
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  const nextMode = policy.mode === "enforce" ? "monitor" : "enforce";
+  return (
+    <Card>
+      <CardTitle meta={`Signed in as ${reviewer.name}`}>Edit policy</CardTitle>
+      <div className="flex flex-wrap gap-3">
+        <button className="pill pill-sm" disabled={busy}
+          onClick={() => window.confirm(`Switch ${policy.agent} to ${nextMode} mode?`) && save({ ...policy, mode: nextMode })}>
+          Switch to {nextMode}
+        </button>
+        <button className="pill pill-sm" disabled={busy} onClick={() => setText(text === null ? JSON.stringify(policy, null, 2) : null)}>
+          {text === null ? "Edit as JSON" : "Close editor"}
+        </button>
+      </div>
+      {text !== null && (
+        <div className="mt-5 flex flex-col gap-3">
+          <label className="sr-only" htmlFor="policy-json">Policy JSON</label>
+          <textarea id="policy-json" className="input mono min-h-[360px] py-3" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+          <div className="flex gap-3">
+            <button className="pill pill-primary pill-sm" disabled={busy} onClick={() => {
+              try { save(JSON.parse(text)); } catch { setMsg({ ok: false, text: "That is not valid JSON." }); }
+            }}>{busy ? "Saving…" : "Validate and save"}</button>
+          </div>
+        </div>
+      )}
+      {msg && <p role={msg.ok ? "status" : "alert"} className="mt-4 text-xs" style={{ color: msg.ok ? "var(--allow)" : "var(--block)" }}>{msg.text}</p>}
+    </Card>
+  );
+}
+
 export function Policy() {
   const [agent, setAgent] = useState(AGENT);
   const [input, setInput] = useState(AGENT);
-  const { data: p, error, loading } = useAsync(() => api.policy(agent), [agent]);
+  const { data: p, error, loading, reload } = useAsync(() => api.policy(agent), [agent]);
   return (
     <div className="space-y-8">
       <PageHeader index="06" label="Policy" title={<>The rules that<br />decide.</>}
@@ -76,7 +128,7 @@ export function Policy() {
               </ul>
             </Card>
           </div>
-          <p className="subtle text-xs">Editing a policy needs an admin key (<span className="mono">PUT /v1/policies/{p.agent}</span>): validated, versioned and written atomically.</p>
+          <Editor policy={p} onSaved={reload} />
         </>
       )}
     </div>

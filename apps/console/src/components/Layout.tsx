@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { api, ApiError, PRODUCT_NAME } from "../api";
+import { ReviewerSignIn } from "./ReviewerSignIn";
 import { SealMark } from "./ui";
 
 type Status = "checking" | "ok" | "waking" | "down";
@@ -105,7 +106,8 @@ export function Layout({ children }: { children: ReactNode }) {
               {status === "ok" ? "Backend online" : status === "checking" ? "Checking" : status === "waking" ? "Waking" : "Offline"}
             </span>
             <ThemeToggle />
-            <Link to="/playground" className="pill pill-primary pill-sm hidden sm:inline-flex">Run the demo</Link>
+            <ReviewerSignIn />
+            <Link to="/playground" className="pill pill-primary pill-sm hidden xl:inline-flex">Run the demo</Link>
           </div>
         </div>
         <nav aria-label="Main (compact)" className="no-scrollbar flex gap-1 overflow-x-auto px-4 pb-3 sm:px-8 lg:hidden">

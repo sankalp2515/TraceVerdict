@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type DecisionRow } from "../api";
+import { admin, api, type DecisionRow } from "../api";
+import { useReviewer } from "../reviewer";
 import { Card, DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Tag } from "../components/ui";
 
 const LABELS = [
@@ -8,17 +9,54 @@ const LABELS = [
   "Context Poisoning", "Multi-Step Jailbreaks", "Encoded Instructions", "Indirect Prompt Injection",
 ];
 
+function Label({ row }: { row: DecisionRow }) {
+  const reviewer = useReviewer();
+  const [state, setState] = useState<{ busy: boolean; msg: string | null; ok: boolean }>({ busy: false, msg: null, ok: false });
+  if (!reviewer || row.kind !== "content_in") return null;
+  async function mark(verdict: "attack" | "false_positive") {
+    setState({ busy: true, msg: null, ok: false });
+    try {
+      await admin.feedback(reviewer!.key, verdict, row.event_id, verdict === "attack" ? row.labels : []);
+      setState({ busy: false, ok: true, msg: verdict === "attack" ? "Remembered as an attack" : "Remembered as a false alarm" });
+    } catch (e) {
+      const m = (e as Error).message;
+      setState({ busy: false, ok: false, msg: m.includes("recent memory") ? "Too old to label: the gateway keeps only recent text" : m });
+    }
+  }
+  if (state.ok) return <span className="text-[11px]" style={{ color: "var(--allow)" }}>{state.msg}</span>;
+  return (
+    <span className="flex flex-col gap-1.5">
+      <span className="flex gap-1.5">
+        <button className="pill pill-sm" style={{ minHeight: 30 }} disabled={state.busy} onClick={() => mark("attack")}>Confirm attack</button>
+        <button className="pill pill-sm" style={{ minHeight: 30 }} disabled={state.busy} onClick={() => mark("false_positive")}>False alarm</button>
+      </span>
+      {state.msg && <span className="text-[11px]" style={{ color: "var(--block)" }}>{state.msg}</span>}
+    </span>
+  );
+}
+
+const PAGE = 50;
+const WINDOWS = [{ v: "", l: "Any time" }, { v: "3600", l: "Last hour" }, { v: "86400", l: "Last 24 hours" }, { v: "604800", l: "Last 7 days" }];
+
 export function Decisions() {
-  const [filters, setFilters] = useState({ decision: "", label: "", agent: "" });
+  const [filters, setFilters] = useState({ decision: "", label: "", agent: "", window: "" });
   const [rows, setRows] = useState<DecisionRow[] | null>(null);
+  const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const reviewer = useReviewer();
 
-  async function load() {
+  async function load(older = false) {
     setLoading(true);
     setError(null);
     try {
-      setRows(await api.decisions({ ...filters, limit: "200" }));
+      const { window, ...rest } = filters;
+      const params: Record<string, string> = { ...rest, limit: String(PAGE) };
+      if (window) params.since = String(Date.now() / 1000 - Number(window));
+      if (older && rows?.length) params.before = String(rows[rows.length - 1].created_at);
+      const page = await api.decisions(params);
+      setRows(older && rows ? [...rows, ...page] : page);
+      setMore(page.length === PAGE);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -45,9 +83,13 @@ export function Decisions() {
             <select className="input" value={filters.label} onChange={(e) => setFilters((f) => ({ ...f, label: e.target.value }))}>
               {LABELS.map((l) => <option key={l} value={l}>{l || "Any type"}</option>)}
             </select></label>
+          <label className="flex flex-col gap-2"><span className="section-label">When</span>
+            <select className="input" value={filters.window} onChange={(e) => setFilters((f) => ({ ...f, window: e.target.value }))}>
+              {WINDOWS.map((w) => <option key={w.v} value={w.v}>{w.l}</option>)}
+            </select></label>
           <label className="flex flex-1 flex-col gap-2"><span className="section-label">Agent</span>
             <input className="input" placeholder="research-agent" value={filters.agent} onChange={(e) => setFilters((f) => ({ ...f, agent: e.target.value }))} /></label>
-          <button className="pill" onClick={load}>Refresh</button>
+          <button className="pill" onClick={() => load()}>Refresh</button>
         </div>
       </Card>
       {error && <ErrorNote>{error}</ErrorNote>}
@@ -56,8 +98,8 @@ export function Decisions() {
       {rows && rows.length > 0 && (
         <Card>
           <div className="overflow-x-auto">
-            <table className="table min-w-[860px]">
-              <thead><tr><th>Time</th><th>Decision</th><th>Source</th><th>Rule · reason</th><th>Attack types</th><th>Session</th></tr></thead>
+            <table className="table min-w-[980px]">
+              <thead><tr><th>Time</th><th>Decision</th><th>Source</th><th>Rule · reason</th><th>Attack types</th><th>Session</th>{reviewer && <th>Review</th>}</tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.event_id}>
@@ -67,10 +109,15 @@ export function Decisions() {
                     <td><span className="mono" style={{ color: "var(--accent-soft)" }}>{r.policy_rule}</span><span className="subtle mt-1 block text-xs">{r.reason}</span></td>
                     <td><div className="flex flex-wrap gap-1.5">{r.labels.map((l) => <Tag key={l}>{l}</Tag>)}</div></td>
                     <td><Link className="text-link mono" to={`/replay?session=${r.session_id}`}>{r.session_id.slice(0, 10)}</Link></td>
+                    {reviewer && <td><Label row={r} /></td>}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <span className="subtle text-xs" aria-live="polite">{rows.length} decision{rows.length === 1 ? "" : "s"} shown</span>
+            {more && <button className="pill pill-sm" disabled={loading} onClick={() => load(true)}>{loading ? "Loading…" : "Load older"}</button>}
           </div>
         </Card>
       )}

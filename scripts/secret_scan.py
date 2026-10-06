@@ -65,5 +65,13 @@ def main(files: list[str] | None = None) -> int:
     return 0
 
 
+def repo_files() -> list[str]:
+    """Every tracked file plus untracked files that are not ignored (CI and pre-release check)."""
+    out = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+                         capture_output=True, text=True, cwd=ROOT, check=True).stdout
+    return [f for f in out.splitlines() if f and not f.endswith((".png", ".pdf", ".onnx", ".docx"))]
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:] or None))
+    args = sys.argv[1:]
+    sys.exit(main(repo_files() if args == ["--all"] else (args or None)))

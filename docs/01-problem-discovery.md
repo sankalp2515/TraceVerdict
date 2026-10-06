@@ -326,7 +326,7 @@ These numbers also decide our honest grid claim (F?/D?).
 
 ## Appendix A — Veriscope: do we need it?
 
-Repo: `E:\AI practical Learning\claude code\Fable - Research Agent` (github.com/sankalp2515/Autonomous-Research-Agent-Multi-ai-agent-)
+Prior, pre-hackathon project of the owner (not part of this repository; no code reused, see the originality rule below).
 
 **Verdict: not needed to win. Reuse lessons and patterns, not code.**
 

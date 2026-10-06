@@ -8,7 +8,7 @@ direction (no colours, fonts, metaphors, layouts or reference brands): that crea
 ## What we are building
 
 A web front end (public landing page + product console) for a security product for AI agents.
-Product name is not decided yet: use the placeholder **[Product Name]** in one configurable place.
+Product name: **IntentSeal** (decided 7 Oct, D-032); keep it in one configurable place.
 
 **The product in plain words.** Companies now let AI agents read outside content (web pages, PDFs, Word files,
 emails, API responses, code, images) and act on it (send emails, query databases, fetch URLs). Text hidden in
@@ -72,9 +72,7 @@ light and dark themes, product name from one config value.
 
 ## Real numbers available (measured; show as measured, never invent others)
 
-Attack success 4.3% without protection → 0.0% with protection (231 tests); a second suite shows 25% without
-protection (protected run pending). Legitimate tasks completed with protection: 20/20. False alarms on tricky but
-legitimate content: 4%. Added latency (fast path, 95th percentile): 196 ms. Secrets leaked with protection: 0.
+(Historical brief, 5 Oct. The figures it quoted are superseded; current measured figures: `docs/EVALUATION.md`.)
 On the live product these come from the API; do not hard-code them.
 
 There are **no customers, logos, testimonials, pricing or press**. Do not invent any.

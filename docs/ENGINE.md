@@ -82,3 +82,16 @@ event loop with instructions to await the async method.
 
 Tests inject `StaticDecisionModel` and fake scorers, using neutral marker text and
 benign documents. They require no model downloads or network access.
+
+## Additions on 6 Oct (D-023 … D-027)
+
+| Stage / rule | Where | Behaviour |
+|---|---|---|
+| Decoding views (CORE-3) | `decode.py`, `Engine._scan` | base64/base64url, hex, Unicode tag characters, %-encoding and rot13 are decoded into extra views; each adds a `decoded:<kind>` finding (Encoded Instructions) and is always escalated; spans point at the encoded run |
+| ASCII view for the judge | `Engine._scan` | text flagged mixed-script/confusable reaches the judge with an extra `[ascii view]` line |
+| `judge_untrusted: always` | `policy.thresholds` | untrusted documents (not user turns, ≥ `judge_min_chars`) always get a Tier 2 assessment; default `classifier` keeps the Tier 1 gate |
+| `known-attack-match` | `memory.py` | content containing ≥ `memory.match_threshold` of a confirmed attack fingerprint → BLOCK at Tier 0, no AI call |
+| False-positive mark | `memory.py` | exact content, per agent: skips Tier 1/2; structural rules (`drop-non-visible`) and the action guard still apply |
+| `human-approved` | `Engine.check_action` | an approved ESCALATE for the same session + tool + arguments allows the call once; never overrides BLOCK |
+| Raw-text fallback | `extract.py` | a structured parse that yields nothing for non-empty text input falls back to the raw text (DEF-016) |
+| `ASG_BUDGET_TIER2_DAILY_TOKENS` | `policy.load_policy` | operational override of the daily Tier 2 cap (`none` lifts it); used by evaluation runs and recorded in the summary |

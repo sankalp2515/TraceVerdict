@@ -55,7 +55,7 @@ providers:
     priority: 3
     timeout_s: 60
     limits: { rpm: 20 }
-    extra_headers: { X-Title: "Agent Security Gateway (dev)" }
+    extra_headers: { X-Title: "IntentSeal (dev)" }
 
   nvidia:
     type: openai_compatible

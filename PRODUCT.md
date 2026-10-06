@@ -58,14 +58,13 @@ decision, full session replay, and a scorecard measured on the customer's own ag
 
 ## Brand Commitments
 
-None yet. Product name is a placeholder (`VITE_PRODUCT_NAME`, shown as "[Product Name]"). After the owner chooses
-a name, brand identity will be finalised with Kapferer's Brand Identity Prism (docs/BRAND_NAMING_BRIEF.md).
+**IntentSeal** — “Keep AI agents inside the user’s intent.” (set in `VITE_PRODUCT_NAME`). Visual
+language: the IntentSeal material design (night-violet canvas, frosted lavender gate, one blue-violet-magenta
+gradient for the primary action), implemented in `apps/console/src/index.css`.
 
 ## Evidence on Hand
 
-Measured results only, from `eval/reports/` (dated, commit-stamped). As of 5 Oct 2026: broad suite attack success
-4.3% unprotected → 0% protected (231 tests); headline suite 25% unprotected (protected run pending); benign task
-utility 20/20 with protection; hard-benign false alarms 4%; fast-path p95 196 ms. No customers, testimonials,
+Measured results only, from `eval/reports/` (dated, commit-stamped). Measured figures are generated, never hand-typed: see `docs/EVALUATION.md` and the README results block. No customers, testimonials,
 pricing, logos, press, or production deployments exist; never fabricate them. Numbers on screen must come from the
 API, never be hard-coded.
 

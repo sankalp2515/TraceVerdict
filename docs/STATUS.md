@@ -1,157 +1,135 @@
 # Status
 
-Updated: **Sun 5 Oct 2026, night (end of Day 1 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: `[Product Name]` (pending, Q1)
-Tests: **110 passing** (`.venv/Scripts/python -m pytest -q`).
+Updated: **Tue 7 Oct 2026 (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
+Tests: **142 passing** offline (`.venv/Scripts/python -m pytest -q`) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
 
-## 1. Headline numbers (from `eval/reports/`; measured, nothing claimed yet)
+## 1. Headline numbers
 
-| Metric | Result | PRD target | Notes |
-|---|---|---|---|
-| Attack success, **broad** suite (231 tests, Nemotron agent, 4 channels) | **4.3% → 0.0%** (10 → 0) | ≥ 80% relative reduction (G1) | Deterministic lower bound; small unprotected base rate |
-| Attack success, **headline** suite (30 tests, gpt-oss-120b agent) | **25.0%** unprotected (7/28) · protected **pending** | G1 | Protected run 6 Oct (Groq 200K tokens/day cap) |
-| Benign task utility, protected | **20/20 (100%)** | ≥ 90% (G3b) | All 11 channel types |
-| False alarms, hard-benign set | **1/25 (4%)** | ≤ 5% (G3) | Remaining one is a real judge call on API-key-handling code |
-| False alarms during benign tasks | **0 / 39 inspections** | — | |
-| Fast-path latency p95 | **196 ms** | ≤ 300 ms (G7) | Local CPU; judge path ~1–2.5 s |
-| Escalation to AI judge (benign) | **~8%** | low (cost) | |
-| Canary leaks with protection | **0** | 0 (G2) | |
-| Recall per attack type | **not yet computed** | ≥ 85% on ≥ 7 types (G5) | Needed for the F-axis claim (M6) |
-| Adaptive ASR | not yet | reported (G6) | Adversary loop (EVAL-4) |
+Generated, never hand-typed: `docs/EVALUATION.md` and the README results block come from
+`python -m asg_eval.summary` (then `python -m asg_eval.readme`). See §3 for what each number is measured on.
+
+**Grid position by the PRD §15 rule: none / none** (0 of 9 attack types at recall ≥ 85% with FPR ≤ 5%). The self-declaration is the team's decision, made from these numbers.
+
+| Metric | Result |
+|---|---|
+| Detection recall, third-party content (426 generated attacks through 14 document/data channels; 33 payloads the channel could not deliver excluded) | 96.5% |
+| Detection recall, direct user-turn attacks (399 cases) | 60.4% |
+| False-positive rate, held-out hard-benign set (39 cases) | 10.3% |
+| Fast-path latency p95 (isolated) | 108.8 ms |
+| Attack success on the reference agent, `headline` suite (27 / 30 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `v2e` suite (144 / 144 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `broad` suite (219 / 219 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) · protected run from the 5 Oct engine (before fingerprinting); rerun pending |
+| Benign task utility retained | 100.0% |
+
+What these numbers mean (details and method in `docs/EVALUATION.md`):
+- **Strong:** indirect injection in documents and data is detected at 91–100% per channel (PDF, DOCX, HTML, hidden text,
+  email, API, Markdown, code, OCR text, DB records, images); no canary leaked and no verified harmful action
+  succeeded with protection in any suite.
+- **Below target:** direct user-turn attacks (60.4%: user turns keep the classifier gate for latency) and held-out FPR
+  10.3% (4/39: three judge errors on a code prompt template, an assistant style guide and a role-change audit event,
+  plus one by-design hidden-comment quarantine; 7.7% counting only blocks). With these, the §15 rule gives no F/D level.
+- **Not yet valid:** G7b cost overhead (window mixes detection-only runs); Multi-Step has only 5 end-to-end cases.
+- Options for the owner (each needs a rerun): judge user turns for high-risk agents (`judge_untrusted`-style policy
+  for the user channel), a second judge opinion before blocking unflagged content, a larger held-out benign set.
 
 ## 2. Milestones
 
-| # | Scope | State | QA note |
-|---|---|---|---|
-| M0 | Repo, config-driven providers, `providers check`, Validate A1–A6 | **Done** (A6 open) | docs/VALIDATE.md |
-| M1 | Reference agent, sandbox, fixtures, harness, baseline | **Mostly done** | Remaining: 8 more channels, garak run, A6 |
-| M2 | Core Engine | **Done** | Engine authored with Codex (D-018) + QA fixes D-019/020 |
-| M3 | Python SDK | **Done** | S1–S7 need scenario content |
-| M4 | Gateway API + LLM proxy | **Done** | S9 needs a scenario + a real unmodified OpenAI-SDK client test |
-| M5 | Security Console | **Functional only** | Works end to end, but **not investor-grade UI** (see §5) |
-| M6 | Full eval, docs, grid claim, deck, video | **Not started** | |
-
-## 3. PRD coverage, requirement by requirement
-
-✅ built and tested · 🟡 partial · ❌ not built · (P1/P2 = lower priority by PRD)
-
-### Core Engine (§8.1)
-| ID | State | Evidence / gap |
+| # | Scope | State |
 |---|---|---|
-| CORE-1 single entry point | ✅ | `Engine.inspect/check_action`; SDK, API, proxy, demo all use it |
-| CORE-2 extraction (text, MD, HTML, PDF, DOCX, email, JSON, code) | ✅ | 10 tests; hidden content surfaced and flagged |
-| CORE-2b images via OCR (P0 per D-007) | 🟡 | Works (RapidOCR); **not yet evaluated** on image-channel attacks |
-| CORE-3 normalisation | ✅ | Library-first (ftfy, confusable-homoglyphs, anyascii) |
-| CORE-4 tiered detection | ✅ | Tier 0 structural, Tier 1 on all content (D-019), Tier 2 judge |
-| CORE-5 attack-type labels | 🟡 | Labels on every finding; **per-type recall not yet measured** |
-| CORE-6 session risk with decay | 🟡 | Implemented; **multi-step scenario not yet demonstrated** |
-| CORE-7 deterministic policy engine | ✅ | Named rules (docs/ENGINE.md), 46 tests |
-| CORE-8 span neutraliser | ✅ | Quarantine + untrusted-data markers |
-| CORE-9 action guard | ✅ | 14 tests: allow-lists, pinned fields, outbound secrets, provenance, session risk |
-| CORE-10 decision logger | ✅ | Redacted previews, hashed user refs |
-| CORE-11 LLM router | ✅ | 16 tests: failover, 429, 401, circuit, budgets, tokens/min |
-| CORE-12 fail-safe | ✅ | Degraded holds verified live |
-| CORE-13 DecisionModel + Jev slot | ✅ | `generative_free`, `jev` (disabled), `static` |
-| CORE-14 cost controls | 🟡 | Per-decision tokens/cost, cache, budgets ✅; **overhead metric (CC7) not reported** |
-| CORE-15 monitor/enforce | ✅ | Tested |
-| CORE-16 input limits/chunking (P1) | 🟡 | Chunking ✅, API body limit ✅ |
-| CORE-17 taint tracking (P2) | 🟡 | Simple provenance (entities) in session |
+| M0 | Repo, config-driven providers, Validate A1–A5 | Done (A6 open) |
+| M1 | Reference agent, sandbox, fixtures, harness | Done (all 11 channels + 3 hidden-text variants delivered) |
+| M2 | Core Engine | Done, plus CORE-3 decoding, shape-based look-alike folding, trainability memory |
+| M3 | Python SDK | Done, plus remote mode (SDK-6) and LangChain/LangGraph helper (SDK-7) |
+| M4 | Gateway API + LLM proxy | Done, plus policy PUT, approvals, feedback/memory, metrics, path-scoped proxy |
+| M5 | Security Console | **Rebuilt 7 Oct in the IntentSeal design** (Overview, Playground, Replay, Results, Decisions, Review, Policy); live data only; dark + light; phone to desktop |
+| M6 | Full eval, docs, grid claim | Eval pipeline, ARCHITECTURE, EVALUATION (generated), README done; deck/video with the owner |
 
-### SDK (§8.2)
-| ID | State | Evidence / gap |
-|---|---|---|
-| SDK-1…5 | ✅ | Guard, inspect, `@guard.tool`, session, fail-open/closed |
-| SDK-6 remote mode (P1) | ❌ | |
-| SDK-7 LangGraph helper, ≤10-line adoption proof (P1) | ❌ | G8 needs this or the proxy proof |
+## 3. PRD coverage (UI/UX and deployment excluded by the owner)
 
-### Gateway API (§8.3)
-| ID | State | Evidence / gap |
+✅ built and tested · 🟡 partial · ❌ not built
+
+### Core Engine
+| ID | State | Evidence |
 |---|---|---|
-| API-1…5, 7…10 | ✅ | 10 integration tests; OpenAPI at `/docs` |
-| API-6 policy read | ✅ | PUT (admin, P1) ❌ |
-| API-11 costs (P1) | ✅ | `/v1/costs` |
+| CORE-1 | ✅ | `tests/test_sdk_surfaces.py::test_every_surface_goes_through_engine_inspect` (SDK, API, proxy, LangChain helper) |
+| CORE-2 / 2b | ✅ | Extraction for every channel incl. hidden text and OCR; evaluated per channel (detect runs) |
+| CORE-3 | ✅ | Unicode + **decoding before scoring** (base64/hex/tag chars/%/rot13) + shape-based look-alike skeleton; `tests/test_decode.py`, `test_normalise.py` |
+| CORE-4 | ✅ | Tier 0/1/2; `judge_untrusted` policy for high-risk agents (DEF-017) |
+| CORE-5 | ✅ | Labels on all findings; per-type recall in EVALUATION.md |
+| CORE-6 | ✅ | Session accumulation test (each turn ALLOW, session escalates then blocks); S6 scenario |
+| CORE-7/8 | ✅ | Named rules incl. `known-attack-match`, `human-approved` |
+| CORE-9 | ✅ | Action guard + approvals (one-shot, never overrides BLOCK) |
+| CORE-10 | ✅ | Decision log; approvals table; memory stores fingerprints only |
+| CORE-11/12/13 | ✅ | Router, fail-safe holds, DecisionModel adapters |
+| CORE-14 | ✅ | Budgets + overhead ratio (`/v1/costs`, summary); eval override `ASG_BUDGET_TIER2_DAILY_TOKENS` |
+| CORE-15 | ✅ | Monitor/enforce; S9 OFF uses the monitor-mode twin policy |
+| CORE-16 (P1) | 🟡 | Chunking + body limit; no span re-mapping across chunks |
+| CORE-17 (P2) | 🟡 | Entity provenance only |
+
+### SDK
+| ID | State | Evidence |
+|---|---|---|
+| SDK-1…5 | ✅ | As before; remote inspection failure withholds content |
+| SDK-6 (P1) | ✅ | `asg_sdk/remote.py`; same decisions as embedded (test) |
+| SDK-7 (P1) | ✅ | `guard.protect_tools(...)`; `examples/langgraph_agent` protected with ≤ 10 added lines (test counts the diff) |
+
+### Gateway API / proxy
+| ID | State | Evidence |
+|---|---|---|
+| API-1…5, 7…11 | ✅ | `tests/test_gateway.py` (18 tests); scorecard serves the summary + grid claim |
+| API-6 | ✅ | GET + admin PUT (validated, versioned, atomic write) |
 | API-12 (P2) | ❌ | |
+| PRX-1…5 | ✅ | Unmodified OpenAI-SDK agent protected by `OPENAI_BASE_URL` alone (`examples/openai_agent`, test with the real `openai` client) |
+| PRX-6 (P1) | 🟡 | Single-chunk streaming compatibility; no incremental upstream streaming |
 
-### LLM Proxy (§8.4)
-| ID | State | Evidence / gap |
+### Console backends (UI excluded)
+CON-6 cost data ✅ (`/v1/costs`, `/v1/costs/{agent}`) · CON-7 policy view/edit ✅ API · CON-8 mark FP / confirm attack ✅ API · CON-9 approvals ✅ API.
+
+### Evaluation
+| ID | State | Evidence |
 |---|---|---|
-| PRX-1…5 | ✅ tests / 🟡 demo | **Not yet shown with an unmodified real agent** (S9) |
-| PRX-6 streaming (P1) | 🟡 | Single-chunk compatibility only |
-
-### Security Console (§8.5)
-| ID | State | Evidence / gap |
-|---|---|---|
-| CON-1 Playground | 🟡 | Works; only benign scenarios installed |
-| CON-2 replay | ✅ | |
-| CON-3 scorecard | 🟡 | ASR off/on by type and channel; **missing FPR, utility, latency, cost, static vs adaptive, grid claim** |
-| CON-4 decisions feed | ✅ | |
-| CON-5 status banner | ✅ | |
-| CON-10 responsive / accessible / themes | 🟡 | Checked at phone width + dark; **visual quality not investor-grade** |
-| CON-6…9 (P1) | ❌ | Cost panel, policy view, false-positive marking, approvals inbox |
-
-### Reference agent (§8.6)
-REF-1…4 ✅
-
-### Evaluation (§8.7)
-| ID | State | Evidence / gap |
-|---|---|---|
-| EVAL-1 corpus | 🟡 | promptfoo/garak + our benign sets (D-014); **8 of 12 channels not yet run; garak not yet run** |
-| EVAL-2 runner | 🟡 | ASR, utility ✅; **recall/type, latency p50/p95, cost not in report** |
-| EVAL-3 report | ✅ | Markdown + JSON, dated, commit-stamped |
-| EVAL-4 adversary loop (P1) | ❌ | |
-| EVAL-5 deterministic success | ✅ | Executed-call rule (DEF-014) |
-| EVAL-6 Jev comparison (P2) | ❌ | Deferred by decision |
+| EVAL-1 | ✅ | v2 corpus: promptfoo user + roles sets, garak probe attempts, pooled indirect payloads × 14 delivery channels; hard-benign dev (v0) + held-out (v1) |
+| EVAL-2/3 | ✅ | `asg_eval.summary`: recall per type at its §14 checkpoint, coverage map, FPR (dev + held-out), latency p50/p95, ASR off/on, utility, cost overhead, grid claim; fail-safe holds excluded; engine fingerprint per suite |
+| EVAL-4 (P1) | 🟡 | Backend done (memory, `/v1/feedback`, `Engine.feedback`); the adaptive generation round itself is left to the owner's generator choice (D-005/D-014) |
+| EVAL-5 | ✅ | Deterministic outcomes; exact re-scoring rules DEF-014, DEF-019 |
+| EVAL-6 (P2) | ❌ | Jev deferred |
 
 ### Demo scenarios (§16)
-S8 ✅ (benign, verified OFF/ON in the Console) · **S1–S7, S9 ❌ need content from owner (Codex)**
+S1–S9 files present (`eval/scenarios/`). S1–S7 and S9 take generator cases via `select.py`; each file states whether
+its case was verified to compromise the unprotected agent (S7 verified; others unverified on today's models).
+S9 runs the unmodified OpenAI-SDK agent through the gateway's own proxy (OFF = monitor mode, ON = enforce).
 
-### Non-functional (§12) and submission (§19)
+### Non-functional / submission
 | Item | State |
 |---|---|
-| Docker image / deployability | ❌ Dockerfile not written yet |
-| CI (lint, tests, small eval subset) | ❌ |
-| Secrets: env-only, pre-commit scan, redaction, hashed API keys | ✅ |
-| CORS, rate limits, size limits, judge without tools | ✅ |
-| Dependencies pinned | 🟡 ranges in pyproject; no lock file |
-| README, docs/ARCHITECTURE.md, docs/EVALUATION.md, grid claim | ❌ (M6) |
-| Deck outline, video script | ❌ (M6) |
-| Hosting + public links | ❌ deferred (owner accounts) |
+| CI | ✅ `.github/workflows/ci.yml`: pinned install, ruff, secret scan, fixtures, tests |
+| Dependencies | ✅ `requirements.lock` (exact); package metadata now declares real runtime deps |
+| Observability | ✅ request ids, structured access log, `/v1/metrics` |
+| Docs | ✅ README, ARCHITECTURE.md, EVALUATION.md (generated), ENGINE.md, DECISIONS D-021…D-028 |
+| Docker / hosting / Console UI | Owner (excluded from this pass) |
+| Deck, video | Owner |
 
-## 4. What is left, in order
-
-1. **Owner:** S1–S7, S9 scenario files · product name · UI/UX direction (§5).
-2. Protected headline run (6 Oct) · remaining 8 channels · garak · A6 utility check.
-3. **Detection recall per attack type** (F-axis) + latency and cost in the report + scorecard fields.
-4. Dockerfile + CI + dependency lock.
-5. S9 proof: an unmodified OpenAI-SDK agent through the proxy (G8).
-6. EVAL-4 adversary loop (P1).
-7. README, ARCHITECTURE.md, EVALUATION.md, grid claim, deck outline, video script.
-
-## 5. UI/UX
-
-The Console is functional but visually basic. This is a lifecycle miss: the design stage stopped at low-fidelity
-wireframes (doc 09 §8) and went straight to code. Owner leads UI/UX (Codex / Lovable, or Claude Code with design
-skills). Engineering supplies `docs/UI_BRIEF.md` (product, users, screens, states, data and API contract) and keeps
-the Gateway API stable so any front end can plug in.
-
-## 6. Defects
+## 4. Defects found and fixed today
 
 | ID | Sev | Description | State |
 |---|---|---|---|
-| DEF-001 | Med | Log-redaction filter broke `%d` formatting | Fixed |
-| DEF-002 | Med | No tokens/min throttle (Groq 8K TPM) | Fixed |
-| DEF-003 | Low | Gemini intermittent 503 / slow | Mitigated (judge order) |
-| DEF-004 | High | Tier 1 classifier FPR 52% on hard-benign | Mitigated: judge clears it (FPR now 4%) |
-| DEF-005 | Med | Classifier latency on long text | Mitigated: chunking + cache (p95 196 ms) |
-| DEF-006 | Med | Raw image bytes passed as text on OCR failure | Fixed |
-| DEF-007 | High (env) | Dev machine out of memory | Resolved by owner |
-| DEF-008 | Med | Report counted assertion failures as errors | Fixed |
-| DEF-009 | **High** | Plain-text attacks skipped Tier 1/2 | Fixed (D-019) |
-| DEF-010 | Med | Benign metadata/comments flagged non-visible | Fixed (D-020) |
-| DEF-011 | Med | Judge replies truncated/unparseable | Fixed |
-| DEF-012 | Low | Errored runs with verified harm excluded | Fixed |
-| DEF-013 | Low | Groq rejects some malformed tool calls (5/30 headline runs errored) | Open |
-| DEF-014 | Med | Blocked calls counted as harm | Fixed (exact re-score) |
-| DEF-015 | Med | Console visual quality below investor bar | Open → owner (UI brief) |
+| DEF-016 | **High** | `source="email"` plain text parsed as an empty RFC 822 message → uninspected text returned to the agent by the SDK | Fixed + regression tests |
+| DEF-017 | **High** | Tier 1 gate: paraphrased third-party instructions score ≈ 0, so they never reached the judge | Fixed by policy `judge_untrusted: always` for high-risk agents |
+| DEF-018 | **High** | Look-alike text folded by sound (anyascii), not by shape → judge read garbled text; Unicode tag characters deleted instead of decoded; no base64 decoding (CORE-3 unmet) | Fixed: `decode.py`, shape skeleton |
+| DEF-019 | Med | Harness: a same-site `http://` fetch counted as an external fetch (inflated ASR) | Fixed + exact re-score |
+| DEF-020 | Med | Harness: API channel served non-JSON as `.json` (fail-closed `extraction-failed` counted as detections); promptfoo parses JSON-looking variables into objects | Fixed (JSON wrapping, target accepts objects) |
+| DEF-021 | **High (process)** | Eval runs hit the production Tier 2 daily cap: `budget-hold` decisions were scored as detections (the first v3 run's "100% recall" was void); stopped tasks left shell loops writing stale results | Fixed: holds excluded from scoring, eval budget override recorded, engine fingerprint on every output, single orchestrated run (`eval/run_protected.sh`) |
+| DEF-022 | Med (security) | Policy loading built a path from the URL agent id (Windows backslash traversal to other `.yaml` files) | Fixed: agent id validation, 422 |
+| DEF-023 | Low | `secret_scan.py --all` scanned nothing; garak `run.sh` report path invalid; test wrote into `data/eval_runs` | Fixed |
+| DEF-024 | Low | Core package metadata omitted runtime dependencies | Fixed |
 
-## 7. Open questions for Sankalp
-- **Q1 product name** (by 9 Oct) · **scenarios S1–S7, S9** (now) · **UI/UX route** (now) · Q3 hosting accounts (by 9 Oct) · Q6 repo name / public timing (10 Oct)
+Open from before: DEF-013 (Groq rejects some malformed tool calls), DEF-015 (Console visual quality → owner).
+
+## 5. What is left
+
+The full, prioritised list lives in **`docs/BACKLOG.md`**. Summary:
+
+1. **Owner:** product name (Q1); Console UI/UX; Docker + hosting + public links; deck and video; EVAL-4 adaptive round
+   (generator choice per D-005/D-014; the memory/feedback backend is ready).
+2. Optional engineering (P1/P2): PRX-6 incremental streaming; CORE-16 span re-mapping; API-12; EVAL-6 (Jev).
+3. Before submission: rerun `eval/run_protected.sh` + `python -m asg_eval.summary` on the final commit; commit the reports.

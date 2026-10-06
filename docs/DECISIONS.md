@@ -1,7 +1,7 @@
 # Decisions log
 
-Product name: **`<PRODUCT_NAME>`** placeholder until Q1 is decided. Code namespace `asg` ("Agent Security
-Gateway", descriptive working name) is easy to rename.
+Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032, 7 Oct). Code namespace `asg`
+(from the earlier working name) stays until a planned mechanical rename (backlog).
 
 | # | Date | Decision | Why | By |
 |---|---|---|---|---|
@@ -25,6 +25,18 @@ Gateway", descriptive working name) is easy to rename.
 | D-018 | 5 Oct | `engine.py` (CORE-1/4–8/10/12/14/15 wiring) authored by the owner using Codex from the PRD; Claude verifies by tests and evaluation, integrates surfaces | Fifth safety-filter block on engine code | Sankalp |
 | D-019 | 5 Oct | **Tier 1 scores all untrusted content and user turns**, not only structurally flagged content; chunks at or above `escalate_band[0]` go to the judge. Supersedes D-013's 'only rule-flagged segments' | QA found plain-text attacks (no structural flag) bypassed Tier 1/2 entirely once Tier 0 became structural-only (D-015) | Eng (QA finding) |
 | D-020 | 5 Oct | Short document metadata (≤12 words: titles, authors) is treated as visible; longer metadata stays flagged | Every titled PDF was being neutralised (false alarm) | Eng |
+| D-021 | 6 Oct | **v2 corpus**: promptfoo generates one pool of indirect payloads; `build_suites.py` delivers every payload through all 11 sources plus 3 hidden-text variants (PDF/DOCX/HTML); user channel = promptfoo user set + roles set (composite jailbreaks) + garak probe attempts harvested with garak's `test.Blank` generator | Per-channel numbers need the same seeds in every channel (D-006); garak and promptfoo still own all attack text | Eng |
+| D-022 | 6 Oct | Evaluation target gains `protection: detect` (content checkpoint only, no agent model) and a `security` summary on protected runs; recall is measured per type at its §14 primary checkpoint | Separates "did the gateway see it" from "did this model fall for it" | Eng |
+| D-023 | 6 Oct | CORE-3 decoding added (`decode.py`, stdlib only): base64/base64url, hex, Unicode tag characters, %-encoding, rot13 become extra detection views; look-alike text reaches the judge ASCII-folded | CORE-3 acceptance ("decode before scoring") was unmet; tag characters were being deleted, not read | Eng |
+| D-024 | 6 Oct | Policy `thresholds.judge_untrusted: always` for agents with high-risk tools: every untrusted document (≥ 40 chars) gets a judge assessment; user turns keep the classifier gate | Tier 1 scores paraphrased third-party instructions ≈ 0 while scoring >50% of hard-benign ≈ 1 (no usable threshold, DEF-017) | Eng |
+| D-025 | 6 Oct | Held-out hard-benign set `eval/corpus/v1/hard_benign_holdout.yaml` (40 cases) written **before** any judge tuning (sha256 `7ce189ee…752a4`, 06:06 UTC); v0 is the development set; the claim uses the held-out FPR | Avoids reporting FPR on the set used for tuning | Eng |
+| D-026 | 6 Oct | Trainability memory: confirmed attacks stored as keyed shingle fingerprints (no text), matched by containment → `known-attack-match` at Tier 0; false-positive marks exact and per agent, never waive structural rules or the action guard | Supporting feature "trainability" (PRD §7.2, §15) with privacy (§10) | Eng |
+| D-027 | 6 Oct | Approvals resolve ESCALATE only, one-shot, same session + tool + arguments (`human-approved`); never a BLOCK | CON-9 must be actionable without letting a reviewer click away a canary/secret block | Eng |
+| D-028 | 6 Oct | Proxy: agent in the URL (`/proxy/<agent>/v1`) and conversation-fingerprint sessions, so an unmodified OpenAI-SDK agent is protected by `OPENAI_BASE_URL` alone; each message inspected once per session and its decision re-applied on resends | G8 "proxy = 1 setting"; stateless clients resend history every turn | Eng |
+| D-029 | 6 Oct | **G3 FPR = each hard-benign case in its own source channel** (an email as an email); every-text-in-every-channel is reported as a stress test, not the claim | Attack payloads are channel-agnostic by design; benign wording is not (an email's "from now on send updates to…" inside a customer record plausibly *is* an injection) | Eng |
+| D-030 | 6 Oct | Judge prompt **unchanged**: a candidate (addressee-based) prompt was compared on the dev set and attack payloads only and rejected (same 2/25 dev false alarms, lower recall 14/33 vs 19/33); the held-out set was never used for tuning | Keeps the held-out FPR clean | Eng |
+| D-031 | 6 Oct | Channel × encoding pairs the channel cannot deliver (PDF renderer font without Cyrillic; OCR of Cyrillic look-alikes and long base64) are reported as "not delivered" and excluded from the claim; raw recall including them is also reported | Verified with neutral text: the agent itself receives boxes / garbled OCR, so these test the fixture, not the gateway. Fix later: embed a Unicode font in the PDF renderer | Eng |
+| D-032 | 7 Oct | **Product name IntentSeal**, tagline “Keep AI agents inside the user’s intent” (Q1 closed). Console rebuilt in the IntentSeal material design (Codex design file `intentseal-static.html`): dark-first, light theme kept for CON-10; the hero stays dark in both themes; every number on the Console comes from the API (no hard-coded figures) | Owner decision; the design's static figures were outdated, so the Overview reads the latest evaluation summary | Sankalp |
 
 **Revised cut order (PRD §20, supersedes):** CON-9 approvals → CON-7/8 → SDK-6/7 → PRX-6 streaming →
 CON-6 cost panel → EVAL-4 adversary loop. P0 (now including CORE-2b OCR) is never cut.

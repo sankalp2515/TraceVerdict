@@ -28,3 +28,11 @@ apps/console/dist/
 .claude/skills/
 .impeccable/questions/
 .impeccable/review/
+# local tool config and design-exploration artefacts (kept on disk, not part of the product repo)
+.claude/
+.impeccable/
+.superdesign/
+design/preview/
+docs/wireframe-evidence/
+docs/high-fidelity-wireframe-directions.html
+*.tsbuildinfo

@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
+from .taint import TaintTracker
+
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+", re.I)
 _DOMAIN = re.compile(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b", re.I)
@@ -74,6 +76,7 @@ class Session:
     trusted_entities: set[str] = field(default_factory=set)
     untrusted_entities: set[str] = field(default_factory=set)
     flagged_untrusted: bool = False        # any finding in untrusted content this session
+    taint: TaintTracker = field(default_factory=TaintTracker)   # CORE-17 data-flow origins (fingerprints only)
     created_at: float = field(default_factory=time.time)
 
     def __post_init__(self) -> None:
@@ -85,6 +88,7 @@ class Session:
 
     def note_trusted(self, text: str) -> None:
         self.trusted_entities |= entities(text)
+        self.taint.observe(text, "", "user", trusted=True, flagged=False)
 
     def note_untrusted(self, text: str) -> None:
         self.untrusted_entities |= entities(text) - self.trusted_entities

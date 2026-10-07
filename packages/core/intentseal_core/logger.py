@@ -59,10 +59,12 @@ class DecisionLogger:
     def __init__(self, store: Store, secrets_to_redact: Iterable[str] = ()) -> None:
         self.store = store
         self.store.ensure_schema(_SCHEMA)
-        try:   # databases created before judge output tokens were recorded (G7b)
-            self.store.execute("ALTER TABLE decisions ADD COLUMN output_tokens INTEGER DEFAULT 0")
-        except Exception:
-            pass   # column already present
+        for table, column in (("decisions", "output_tokens INTEGER DEFAULT 0"),   # G7b
+                              ("actions", "taint TEXT")):                          # CORE-17
+            try:   # databases created before the column existed
+                self.store.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
+            except Exception:
+                pass   # column already present
         self.extra_secrets = [s for s in secrets_to_redact if s]
         self.previews = os.environ.get("INTENTSEAL_STORE_PREVIEWS", "1") != "0"
         self._seq: dict[str, int] = {}
@@ -123,9 +125,11 @@ class DecisionLogger:
     def action(self, session_id: str, agent_id: str, tool: str, args: dict[str, Any], r: ActionResult,
                session_risk: float) -> str:
         eid = self.event(session_id, agent_id, "action", f"tool:{tool}")
-        self.store.execute("INSERT INTO actions (event_id, tool, args_redacted, final_args_redacted, pinned_overrides) VALUES (?,?,?,?,?)",
+        self.store.execute("INSERT INTO actions (event_id, tool, args_redacted, final_args_redacted, pinned_overrides, taint) "
+                           "VALUES (?,?,?,?,?,?)",
                            (eid, self._redact(tool), self.scrub_obj(args), self.scrub_obj(r.final_args) if r.final_args else None,
-                            self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None))
+                            self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None,
+                            json.dumps(r.taint) if r.taint else None))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0)
         if r.decision.value == "ESCALATE":
@@ -187,7 +191,10 @@ class DecisionLogger:
             r["labels"] = json.loads(r["labels"]) if r.get("labels") else []
             r["findings"] = [dict(f, labels=json.loads(f["labels"] or "[]"))
                              for f in self.store.query("SELECT * FROM findings WHERE event_id = ?", (r["id"],))]
-            act = self.store.query("SELECT tool, args_redacted, final_args_redacted, pinned_overrides FROM actions WHERE event_id = ?", (r["id"],))
+            act = self.store.query("SELECT tool, args_redacted, final_args_redacted, pinned_overrides, taint FROM actions "
+                                   "WHERE event_id = ?", (r["id"],))
+            if act:
+                act[0]["taint"] = json.loads(act[0]["taint"]) if act[0]["taint"] else []
             r["action"] = act[0] if act else None
         return rows
 

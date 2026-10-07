@@ -575,6 +575,10 @@ class Engine:
                                                   assessment.model, assessment.input_tokens, assessment.est_cost,
                                                   assessment.output_tokens)
         self._remember_recent(result.event_id, agent_id, scan.doc.text)
+        if policy.taint.enabled and source != "user":   # CORE-17: where this content came from (fingerprints only;
+            # the user's own words were recorded as trusted above)
+            session.taint.observe(scan.doc.text, result.event_id or "", source, trusted=False,
+                                  flagged=decision != Decision.ALLOW or risk >= policy.thresholds.neutralise)
         return result
 
     async def check_action(self, tool: str, args: dict[str, Any], agent_id: str,

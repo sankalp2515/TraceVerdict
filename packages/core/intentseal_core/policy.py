@@ -58,6 +58,12 @@ class MemoryPolicy(BaseModel):
     match_threshold: float = 0.6                        # containment of a stored attack fingerprint
 
 
+class TaintPolicy(BaseModel):
+    enabled: bool = True                                # CORE-17: trace tool-argument text to its origin
+    min_coverage: float = 0.3                           # share of an argument's shingles from one origin
+    flagged_to_high_risk: str = "escalate"              # escalate | block | record: flagged content into a high-risk tool
+
+
 class AgentPolicy(BaseModel):
     agent: str
     mode: str = "monitor"                               # monitor | enforce
@@ -69,6 +75,7 @@ class AgentPolicy(BaseModel):
     session: SessionPolicy = Field(default_factory=SessionPolicy)
     budgets: Budgets = Field(default_factory=Budgets)
     memory: MemoryPolicy = Field(default_factory=MemoryPolicy)
+    taint: TaintPolicy = Field(default_factory=TaintPolicy)
     decision_model: str = "generative_free"
     version: str = "1"
 

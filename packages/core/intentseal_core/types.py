@@ -54,6 +54,7 @@ class ActionResult(BaseModel):
     enforced: Decision
     final_args: dict[str, Any] | None = None
     pinned_overrides: dict[str, Any] = Field(default_factory=dict)
+    taint: list[dict[str, Any]] = Field(default_factory=list)   # CORE-17: where argument text came from
     labels: list[str] = Field(default_factory=list)
     policy_rule: str = ""
     reason: str = ""

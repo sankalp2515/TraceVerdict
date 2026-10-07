@@ -139,6 +139,15 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
                                   f"session risk {session.risk:.2f} after untrusted content",
                                   sorted(session.labels) or ["Multi-Step Jailbreaks"]))
 
+    # 9. data flow (CORE-17): where each argument's text came from; flagged content into a high-risk tool
+    taint = session.taint.trace(args, policy.taint.min_coverage) if policy.taint.enabled else []
+    flagged = sorted({h.arg for h in taint if h.flagged})
+    if tp.risk == "high" and flagged and policy.taint.flagged_to_high_risk in ("escalate", "block"):
+        checks.append(ActionCheck("tainted-from-flagged-content",
+                                  Decision.BLOCK if policy.taint.flagged_to_high_risk == "block" else Decision.ESCALATE,
+                                  f"argument(s) {', '.join(flagged)} copy text from content the gateway flagged",
+                                  ["Indirect Prompt Injection", "Tool Abuse"]))
+
     order = {Decision.BLOCK: 3, Decision.ESCALATE: 2, Decision.NEUTRALISE: 1, Decision.ALLOW: 0}
     worst = max(checks, key=lambda c: order[c.decision], default=None)
     decision = worst.decision if worst else Decision.ALLOW
@@ -154,6 +163,6 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
         session.add_risk(0.5 if decision == Decision.BLOCK else 0.3, labels)
     return ActionResult(decision=decision, enforced=enforced,
                         final_args=args if enforced == Decision.ALLOW else None,
-                        pinned_overrides=overrides, labels=labels,
+                        pinned_overrides=overrides, labels=labels, taint=[h.as_dict() for h in taint],
                         policy_rule=worst.rule if worst else "allow", reason=reason, notice=notice,
                         latency_ms=round((time.perf_counter() - t0) * 1000, 2))

@@ -565,3 +565,56 @@ async def test_large_html_document_inspected_without_timeouts(policy):
     t0 = time.perf_counter()
     r = await e.inspect(html, "web", policy.agent)
     assert not r.degraded and r.decision == Decision.ALLOW and time.perf_counter() - t0 < 10
+
+
+# ---- CORE-17: data flow from inspected content into tool arguments ---------------------------------------
+
+PAGE = ("The vendor confirmed that the renewal price for the analytics bundle rises to 4,200 per seat next quarter, "
+        "and the support window moves to weekdays only. " + MARKER)
+COPIED = "the renewal price for the analytics bundle rises to 4,200 per seat next quarter, and the support window moves"
+
+
+async def test_text_copied_from_flagged_content_into_a_high_risk_tool_needs_approval(policy):
+    e = engine(policy, malicious=0.7)                       # judge: neutralise the page
+    s = e.start_session(policy.agent, task="Summarise the vendor page for finance@example-corp.test")
+    r = await e.inspect(PAGE, "web", policy.agent, session_id=s.session_id)
+    assert r.decision == Decision.NEUTRALISE
+    a = await e.check_action("send_message", {"to": "finance@example-corp.test", "subject": "Vendor", "body": COPIED},
+                             policy.agent, session_id=s.session_id)
+    assert a.decision == Decision.ESCALATE and a.policy_rule in ("tainted-from-flagged-content", "high-risk-tool-in-risky-session")
+    assert any(t["arg"] == "body" and t["origin"] == r.event_id and t["source"] == "web" and t["flagged"] for t in a.taint)
+    replay = e.logger.session_events(s.session_id)
+    assert replay[-1]["action"]["taint"][0]["origin"] == r.event_id     # recorded for replay
+
+
+async def test_text_from_clean_content_is_traced_but_allowed(policy):
+    e = engine(policy, malicious=0.0)
+    s = e.start_session(policy.agent, task="Summarise the vendor page for finance@example-corp.test")
+    r = await e.inspect(PAGE.replace(MARKER, ""), "web", policy.agent, session_id=s.session_id)
+    a = await e.check_action("send_message", {"to": "finance@example-corp.test", "subject": "Vendor", "body": COPIED},
+                             policy.agent, session_id=s.session_id)
+    assert a.decision == Decision.ALLOW
+    assert a.taint and a.taint[0]["origin"] == r.event_id and not a.taint[0]["flagged"]
+
+
+async def test_the_users_own_words_are_never_taint(policy):
+    e = engine(policy, malicious=0.7)
+    s = e.start_session(policy.agent, task="Email finance@example-corp.test: " + COPIED)
+    await e.inspect(PAGE, "web", policy.agent, session_id=s.session_id)
+    a = await e.check_action("send_message", {"to": "finance@example-corp.test", "subject": "Vendor", "body": COPIED},
+                             policy.agent, session_id=s.session_id)
+    assert a.taint == [] and a.policy_rule != "tainted-from-flagged-content"
+
+
+async def test_taint_policy_block_and_disable(policy):
+    policy.taint.flagged_to_high_risk = "block"
+    policy.session.escalate_at = policy.session.block_at = 99   # isolate the taint rule from session risk
+    e = engine(policy, malicious=0.7)
+    s = e.start_session(policy.agent, task="Summarise the vendor page for finance@example-corp.test")
+    await e.inspect(PAGE, "web", policy.agent, session_id=s.session_id)
+    args = {"to": "finance@example-corp.test", "subject": "Vendor", "body": COPIED}
+    a = await e.check_action("send_message", args, policy.agent, session_id=s.session_id)
+    assert a.decision == Decision.BLOCK and a.policy_rule == "tainted-from-flagged-content"
+    policy.taint.enabled = False
+    a = await e.check_action("send_message", args, policy.agent, session_id=s.session_id)
+    assert a.taint == [] and a.policy_rule != "tainted-from-flagged-content"

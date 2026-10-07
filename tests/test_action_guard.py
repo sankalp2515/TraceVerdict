@@ -140,3 +140,32 @@ def test_recipient_display_names_are_fine(policy):
     r = check_action("send_message", {"to": to, "subject": "", "body": ""}, policy,
                      sess(task="email asha.rao@example-corp.test and finance@example-corp.test"))
     assert r.decision == Decision.ALLOW
+
+
+# ---- lessons from the Kaggle agent-security competition (docs/13) --------------------------------------------
+
+def test_unrequested_share_action_needs_approval(policy):
+    """L1 confused deputy: a send the user never asked for is held, even to an allowed recipient."""
+    r = check_action("send_message", {"to": "asha.rao@example-corp.test", "subject": "Q3", "body": "ready"}, policy,
+                     sess(task="Summarise the Q3 report for asha.rao@example-corp.test"))
+    assert r.decision == Decision.ESCALATE and r.policy_rule == "action-not-requested"
+    ok = check_action("send_message", {"to": "asha.rao@example-corp.test", "subject": "Q3", "body": "ready"}, policy,
+                      sess(task="Please reply to asha.rao@example-corp.test that Q3 is ready"))
+    assert ok.decision == Decision.ALLOW
+
+
+def test_every_argument_is_scanned_not_the_first_matching_name(policy):
+    """L2: a harmless first argument must not hide protected data in a later one."""
+    args = {"url": "https://fixtures.test/ok", "data": {"note": "fine", "items": ["x", f"payload {CANARY}"]}}
+    r = check_action("web_fetch", args, policy, sess())
+    assert r.decision == Decision.BLOCK and r.policy_rule == "outbound-secret"
+
+
+def test_encoded_protected_data_is_caught(policy):
+    """L3: canaries leave encoded too (base64, hex, %-encoding)."""
+    import base64
+    import urllib.parse
+    for encoded in (base64.b64encode(CANARY.encode()).decode(), CANARY.encode().hex(),
+                    urllib.parse.quote(CANARY, safe="").replace("-", "%2D")):
+        r = check_action("write_file", {"path": "notes/x.txt", "text": f"see {encoded} attached"}, policy, sess())
+        assert r.decision == Decision.BLOCK and r.policy_rule == "outbound-secret", encoded

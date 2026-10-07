@@ -23,6 +23,7 @@ from typing import Any, Callable, Iterable
 from . import action_guard
 from .classifier import local_classifier
 from .decision_model import Assessment, DecisionModel, make_decision_model
+from . import markers
 from .decode import decode_views
 from .extract import ExtractedDoc, extract
 from .llm.router import Router
@@ -176,6 +177,10 @@ class Engine:
             if seg_norm.flags & {"mixed_script", "confusable_characters"}:
                 views.append("[ascii view] " + (seg_norm.skeleton or seg_norm.ascii_view))   # look-alikes folded by shape
             encoded = list(self._encoded.finditer(segment.text))
+            forged = markers.find(segment.text)   # forged role / tool-call markers (docs/13 L4)
+            for m in forged:
+                findings.append(Finding(span=(segment.start + m.start(), segment.start + m.end()), preview=m.group(0),
+                                        origin=segment.origin, signal="role-marker", labels=["Role Change"]))
             for offset in range(0, len(segment.text), self.segment_chars):
                 text = segment.text[offset:offset + self.segment_chars]
                 norm = normalise(text)
@@ -185,8 +190,11 @@ class Engine:
                     signals.append("non-visible-content")
                 if any(m.start() < offset + len(text) and m.end() > offset for m in encoded):
                     signals.append("encoded-blob")
+                if any(m.start() < offset + len(text) and m.end() > offset for m in forged):
+                    signals.append("role-markers")
                 for signal in signals:
-                    labels = ["Indirect Prompt Injection"] if signal == "non-visible-content" else ["Encoded Instructions"]
+                    labels = {"non-visible-content": ["Indirect Prompt Injection"],
+                              "role-markers": ["Role Change"]}.get(signal, ["Encoded Instructions"])
                     findings.append(Finding(span=span, preview=text, origin=segment.origin,
                                             signal=signal, labels=labels))
                 if norm.changes:
@@ -249,7 +257,7 @@ class Engine:
         windows and the spans that did not fit (never silently dropped: the caller decides on them)."""
         flagged = sorted({(c[0], c[1]) for c in scan.chunks})
         if len(scan.view) <= self.judge_window_chars:
-            return [(scan.view, flagged)], []
+            return [(scan.view, [])], []   # judged whole: no span list means "the whole document"
         views: dict[tuple[int, int], list[str]] = {}
         for start, end, _, text in scan.chunks:
             views.setdefault((start, end), []).append(text)
@@ -344,17 +352,17 @@ class Engine:
 
     @staticmethod
     def _judge_findings(scan: _Scan, assessment: Assessment, labels: list[str]) -> list[Finding]:
-        # Evidence quotes are located in the original text, inside the windows the judge called malicious
-        # (the whole document when it was judged whole); never detection-view offsets.
-        regions = sorted(assessment.spans) or [(0, len(scan.doc.text))]
-        whole = len(regions) == 1 and regions[0] == (0, len(scan.doc.text))
+        # Evidence quotes are located in the original text: anywhere when the document was judged whole, otherwise
+        # inside the windows the judge called malicious. Never detection-view offsets.
+        text = scan.doc.text
+        regions = sorted(assessment.spans) or [(0, len(text))]
         spans: set[tuple[int, int]] = set()
         for quote in assessment.evidence:
             if not quote:
                 continue
-            for lo, hi in ([(0, len(scan.doc.text))] if whole or not assessment.spans else regions):
+            for lo, hi in regions:
                 start = lo
-                while (pos := scan.doc.text.find(quote, start, hi + len(quote))) >= 0:
+                while (pos := text.find(quote, start, min(len(text), hi + len(quote)))) >= 0:
                     spans.add((pos, pos + len(quote)))
                     start = pos + len(quote)
         if not spans:   # quote not found verbatim (normalised/decoded view): the windows' own chunk spans
@@ -530,6 +538,10 @@ class Engine:
             findings.extend(self._judge_findings(scan, assessment, judge_labels))
         hidden = [(f.span[0], f.span[1]) for f in findings
                   if f.signal == "non-visible-content" and f.span and policy.sensitive_data.drop_non_visible]
+        # Forged role / tool-call markers are removed by policy, except from source code, where they are legitimate.
+        hidden += [(f.span[0], f.span[1]) for f in findings
+                   if f.signal == "role-marker" and f.span and policy.sensitive_data.strip_role_markers
+                   and scan.doc.format != "code"]
         risk = max(assessment.malicious,
                    policy.thresholds.neutralise if hidden else 0.0,
                    policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
@@ -556,7 +568,10 @@ class Engine:
         elif session.risk >= policy.session.escalate_at:
             decision, rule, reason = Decision.ESCALATE, "session-risk-escalate", "Accumulated session risk requires review"
         elif hidden:
-            decision, rule, reason = Decision.NEUTRALISE, "drop-non-visible", "Non-visible content quarantined by policy"
+            only_markers = all(f.signal != "non-visible-content" for f in findings if f.span in hidden)
+            decision, rule, reason = ((Decision.NEUTRALISE, "strip-role-markers", "Forged role/tool-call markers removed by policy")
+                                      if only_markers else
+                                      (Decision.NEUTRALISE, "drop-non-visible", "Non-visible content quarantined by policy"))
         elif risk >= policy.thresholds.neutralise:
             decision, rule, reason = Decision.NEUTRALISE, "judge-neutralise", "Assessed spans reached the policy neutralise threshold"
         else:

@@ -74,6 +74,7 @@ class Session:
     turns: int = 0
     labels: set[str] = field(default_factory=set)
     trusted_entities: set[str] = field(default_factory=set)
+    trusted_words: set[str] = field(default_factory=set)   # words of the user's own messages (explicit-intent rule)
     untrusted_entities: set[str] = field(default_factory=set)
     flagged_untrusted: bool = False        # any finding in untrusted content this session
     taint: TaintTracker = field(default_factory=TaintTracker)   # CORE-17 data-flow origins (fingerprints only)
@@ -88,10 +89,16 @@ class Session:
 
     def note_trusted(self, text: str) -> None:
         self.trusted_entities |= entities(text)
+        self.trusted_words |= set(re.findall(r"[a-z0-9]+", (text or "").lower()))
         self.taint.observe(text, "", "user", trusted=True, flagged=False)
 
     def note_untrusted(self, text: str) -> None:
         self.untrusted_entities |= entities(text) - self.trusted_entities
+
+    def user_asked_for(self, terms: list[str]) -> bool:
+        """Did the user's own words include any of these terms (word prefix: "send" matches "sends", "sending")?"""
+        wanted = [t.lower().strip() for t in terms if t.strip()]
+        return any(w.startswith(t) for t in wanted for w in self.trusted_words)
 
     def from_untrusted_only(self, value: str) -> bool:
         ents = entities(value) or {value.lower().strip()}

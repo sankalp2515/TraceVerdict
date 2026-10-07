@@ -23,6 +23,9 @@ class ToolPolicy(BaseModel):
     allowed_domains: list[str] = Field(default_factory=list)      # for URL-taking tools
     url_arg: str = "url"
     path_arg: str | None = None                         # argument holding a file path (sandbox check)
+    # Explicit intent (docs/13 L1, confused deputy): when set, the user's own words in this session must contain one of
+    # these terms (word prefix match: "send" matches "sending") or the call is escalated for approval.
+    intent_terms: list[str] = Field(default_factory=list)
 
 
 class Thresholds(BaseModel):
@@ -51,6 +54,7 @@ class SensitiveData(BaseModel):
     patterns: list[str] = Field(default_factory=lambda: ["api_key", "credential"])
     canaries: list[str] = Field(default_factory=list)   # literal values; "from_env" reads INTENTSEAL_CANARIES
     drop_non_visible: bool = True                       # untrusted docs: the model sees what a human sees
+    strip_role_markers: bool = True                     # remove forged role/tool-call markers (not from source code)
 
 
 class MemoryPolicy(BaseModel):

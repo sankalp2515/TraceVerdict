@@ -1,7 +1,7 @@
 # Status
 
 Updated: **Tue 7 Oct 2026, evening (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
-Tests: **205 passing** offline (`.venv/Scripts/python -m pytest -q`; storage contract tests also on PostgreSQL when
+Tests: **223 passing** offline (`.venv/Scripts/python -m pytest -q`; storage contract tests also on PostgreSQL when
 `INTENTSEAL_TEST_DATABASE_URL` is set, as in CI) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
 
 ## 1. Headline numbers
@@ -149,5 +149,8 @@ The full, prioritised list lives in **`docs/BACKLOG.md`**. Summary:
    grid self-declaration from the final numbers, EVAL-4 adaptive round (needs a verified promptfoo account, D-036), LICENSE.
 2. Engineering left: E4 (PyPI packaging: default config + starter policy inside the package, per-user data dir,
    `[embedded]` extra, LICENSE, TestPyPI dry run) and E6 (Jev comparison), both excluded from this pass.
-3. Final evaluation (B3, D-046) ran on engine `0e473daf3561`; rerun `sh eval/run_final.sh` only if engine, SDK or
-   policy code changes again.
+3. Final evaluation (B3, D-046) ran on engine `0e473daf3561`. The 8 Oct engine changes (D-047 intent rule, decoded outbound
+   scan, role-marker stripping, evidence-span fix; D-048 providers) need **one more `sh eval/run_final.sh`** after the free
+   quotas reset (Groq resets 05:30 IST); it also measures whether the intent rule costs utility.
+4. New since the final run: any major provider through the proxy (incl. Anthropic Messages), onboarding (Console Set up,
+   templates, self-test), integration guide (docs/INTEGRATION.md), market and competition analysis (docs/13).

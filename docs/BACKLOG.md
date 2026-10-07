@@ -70,3 +70,6 @@ IntentSeal flagged; (c) both: S7 for the compromise, S2/S3 for detection on docu
 |---|---|---|---|
 | F1 | Console: the Overview does not refetch its figures when the backend comes back from "waking up" (needs a page reload); keep "waking up" for ~2–3 minutes instead of switching to "unavailable" after ~45 s (a free Space plus classifier load can take longer). Both in `apps/console/src/components/Layout.tsx` / `pages/Overview.tsx`, which were being edited in another session | Owner / Console session | S |
 | F2 | Hosting with persistent data: the free Spaces tier has no persistent disk; use a free hosted PostgreSQL (`INTENTSEAL_DATABASE_URL`) if decisions must survive restarts | Owner | S |
+| F3 | Rerun the final evaluation on the merged engine (D-047/D-048 change enforcement) after the free quotas reset: `sh eval/run_final.sh`, then summary + readme | Eng | M (waiting) |
+| F4 | Proxy: native AWS Bedrock and Vertex AI SDK formats (today: SDK or REST path); native Gemini `generateContent` | Eng | M |
+| F5 | E4 PyPI packaging (held by the owner): config and templates inside the package, `intentseal init`, per-user data dir, extras, LICENSE, TestPyPI | Eng + Owner | M |

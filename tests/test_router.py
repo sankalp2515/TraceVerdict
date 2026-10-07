@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
@@ -226,3 +227,34 @@ async def test_max_queue_fails_over_instead_of_waiting():
     respx.post("https://b.test/v1/chat/completions").respond(200, json=OK)
     res = await r.chat("judge", req())
     assert res.provider == "b" and any(x.outcome == "skipped:throttled" for x in res.attempts)
+
+
+def _sse(*objs) -> bytes:
+    lines = [f"data: {json.dumps(o)}" for o in objs] + ["data: [DONE]"]
+    return "".join(line + "\n\n" for line in lines).encode()
+
+
+@respx.mock
+async def test_stream_fails_over_before_first_byte_and_records_usage_at_end():
+    r, _ = make_router([prov("a"), prov("b")])
+    respx.post("https://a.test/v1/chat/completions").respond(429, headers={"retry-after": "30"}, text="slow down")
+    body = _sse({"choices": [{"index": 0, "delta": {"content": "he"}}]},
+                {"choices": [{"index": 0, "delta": {"content": "llo"}, "finish_reason": "stop"}]},
+                {"choices": [], "usage": {"prompt_tokens": 9, "completion_tokens": 3}})
+    b = respx.post("https://b.test/v1/chat/completions").respond(200, content=body,
+                                                                headers={"content-type": "text/event-stream"})
+    s = await r.stream_chat("judge", req())
+    assert s.provider == "b" and json.loads(b.calls[0].request.content)["stream"] is True
+    assert r.store.query("SELECT status FROM llm_usage WHERE provider = 'b'") == []   # recorded when it ends
+    text = "".join(c["choices"][0]["delta"].get("content", "") for c in [x async for x in s.chunks()] if c["choices"])
+    assert text == "hello"
+    rows = r.store.query("SELECT status, input_tokens, output_tokens FROM llm_usage WHERE provider = 'b'")
+    assert rows == [{"status": "ok", "input_tokens": 9, "output_tokens": 3}]
+
+
+@respx.mock
+async def test_stream_all_providers_down_raises_before_streaming():
+    r, _ = make_router([prov("a")])
+    respx.post("https://a.test/v1/chat/completions").respond(503, text="down")
+    with pytest.raises(AllProvidersFailed):
+        await r.stream_chat("judge", req())

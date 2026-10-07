@@ -76,6 +76,37 @@ class ChatResult:
         return any(a.outcome != "ok" for a in self.attempts)
 
 
+class ChatStream:
+    """A streamed completion from one provider: iterate `chunks()`; usage is recorded once, when it ends."""
+
+    def __init__(self, router: "Router", role: str, provider: ProviderConfig, ref: ModelRef, key_alias: str,
+                 handle: Any, t0: float, attempts: list[Attempt]) -> None:
+        self.router, self.role, self.p, self.ref, self.key_alias = router, role, provider, ref, key_alias
+        self.handle, self.t0, self.attempts = handle, t0, attempts
+        self.provider, self.model = provider.name, ref.model
+
+    async def chunks(self):
+        status, error = "ok", None
+        try:
+            async for chunk in self.handle.chunks():
+                yield chunk
+        except ProviderError as e:
+            status, error = e.kind, str(e)
+            raise
+        finally:
+            h = self.handle
+            cost = (h.input_tokens * self.ref.price_in + h.output_tokens * self.ref.price_out) / 1_000_000
+            self.router._record_tokens(self.p, self.ref.model, h.input_tokens + h.output_tokens)
+            self.router.store.record_usage(role=self.role, provider=self.p.name, key_alias=self.key_alias,
+                                           model=self.ref.model, status=status, http_status=200,
+                                           latency_ms=(time.perf_counter() - self.t0) * 1000,
+                                           input_tokens=h.input_tokens, output_tokens=h.output_tokens,
+                                           est_cost_usd=cost, error=error)
+
+    async def aclose(self) -> None:
+        await self.handle.aclose()
+
+
 class AllProvidersFailed(Exception):
     def __init__(self, role: str, attempts: list[Attempt]) -> None:
         summary = "; ".join(f"{a.provider}/{a.model}:{a.outcome}" for a in attempts) or "no eligible provider"
@@ -230,6 +261,24 @@ class Router:
                                         cached=1, latency_ms=0.0)
                 return ChatResult(**{**hit, "latency_ms": 0.0, "cached": True, "attempts": []})
 
+        result = await self._route(role, rc, req, stream=False)
+        if use_cache:
+            payload = {k: v for k, v in result.__dict__.items() if k not in ("attempts", "cached", "latency_ms")}
+            self.store.cache_put(ck, payload, rc.cache_ttl_s)
+        return result
+
+    async def stream_chat(self, role: str, req: ChatRequest) -> "ChatStream":
+        """Streamed completion (PRX-6). Fails over like chat() until a provider accepts the request; once
+        chunks flow there is no failover. Never cached. Usage is recorded when the stream ends."""
+        rc: RoleConfig | None = self.settings.roles.get(role)
+        if rc is None:
+            raise KeyError(f"unknown role '{role}' (config/models.yaml)")
+        for k, v in rc.defaults.items():
+            if getattr(req, k, None) is None:
+                setattr(req, k, v)
+        return await self._route(role, rc, req, stream=True)
+
+    async def _route(self, role: str, rc: RoleConfig, req: ChatRequest, stream: bool) -> Any:
         attempts: list[Attempt] = []
         waited = 0.0
         while True:
@@ -238,11 +287,8 @@ class Router:
                 if reason:
                     attempts.append(Attempt(ref.provider, ref.model, None, f"skipped:{reason}"))
                     continue
-                result = await self._try_provider(role, ref, req, attempts)
+                result = await self._try_provider(role, ref, req, attempts, stream=stream)
                 if result is not None:
-                    if use_cache:
-                        payload = {k: v for k, v in result.__dict__.items() if k not in ("attempts", "cached", "latency_ms")}
-                        self.store.cache_put(ck, payload, rc.cache_ttl_s)
                     return result
             # Every candidate failed. If the role allows it, wait out the shortest provider cooldown.
             wait = self._shortest_cooldown(rc)
@@ -253,7 +299,7 @@ class Router:
             waited += wait + 0.5
 
     async def _try_provider(self, role: str, ref: ModelRef, req: ChatRequest,
-                            attempts: list[Attempt]) -> ChatResult | None:
+                            attempts: list[Attempt], stream: bool = False) -> Any:
         p = self.settings.providers[ref.provider]
         h = self.provider_health[p.name]
         adapter = get_adapter(p.type)
@@ -270,7 +316,10 @@ class Router:
                 return None   # would exceed this role's latency budget: try the next provider
             t0 = time.perf_counter()
             try:
-                r: AdapterResponse = await adapter.chat(p, key, ref.model, req, self.client, ref.params)
+                if stream:
+                    handle = await adapter.open_stream(p, key, ref.model, req, self.client, ref.params)
+                else:
+                    r: AdapterResponse = await adapter.chat(p, key, ref.model, req, self.client, ref.params)
             except ProviderError as e:
                 ms = (time.perf_counter() - t0) * 1000
                 attempts.append(Attempt(p.name, ref.model, key.alias, e.kind, ms, str(e)[:200]))
@@ -310,6 +359,9 @@ class Router:
             h.rate_limit_streak = 0
             kh = self._kh(key)
             kh.last_status, kh.last_used = "ok", self._clock()
+            if stream:
+                attempts.append(Attempt(p.name, ref.model, key.alias, "ok", ms))
+                return ChatStream(self, role, p, ref, key.alias, handle, t0, attempts)
             self._record_tokens(p, ref.model, r.input_tokens + r.output_tokens)
             cost = (r.input_tokens * ref.price_in + r.output_tokens * ref.price_out) / 1_000_000
             attempts.append(Attempt(p.name, ref.model, key.alias, "ok", ms))

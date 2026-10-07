@@ -37,8 +37,37 @@ class FakeRouter:
                           model="m", key_alias=None, input_tokens=5, output_tokens=2, latency_ms=1, est_cost_usd=0,
                           cached=False, attempts=[])
 
+    async def stream_chat(self, role: str, req: Any) -> "FakeStream":
+        self.requests.append(req)
+        tcs, self.tool_calls = self.tool_calls, []
+        return FakeStream(self.content if not tcs else "Checking that for you.", tcs, getattr(self, "fail_mid_stream", False))
+
     async def aclose(self) -> None:
         return None
+
+
+class FakeStream:
+    """Upstream SSE chunks as providers send them: text in pieces, tool-call arguments split across chunks."""
+
+    provider, model = "fake", "m"
+
+    def __init__(self, content: str, tool_calls: list[dict[str, Any]], fail: bool = False) -> None:
+        self.content, self.tool_calls, self.fail = content, tool_calls, fail
+        self.handle = type("H", (), {"input_tokens": 5, "output_tokens": 7})()
+
+    async def chunks(self):
+        for word in self.content.split(" "):
+            yield {"choices": [{"index": 0, "delta": {"content": word + " "}, "finish_reason": None}]}
+        for i, call in enumerate(self.tool_calls):
+            args = call["function"]["arguments"]
+            half = len(args) // 2
+            yield {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": i, "id": call["id"], "type": "function",
+                   "function": {"name": call["function"]["name"], "arguments": args[:half]}}]}, "finish_reason": None}]}
+            if self.fail:
+                raise RuntimeError("connection reset")
+            yield {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": i, "function": {"arguments": args[half:]}}]},
+                                "finish_reason": None}]}
+        yield {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls" if self.tool_calls else "stop"}]}
 
 
 def tc(name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -411,3 +440,66 @@ def test_chunked_body_over_limit_is_rejected_while_streaming(env, monkeypatch):
     with make_client(env) as c:
         r = c.post("/v1/inspect", content=body(), headers={**H(PROJECT), "Content-Type": "application/json"})
         assert r.status_code == 413
+
+
+def _events(text: str) -> list[Any]:
+    out = []
+    for line in text.splitlines():
+        if line.startswith("data: ") and line != "data: [DONE]":
+            out.append(json.loads(line[6:]))
+    return out
+
+
+def test_proxy_streams_text_and_releases_only_checked_tool_calls(env):
+    """PRX-6: text streams through; tool calls are buffered, assembled, checked, then released or replaced."""
+    router = FakeRouter(tool_calls=[tc("send_message", {"to": "x@elsewhere.test", "subject": "s", "body": "b"}),
+                                    tc("query_db", {"customer_id": "C-2001"})])
+    with make_client(env, router) as c:
+        sid = c.post("/v1/sessions", json={"agent_id": "research-agent", "task": "look up C-1042",
+                                           "trusted": {"customer_id": "C-1042"}}, headers=H(PROJECT)).json()["session_id"]
+        body = {"messages": [{"role": "user", "content": "Look up customer C-1042"}], "stream": True,
+                "stream_options": {"include_usage": True}}
+        r = c.post("/proxy/research-agent/v1/chat/completions", json=body, headers={**H(PROJECT), "X-Session-Id": sid})
+        assert r.status_code == 200 and r.text.rstrip().endswith("data: [DONE]")
+        events = _events(r.text)
+        deltas = [e["choices"][0]["delta"] for e in events if e.get("choices")]
+        text_chunks = [d["content"] for d in deltas if d.get("content")]
+        assert len(text_chunks) >= 3 and text_chunks[0].startswith("Checking")      # streamed, not one block
+        released = [tc for d in deltas for tc in d.get("tool_calls", [])]
+        assert [t["function"]["name"] for t in released] == ["query_db"]           # send_message never released
+        assert json.loads(released[0]["function"]["arguments"]) == {"customer_id": "C-1042"}   # pinned, whole
+        assert "elsewhere.test" not in r.text and "blocked" in "".join(text_chunks)
+        final = [e for e in events if e.get("choices") and e["choices"][0]["finish_reason"]][-1]
+        assert final["choices"][0]["finish_reason"] == "tool_calls" and final["x_security"]["blocked_tool_calls"] == 1
+        assert events[-1]["usage"]["total_tokens"] == 12
+
+
+def test_proxy_stream_failure_never_releases_a_partial_tool_call(env):
+    router = FakeRouter(tool_calls=[tc("query_db", {"customer_id": "C-1042"})])
+    router.fail_mid_stream = True
+    with make_client(env, router) as c:
+        r = c.post("/proxy/research-agent/v1/chat/completions",
+                   json={"messages": [{"role": "user", "content": "Look up C-1042"}], "stream": True}, headers=H(PROJECT))
+        events = _events(r.text)
+        assert any("error" in e for e in events)
+        assert not any(d.get("tool_calls") for e in events for d in [e.get("choices", [{}])[0].get("delta", {})] if e.get("choices"))
+
+
+def test_openai_sdk_streaming_client_gets_checked_tool_call(env):
+    from openai import OpenAI
+
+    router = FakeRouter(tool_calls=[tc("query_db", {"customer_id": "C-1042"})])
+    with make_client(env, router) as c:
+        client = OpenAI(base_url="http://testserver/proxy/research-agent/v1", api_key=PROJECT, http_client=c)
+        stream = client.chat.completions.create(model="any", messages=[{"role": "user", "content": "Look up C-1042"}],
+                                                stream=True)
+        names, args, text = [], "", ""
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            d = chunk.choices[0].delta
+            text += d.content or ""
+            for call in d.tool_calls or []:
+                names.append(call.function.name)
+                args += call.function.arguments or ""
+        assert names == ["query_db"] and json.loads(args) == {"customer_id": "C-1042"} and text.startswith("Checking")

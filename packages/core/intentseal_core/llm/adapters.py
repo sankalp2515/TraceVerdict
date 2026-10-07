@@ -86,6 +86,57 @@ def classify_http_error(resp: httpx.Response) -> ProviderError:
     return ProviderError("error", f"HTTP {s}: {body[:300]}", s)
 
 
+class ChatStreamHandle:
+    """An open server-sent-events completion: `chunks()` yields each `data:` object; usage and the finish reason
+    are collected on the way (estimated from the streamed text when the provider sends no usage)."""
+
+    def __init__(self, resp: httpx.Response) -> None:
+        self.resp = resp
+        self.input_tokens = self.output_tokens = 0
+        self.finish_reason: str | None = None
+        self._chars = 0
+
+    async def chunks(self):
+        try:
+            async for line in self.resp.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(chunk, dict):
+                    continue
+                if chunk.get("error"):
+                    raise ProviderError("server_error", f"stream error: {str(chunk['error'])[:200]}")
+                usage = chunk.get("usage") or (chunk.get("x_groq") or {}).get("usage")
+                if usage:
+                    self.input_tokens = int(usage.get("prompt_tokens") or self.input_tokens)
+                    self.output_tokens = int(usage.get("completion_tokens") or self.output_tokens)
+                for choice in chunk.get("choices") or []:
+                    delta = choice.get("delta") or {}
+                    self._chars += len(delta.get("content") or "")
+                    for tc in delta.get("tool_calls") or []:
+                        self._chars += len(str((tc.get("function") or {}).get("arguments") or ""))
+                    if choice.get("finish_reason"):
+                        self.finish_reason = choice["finish_reason"]
+                yield chunk
+        except httpx.TimeoutException as e:
+            raise ProviderError("timeout", f"stream timeout: {type(e).__name__}") from None
+        except httpx.HTTPError as e:
+            raise ProviderError("server_error", f"stream transport: {type(e).__name__}") from None
+        finally:
+            await self.aclose()
+        if not self.output_tokens:
+            self.output_tokens = self._chars // 4
+
+    async def aclose(self) -> None:
+        await self.resp.aclose()
+
+
 class OpenAICompatibleAdapter:
     """Any provider exposing POST {base_url}/chat/completions in the OpenAI format."""
 
@@ -140,6 +191,38 @@ class OpenAICompatibleAdapter:
             output_tokens=int(usage.get("completion_tokens") or 0),
             raw=data,
         )
+
+    async def open_stream(self, provider: ProviderConfig, key: ApiKey, model: str, req: ChatRequest,
+                          client: httpx.AsyncClient, params: dict[str, Any] | None = None) -> "ChatStreamHandle":
+        """Start a streamed completion. Errors before the first byte raise ProviderError (so the router can
+        retry or fail over); the returned handle yields parsed chunks and collects usage."""
+        body: dict[str, Any] = {"model": model, "messages": req.messages, "stream": True}
+        if provider.options.get("stream_usage", True):
+            body["stream_options"] = {"include_usage": True}
+        if req.temperature is not None:
+            body["temperature"] = req.temperature
+        if req.max_tokens is not None:
+            body["max_tokens"] = req.max_tokens
+        if req.tools:
+            body["tools"] = req.tools
+            if req.tool_choice is not None:
+                body["tool_choice"] = req.tool_choice
+        body.update(params or {})
+        body.update(req.extra)
+        timeout = httpx.Timeout(provider.timeout_s, connect=provider.connect_timeout_s)
+        request = client.build_request("POST", f"{provider.base_url}/chat/completions",
+                                       headers=self._headers(provider, key), json=body, timeout=timeout)
+        try:
+            resp = await client.send(request, stream=True)
+        except httpx.TimeoutException as e:
+            raise ProviderError("timeout", f"timeout: {type(e).__name__}") from None
+        except httpx.HTTPError as e:
+            raise ProviderError("server_error", f"transport: {type(e).__name__}") from None
+        if resp.status_code >= 400:
+            await resp.aread()
+            await resp.aclose()
+            raise classify_http_error(resp)
+        return ChatStreamHandle(resp)
 
     async def list_models(self, provider: ProviderConfig, key: ApiKey, client: httpx.AsyncClient) -> list[str]:
         try:

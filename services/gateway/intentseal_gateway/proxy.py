@@ -115,19 +115,54 @@ async def _complete(request: Request, agent_id: str) -> Any:
 
     req = ChatRequest(messages=messages, tools=body.get("tools"), tool_choice=body.get("tool_choice"),
                       temperature=body.get("temperature", 0), max_tokens=body.get("max_tokens") or 1024)
+    security = {"session_id": session_id, "inbound": findings_summary}
+    if body.get("stream"):
+        try:
+            upstream = await engine.router.stream_chat(PROXY_ROLE, req)
+        except AllProvidersFailed as e:
+            return _unavailable(e)
+        include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
+        return StreamingResponse(_stream(engine, upstream, agent_id, session_id, security, include_usage),
+                                 media_type="text/event-stream")
     try:
         res = await engine.router.chat(PROXY_ROLE, req)
     except AllProvidersFailed as e:
-        return JSONResponse({"error": {"message": "all upstream providers unavailable", "type": "upstream_unavailable",
-                                       "detail": str(e)[:300]}}, status_code=503)
+        return _unavailable(e)
 
-    # PRX-3: check each tool call before the agent can run it.
+    kept, notices = await _check_tool_calls(engine, res.tool_calls, agent_id, session_id)
+    content = res.content or ""
+    if notices:
+        content = (content + "\n\n" if content else "") + "\n".join(notices)
+    message: dict[str, Any] = {"role": "assistant", "content": content}
+    if kept:
+        message["tool_calls"] = kept
+    return {
+        "id": "chatcmpl-" + uuid.uuid4().hex[:24], "object": "chat.completion", "created": int(time.time()),
+        "model": f"{res.provider}/{res.model}",
+        "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if kept else "stop"}],
+        "usage": {"prompt_tokens": res.input_tokens, "completion_tokens": res.output_tokens,
+                  "total_tokens": res.input_tokens + res.output_tokens},
+        "x_security": {**security, "blocked_tool_calls": len(notices)},
+    }
+
+
+def _unavailable(e: Exception) -> JSONResponse:
+    return JSONResponse({"error": {"message": "all upstream providers unavailable", "type": "upstream_unavailable",
+                                   "detail": str(e)[:300]}}, status_code=503)
+
+
+async def _check_tool_calls(engine: Any, tool_calls: list[dict[str, Any]], agent_id: str,
+                            session_id: str) -> tuple[list[dict[str, Any]], list[str]]:
+    """PRX-3: check each tool call before the agent can run it. Blocked calls become notices; pinned fields are
+    rewritten in the released call."""
     kept, notices = [], []
-    for tc in res.tool_calls:
+    for tc in tool_calls:
         fn = tc.get("function") or {}
         try:
             args = json.loads(fn.get("arguments") or "{}")
         except json.JSONDecodeError:
+            args = {"_raw": fn.get("arguments")}
+        if not isinstance(args, dict):
             args = {"_raw": fn.get("arguments")}
         ar = await engine.check_action(fn.get("name", ""), args, agent_id, session_id=session_id)
         if ar.enforced == Decision.ALLOW:
@@ -136,32 +171,62 @@ async def _complete(request: Request, agent_id: str) -> Any:
             kept.append(tc)
         else:
             notices.append(ar.notice or f"Tool call '{fn.get('name')}' was blocked by the security policy.")
-    content = res.content or ""
+    return kept, notices
+
+
+def _sse(obj: Any) -> str:
+    return f"data: {json.dumps(obj)}\n\n"
+
+
+async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, security: dict[str, Any],
+                  include_usage: bool):
+    """PRX-6: text deltas stream through as they arrive; tool-call deltas are buffered until the upstream stream
+    ends, assembled, checked, and only then released (allowed calls) or replaced by a notice (blocked calls).
+    If the upstream fails part-way, buffered tool calls are never released."""
+    cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
+    model = f"{upstream.provider}/{upstream.model}"
+
+    def chunk(delta: dict[str, Any], finish: str | None = None, **extra: Any) -> str:
+        return _sse({"id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
+                     "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], **extra})
+
+    calls: dict[int, dict[str, Any]] = {}
+    finish, started = None, False
+    try:
+        async for c in upstream.chunks():
+            for choice in c.get("choices") or []:
+                delta = choice.get("delta") or {}
+                for pos, tc in enumerate(delta.get("tool_calls") or []):
+                    i = tc.get("index", pos)
+                    slot = calls.setdefault(i, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                    slot["id"] = tc.get("id") or slot["id"]
+                    fn = tc.get("function") or {}
+                    slot["function"]["name"] += fn.get("name") or ""
+                    slot["function"]["arguments"] += fn.get("arguments") or ""
+                if delta.get("content"):
+                    yield chunk({**({} if started else {"role": "assistant"}), "content": delta["content"]})
+                    started = True
+                finish = choice.get("finish_reason") or finish
+    except Exception as e:   # upstream failed mid-stream: say so; buffered tool calls are dropped, never released
+        yield _sse({"error": {"message": "upstream stream failed", "type": "upstream_error", "detail": type(e).__name__}})
+        yield "data: [DONE]\n\n"
+        return
+    ordered = [calls[i] for i in sorted(calls)]
+    for tc in ordered:
+        tc["id"] = tc["id"] or f"call_{uuid.uuid4().hex[:12]}"
+    kept, notices = await _check_tool_calls(engine, ordered, agent_id, session_id)
     if notices:
-        content = (content + "\n\n" if content else "") + "\n".join(notices)
-    message: dict[str, Any] = {"role": "assistant", "content": content}
+        text = ("\n\n" if started else "") + "\n".join(notices)
+        yield chunk({**({} if started else {"role": "assistant"}), "content": text})
+        started = True
     if kept:
-        message["tool_calls"] = kept
-    completion = {
-        "id": "chatcmpl-" + uuid.uuid4().hex[:24], "object": "chat.completion", "created": int(time.time()),
-        "model": f"{res.provider}/{res.model}",
-        "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if kept else "stop"}],
-        "usage": {"prompt_tokens": res.input_tokens, "completion_tokens": res.output_tokens,
-                  "total_tokens": res.input_tokens + res.output_tokens},
-        "x_security": {"session_id": session_id, "inbound": findings_summary, "blocked_tool_calls": len(notices)},
-    }
-    if body.get("stream"):
-        return StreamingResponse(_as_stream(completion), media_type="text/event-stream")
-    return completion
-
-
-async def _as_stream(c: dict[str, Any]):
-    """Minimal streaming compatibility: the checked message is sent as one chunk (PRX-6 is P1)."""
-    msg = c["choices"][0]["message"]
-    delta: dict[str, Any] = {"role": "assistant", "content": msg.get("content", "")}
-    if msg.get("tool_calls"):
-        delta["tool_calls"] = [{**tc, "index": i} for i, tc in enumerate(msg["tool_calls"])]
-    chunk = {"id": c["id"], "object": "chat.completion.chunk", "created": c["created"], "model": c["model"],
-             "choices": [{"index": 0, "delta": delta, "finish_reason": c["choices"][0]["finish_reason"]}]}
-    yield f"data: {json.dumps(chunk)}\n\n"
+        yield chunk({**({} if started else {"role": "assistant"}),
+                     "tool_calls": [{**tc, "index": i} for i, tc in enumerate(kept)]})
+    final = "tool_calls" if kept else ("stop" if finish in (None, "tool_calls") else finish)
+    yield chunk({}, final, x_security={**security, "blocked_tool_calls": len(notices)})
+    if include_usage:
+        h = upstream.handle
+        yield _sse({"id": cid, "object": "chat.completion.chunk", "created": created, "model": model, "choices": [],
+                    "usage": {"prompt_tokens": h.input_tokens, "completion_tokens": h.output_tokens,
+                              "total_tokens": h.input_tokens + h.output_tokens}})
     yield "data: [DONE]\n\n"

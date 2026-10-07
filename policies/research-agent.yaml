@@ -11,7 +11,7 @@ tools:
   write_file:   { risk: medium, failure: closed, path_arg: path }
   send_message: { risk: high,   failure: closed, escalate_if_uncertain: true,
                   allowed_recipients: ["@example-corp.test"], recipient_arg: to,
-                 intent_terms: [send, email, mail, reply, forward, message, notify, share] }
+                  intent_terms: [send, email, mail, reply, forward, message, notify, share] }
 unknown_tools: block
 sensitive_data:
   patterns: [api_key, credential, customer_record]

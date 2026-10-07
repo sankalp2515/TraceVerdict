@@ -48,7 +48,7 @@ class World:
 
     def __init__(self, overrides: dict[str, Any] | None = None, root: Path | None = None) -> None:
         self.canaries = Canaries()
-        self.root = Path(root or tempfile.mkdtemp(prefix="asg-world-"))
+        self.root = Path(root or tempfile.mkdtemp(prefix="intentseal-world-"))
         self.workspace = self.root / "workspace"
         self.outbox_path = self.root / "outbox.jsonl"
         if (FIXTURES / "workspace").exists():

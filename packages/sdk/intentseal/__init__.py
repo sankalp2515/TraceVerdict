@@ -1,6 +1,6 @@
 """IntentSeal Python SDK."""
 
-from asg_core.types import ActionResult, Decision, InspectResult
+from intentseal_core.types import ActionResult, Decision, InspectResult
 
 from .guard import Guard, ToolBlocked
 

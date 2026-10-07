@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from asg_core.memory import AttackMemory
-from asg_core.store import Store
+from intentseal_core.memory import AttackMemory
+from intentseal_core.store import Store
 
 
 def results(path, cases):
@@ -20,8 +20,8 @@ CAUGHT = "a different neutral sentence about the lantern schedule that the gatew
 
 
 def test_learn_adds_only_misses_and_report_counts_rounds(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("ASG_DB_PATH", str(tmp_path / "m.db"))
-    from asg_eval import adaptive
+    monkeypatch.setenv("INTENTSEAL_DB_PATH", str(tmp_path / "m.db"))
+    from intentseal_eval import adaptive
 
     r1 = results(tmp_path / "r1.json", [
         (MISS, {"compromised": True, "security": {"detected": False}}),

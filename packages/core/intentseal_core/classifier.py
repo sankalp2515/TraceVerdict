@@ -17,8 +17,8 @@ from pathlib import Path
 
 from .config import repo_root
 
-log = logging.getLogger("asg.tier1")
-MODEL_REPO = os.environ.get("ASG_TIER1_MODEL", "protectai/deberta-v3-base-prompt-injection-v2")
+log = logging.getLogger("intentseal.tier1")
+MODEL_REPO = os.environ.get("INTENTSEAL_TIER1_MODEL", "protectai/deberta-v3-base-prompt-injection-v2")
 
 
 class LocalClassifier:
@@ -33,7 +33,7 @@ class LocalClassifier:
         tok = path / "onnx" / "tokenizer.json"
         self.tok = Tokenizer.from_file(str(tok if tok.exists() else path / "tokenizer.json"))
         so = ort.SessionOptions()
-        so.intra_op_num_threads = threads or int(os.environ.get("ASG_TIER1_THREADS") or "2")
+        so.intra_op_num_threads = threads or int(os.environ.get("INTENTSEAL_TIER1_THREADS") or "2")
         self.sess = ort.InferenceSession(str(path / "onnx" / "model.onnx"), so, providers=["CPUExecutionProvider"])
         self.inputs = {i.name for i in self.sess.get_inputs()}
         cfg = json.loads((path / "config.json").read_text())

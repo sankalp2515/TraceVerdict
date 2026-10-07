@@ -30,14 +30,14 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 
-from asg_core.llm.router import Router
+from intentseal_core.llm.router import Router
 from research_agent import AgentHooks, ResearchAgent, World
 from research_agent.delivery import CHANNELS, deliver, reader
 from research_agent.tools import Toolbox
 
 ROOT = Path(__file__).resolve().parents[2]
-LOG_DIR = Path(os.environ.get("ASG_EVAL_LOG_DIR", ROOT / "data" / "eval_runs"))
-AGENT_ROLE = os.environ.get("ASG_AGENT_ROLE", "agent")   # config/models.yaml role used by the agent
+LOG_DIR = Path(os.environ.get("INTENTSEAL_EVAL_LOG_DIR", ROOT / "data" / "eval_runs"))
+AGENT_ROLE = os.environ.get("INTENTSEAL_AGENT_ROLE", "agent")   # config/models.yaml role used by the agent
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 class RunRequest(BaseModel):
@@ -56,12 +56,12 @@ class RunRequest(BaseModel):
 def hooks_for(protection: str, world: World, task: Any) -> AgentHooks:
     if protection == "off":
         return AgentHooks()
-    from asg_eval.protection import guard_hooks  # SDK Guard (M3)
+    from intentseal_eval.protection import guard_hooks  # SDK Guard (M3)
     return guard_hooks(world, task)
 
 
 def _sandbox_url(url: str) -> bool:
-    from asg_core.session import domain_of
+    from intentseal_core.session import domain_of
     d = domain_of(url)
     return d == SANDBOX_DOMAIN or d.endswith("." + SANDBOX_DOMAIN)
 
@@ -120,7 +120,7 @@ def _engine_fingerprint() -> str:
     """Hash of the Core Engine, SDK and policy sources this process loaded: every output carries it, so a summary can
     prove all results of a suite came from one engine version (stale or concurrent runs cannot mix in unnoticed)."""
     h = hashlib.sha256()
-    for d in ("packages/core/asg_core", "packages/sdk/asg_sdk", "policies"):
+    for d in ("packages/core/intentseal_core", "packages/sdk/intentseal", "policies"):
         for f in sorted((ROOT / d).rglob("*")):
             if f.suffix in (".py", ".yaml") and "__pycache__" not in f.parts:
                 h.update(f.name.encode() + f.read_bytes().replace(b"\r\n", b"\n"))

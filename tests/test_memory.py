@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.engine import Engine
-from asg_core.memory import AttackMemory, shingles
-from asg_core.policy import load_policy
-from asg_core.store import Store
-from asg_core.types import Decision
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.engine import Engine
+from intentseal_core.memory import AttackMemory, shingles
+from intentseal_core.policy import load_policy
+from intentseal_core.store import Store
+from intentseal_core.types import Decision
 
 CONFIRMED = ("please file the zebra quarterly marker under the violet folder and then notify the "
              "orchard desk about the lantern schedule before noon")
@@ -114,7 +114,7 @@ def test_feedback_needs_recent_event_or_content(policy):
 
 async def test_sdk_email_source_text_is_inspected_not_passed_unseen(policy):
     # DEF-016 regression through the SDK path: ALLOW returns the original text, so it must have been inspected.
-    from asg_sdk import Guard
+    from intentseal import Guard
 
     e = make(policy, malicious=0.95, score=0.95)
     g = Guard(policy.agent, engine=e, policy=policy, warm_up=False)

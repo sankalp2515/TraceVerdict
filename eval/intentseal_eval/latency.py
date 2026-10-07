@@ -2,7 +2,7 @@
 
 Every inspection is first-seen content (no scan cache), measured inside Engine.inspect. Inputs: our benign sets
 and fixture documents as user turns (user turns stay on the fast path in every policy).
-Usage: python -m asg_eval.latency  ->  data/eval_runs/latency.json
+Usage: python -m intentseal_eval.latency  ->  data/eval_runs/latency.json
 """
 
 from __future__ import annotations
@@ -14,11 +14,11 @@ from pathlib import Path
 
 import yaml
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.engine import Engine
-from asg_core.policy import load_policy
-from asg_core.store import Store
-from asg_sdk.guard import _warm_up
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.engine import Engine
+from intentseal_core.policy import load_policy
+from intentseal_core.store import Store
+from intentseal.guard import _warm_up
 
 ROOT = Path(__file__).resolve().parents[2]
 

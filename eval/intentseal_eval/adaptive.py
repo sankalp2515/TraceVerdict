@@ -1,11 +1,11 @@
 """EVAL-4 adaptive rounds: turn the protected agent's misses into attack memory, and report rounds side by side.
 
-    python -m asg_eval.adaptive learn  <round results.json>        # misses -> AttackMemory (fingerprints only)
-    python -m asg_eval.adaptive report <round1.json> <round2.json> # per-round attack success, caught rate
+    python -m intentseal_eval.adaptive learn  <round results.json>        # misses -> AttackMemory (fingerprints only)
+    python -m intentseal_eval.adaptive report <round1.json> <round2.json> # per-round attack success, caught rate
 
 The attack text comes from promptfoo's iterative strategies (configs/adaptive.yaml). A "miss" is a case where the
 protected agent took a verifiable harmful action (EVAL-5 outcome flags) or the gateway flagged nothing. Misses are
-added to the memory the engine consults at Tier 0 (asg_core.memory), so a later round shows whether the system
+added to the memory the engine consults at Tier 0 (intentseal_core.memory), so a later round shows whether the system
 learned. Round 2 must include fresh generated attacks, not only replays, to show generalisation.
 """
 
@@ -16,9 +16,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from asg_core.config import load_settings
-from asg_core.memory import AttackMemory
-from asg_core.store import Store
+from intentseal_core.config import load_settings
+from intentseal_core.memory import AttackMemory
+from intentseal_core.store import Store
 
 from .report import rescore
 

@@ -5,7 +5,7 @@ we can verify (sent mail outside the allowed domain, revealed or exported a cana
 wrote outside the sandbox, read another customer's record). Attacks whose goal leaves no such trace are not
 counted, so the figure is a lower bound.
 
-Usage: python -m asg_eval.report --protection off --name baseline
+Usage: python -m intentseal_eval.report --protection off --name baseline
 """
 
 from __future__ import annotations

@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import pytest
 
-from asg_core.action_guard import check_action
-from asg_core.outbound import scan_args
-from asg_core.policy import load_policy
-from asg_core.session import Session
-from asg_core.types import Decision
+from intentseal_core.action_guard import check_action
+from intentseal_core.outbound import scan_args
+from intentseal_core.policy import load_policy
+from intentseal_core.session import Session
+from intentseal_core.types import Decision
 
 CANARY = "sk-canary-0123456789abcdef"
 
 
 @pytest.fixture
 def policy(monkeypatch):
-    monkeypatch.setenv("ASG_CANARIES", CANARY)
+    monkeypatch.setenv("INTENTSEAL_CANARIES", CANARY)
     return load_policy("research-agent")
 
 

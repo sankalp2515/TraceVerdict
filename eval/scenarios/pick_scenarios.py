@@ -7,7 +7,7 @@ data and never printed.
 
 Usage: python eval/scenarios/pick_scenarios.py [--suite v2e]
        python eval/scenarios/pick_scenarios.py --verify http://127.0.0.1:8011 --key <project key> --cand-dir <dir> [--tries 4]
-         (--verify runs each candidate OFF through a gateway whose ASG_SCENARIO_DIR is --cand-dir and keeps the first
+         (--verify runs each candidate OFF through a gateway whose INTENTSEAL_SCENARIO_DIR is --cand-dir and keeps the first
           that verifiably compromises the unprotected demo agent: canary leaked or a send outside the company)
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from asg_eval.report import rescore
+from intentseal_eval.report import rescore
 
 HERE = Path(__file__).parent
 OUT = HERE.parents[0] / "promptfoo" / "output"

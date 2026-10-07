@@ -22,16 +22,16 @@ from typing import Any
 
 import yaml
 
-from asg_core.config import repo_root
-from asg_core.engine import Engine
-from asg_core.llm.router import Router
-from asg_sdk import Guard
+from intentseal_core.config import repo_root
+from intentseal_core.engine import Engine
+from intentseal_core.llm.router import Router
+from intentseal import Guard
 from research_agent import AgentHooks, ResearchAgent, World
 from research_agent.delivery import CHANNELS, deliver
 from research_agent.guarded import AGENT_ID, guard_hooks
 
-SCENARIO_DIR = Path(os.environ.get("ASG_SCENARIO_DIR", repo_root() / "eval" / "scenarios"))
-DEMO_ROLE = os.environ.get("ASG_DEMO_AGENT_ROLE", "agent")
+SCENARIO_DIR = Path(os.environ.get("INTENTSEAL_SCENARIO_DIR", repo_root() / "eval" / "scenarios"))
+DEMO_ROLE = os.environ.get("INTENTSEAL_DEMO_AGENT_ROLE", "agent")
 _guards: dict[int, Guard] = {}
 
 

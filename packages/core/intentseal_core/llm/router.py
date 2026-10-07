@@ -24,7 +24,7 @@ from ..secrets import ApiKey, install_log_redaction
 from ..store import Store
 from .adapters import AdapterResponse, ChatRequest, ProviderError, get_adapter
 
-log = logging.getLogger("asg.router")
+log = logging.getLogger("intentseal.router")
 
 
 @dataclass

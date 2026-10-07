@@ -1,6 +1,6 @@
 """LangChain / LangGraph helper (SDK-7): protect an existing tool list in one line.
 
-    from asg_sdk import Guard
+    from intentseal import Guard
     guard = Guard("research-agent")
     tools = guard.protect_tools(tools)          # or: protect_tools(guard, tools)
     with guard.session(user_id="u1", task=task):
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterable
 
-from asg_core.types import Decision
+from intentseal_core.types import Decision
 
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool

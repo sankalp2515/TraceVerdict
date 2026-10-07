@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from asg_sdk import Decision, Guard
+from intentseal import Decision, Guard
 from .agent import ActionVerdict, AgentHooks
 from .world import World
 

@@ -3,12 +3,12 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "asg-eval"
+name = "intentseal-eval"
 version = "0.1.0"
 description = "Evaluation harness for IntentSeal"
 requires-python = ">=3.11"
-dependencies = ["asg-core", "asg-research-agent", "fastapi", "uvicorn", "pyyaml"]
+dependencies = ["intentseal-core", "intentseal-research-agent", "fastapi", "uvicorn", "pyyaml"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["asg_eval*", "targets*"]
+include = ["intentseal_eval*", "targets*"]

@@ -1,4 +1,4 @@
-"""Gateway API (API-1…API-11) and LLM proxy mount. Run: uvicorn asg_gateway.app:app --port 8000
+"""Gateway API (API-1…API-11) and LLM proxy mount. Run: uvicorn intentseal_gateway.app:app --port 8000
 
 All surfaces share one Core Engine instance (CORE-1). OpenAPI docs at /docs (API-10).
 """
@@ -20,11 +20,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
-from asg_core.config import repo_root
-from asg_core.costs import overhead, usage_by_role
-from asg_core.engine import Engine
-from asg_core.llm.router import Router
-from asg_core.policy import AgentPolicy, load_policy, save_policy
+from intentseal_core.config import repo_root
+from intentseal_core.costs import overhead, usage_by_role
+from intentseal_core.engine import Engine
+from intentseal_core.llm.router import Router
+from intentseal_core.policy import AgentPolicy, load_policy, save_policy
 
 from .security import BodySizeLimit, KeyRing, Principal, require
 
@@ -71,7 +71,7 @@ class ApprovalRequest(BaseModel):
     note: str = ""
 
 
-access = logging.getLogger("asg.access")
+access = logging.getLogger("intentseal.access")
 
 
 def _percentile(values: list[float], q: float) -> float | None:
@@ -81,7 +81,7 @@ def _percentile(values: list[float], q: float) -> float | None:
 
 def build_engine() -> Engine:
     router = Router()
-    return Engine(router=router, store=router.store, tier0_timeout_s=float(os.environ.get("ASG_EXTRACT_TIMEOUT_S") or "10"))
+    return Engine(router=router, store=router.store, tier0_timeout_s=float(os.environ.get("INTENTSEAL_EXTRACT_TIMEOUT_S") or "10"))
 
 
 def create_app(engine: Engine | None = None, reports_dir: Path | None = None) -> FastAPI:
@@ -91,7 +91,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         if engine is None:   # load classifier + OCR before the first request (no cold-start degraded decisions)
             import asyncio
 
-            from asg_sdk.guard import _warm_up
+            from intentseal.guard import _warm_up
             await asyncio.to_thread(_warm_up)
         app.state.keys = KeyRing()
         # Ephemeral key for the demo runner's own calls to the proxy (S9); random per process, never exposed.
@@ -107,7 +107,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
 
     app = FastAPI(title="IntentSeal Gateway API", version="0.1.0", lifespan=lifespan,
                   description="Keep AI agents inside the user's intent. Inspect content, check actions, replay sessions. Rules decide; AI advises.")
-    origins = [o.strip() for o in os.environ.get("ASG_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
+    origins = [o.strip() for o in os.environ.get("INTENTSEAL_CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST", "PUT", "DELETE"],
                        allow_headers=["Authorization", "X-API-Key", "Content-Type", "X-Agent-Id", "X-Session-Id",
                                       "X-Request-Id"], expose_headers=["X-Request-Id"])
@@ -185,7 +185,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         latest, summary = {}, None
         for f in reports:
             rep = json.loads(f.read_text(encoding="utf-8"))
-            if rep.get("kind") == "summary":   # grid claim + headline metrics (asg_eval.summary)
+            if rep.get("kind") == "summary":   # grid claim + headline metrics (intentseal_eval.summary)
                 summary = summary or {"file": f.name, **rep}
                 continue
             key = f"{rep.get('suite', 'broad')}:{rep.get('protection')}"

@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 
-from asg_sdk import Guard
+from intentseal import Guard
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 

@@ -1,4 +1,4 @@
-"""Command line: `asg providers check [--no-call] [--models]`.
+"""Command line: `intentseal providers check [--no-call] [--models]`.
 
 Prints providers, key *aliases* and health, and makes one minimal test call per key.
 Key values are never printed.
@@ -70,7 +70,7 @@ async def providers_check(call: bool, show_models: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="asg")
+    ap = argparse.ArgumentParser(prog="intentseal")
     sub = ap.add_subparsers(dest="cmd", required=True)
     pr = sub.add_parser("providers", help="provider operations")
     prs = pr.add_subparsers(dest="sub", required=True)

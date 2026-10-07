@@ -1,5 +1,5 @@
 """Insert the headline results from the latest evaluation summary into README.md (between RESULTS markers),
-so the README never carries hand-typed numbers. Usage: python -m asg_eval.readme"""
+so the README never carries hand-typed numbers. Usage: python -m intentseal_eval.readme"""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def block(s: dict) -> str:
 def main() -> None:
     files = sorted(REPORTS.glob("*-summary.json"))
     if not files:
-        sys.exit("no summary yet: run python -m asg_eval.summary")
+        sys.exit("no summary yet: run python -m intentseal_eval.summary")
     s = json.loads(files[-1].read_text(encoding="utf-8"))
     readme = ROOT / "README.md"
     text = readme.read_text(encoding="utf-8")

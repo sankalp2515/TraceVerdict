@@ -1,7 +1,7 @@
 """False-positive rate on the hard-benign set (G3): legitimate content that looks suspicious.
 
 Each case goes straight through Engine.inspect with its channel; any decision other than ALLOW is a false alarm.
-Usage: python -m asg_eval.fpr
+Usage: python -m intentseal_eval.fpr
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from asg_sdk import Guard
+from intentseal import Guard
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_MAP = {"ocr_text": "ocr_text", "docx": "docx", "pdf": "pdf"}

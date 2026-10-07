@@ -37,5 +37,5 @@ jobs:
         run: python agents/research_agent/fixtures/build.py
       - name: Tests
         env:
-          ASG_DB_PATH: ${{ runner.temp }}/asg-ci.db
+          INTENTSEAL_DB_PATH: ${{ runner.temp }}/intentseal-ci.db
         run: python -m pytest -q

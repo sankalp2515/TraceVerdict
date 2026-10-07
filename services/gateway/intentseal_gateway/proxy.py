@@ -21,9 +21,9 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from asg_core.llm.adapters import ChatRequest
-from asg_core.llm.router import AllProvidersFailed
-from asg_core.types import Decision
+from intentseal_core.llm.adapters import ChatRequest
+from intentseal_core.llm.router import AllProvidersFailed
+from intentseal_core.types import Decision
 
 from .security import Principal, require
 

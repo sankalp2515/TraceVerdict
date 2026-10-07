@@ -88,8 +88,8 @@ def build_sample(seed: int = 11) -> list[dict]:
 
 
 async def prompt_guard_scores(texts: list[str]) -> list[float | None]:
-    from asg_core.llm.adapters import ChatRequest, ProviderError
-    from asg_core.llm.router import Router
+    from intentseal_core.llm.adapters import ChatRequest, ProviderError
+    from intentseal_core.llm.router import Router
     router = Router()
     scores: list[float | None] = []
     for t in texts:

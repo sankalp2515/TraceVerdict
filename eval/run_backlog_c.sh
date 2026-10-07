@@ -5,13 +5,13 @@ set -u
 cd "$(dirname "$0")"
 PY=../.venv/Scripts/python; [ -x "$PY" ] || PY=../.venv/bin/python
 GPY="$(cd .. && pwd)/.venv-garak/Scripts/python"; [ -x "$GPY" ] || GPY="$(cd .. && pwd)/.venv-garak/bin/python"
-export ASG_BUDGET_TIER2_DAILY_TOKENS=none
+export INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS=none
 mkdir -p ../data/logs garak/runs
-ASG_AGENT_ROLE=agent_eval "$PY" -m uvicorn targets.agent_target:app --port 8787 --log-level warning > ../data/logs/target.8787.log 2>&1 &
+INTENTSEAL_AGENT_ROLE=agent_eval "$PY" -m uvicorn targets.agent_target:app --port 8787 --log-level warning > ../data/logs/target.8787.log 2>&1 &
 T0=$!
-ASG_AGENT_ROLE=agent_eval "$PY" -m uvicorn targets.agent_target:app --port 8789 --log-level warning > ../data/logs/target.8789.log 2>&1 &
+INTENTSEAL_AGENT_ROLE=agent_eval "$PY" -m uvicorn targets.agent_target:app --port 8789 --log-level warning > ../data/logs/target.8789.log 2>&1 &
 T1=$!
-ASG_AGENT_ROLE=agent_headline "$PY" -m uvicorn targets.agent_target:app --port 8790 --log-level warning > ../data/logs/target.8790.log 2>&1 &
+INTENTSEAL_AGENT_ROLE=agent_headline "$PY" -m uvicorn targets.agent_target:app --port 8790 --log-level warning > ../data/logs/target.8790.log 2>&1 &
 T2=$!
 trap 'kill $T0 $T1 $T2 2>/dev/null' EXIT
 for port in 8787 8789 8790; do

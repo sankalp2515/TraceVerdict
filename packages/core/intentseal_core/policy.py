@@ -49,7 +49,7 @@ class Budgets(BaseModel):
 
 class SensitiveData(BaseModel):
     patterns: list[str] = Field(default_factory=lambda: ["api_key", "credential"])
-    canaries: list[str] = Field(default_factory=list)   # literal values; "from_env" reads ASG_CANARIES
+    canaries: list[str] = Field(default_factory=list)   # literal values; "from_env" reads INTENTSEAL_CANARIES
     drop_non_visible: bool = True                       # untrusted docs: the model sees what a human sees
 
 
@@ -76,7 +76,7 @@ class AgentPolicy(BaseModel):
         out: list[str] = []
         for c in self.sensitive_data.canaries:
             if c == "from_env":
-                out += [v.strip() for v in os.environ.get("ASG_CANARIES", "").split(",") if v.strip()]
+                out += [v.strip() for v in os.environ.get("INTENTSEAL_CANARIES", "").split(",") if v.strip()]
             else:
                 out.append(c)
         return out
@@ -89,7 +89,7 @@ def policy_path(agent: str, directory: Path | None = None) -> Path:
     """policies/<agent>.yaml; agent ids are restricted so a request can never name a file outside the directory."""
     if not AGENT_ID.match(agent or "") or ".." in agent:
         raise ValueError("invalid agent id")
-    return (directory or Path(os.environ.get("ASG_POLICY_DIR") or repo_root() / "policies")) / f"{agent}.yaml"
+    return (directory or Path(os.environ.get("INTENTSEAL_POLICY_DIR") or repo_root() / "policies")) / f"{agent}.yaml"
 
 
 def save_policy(policy: AgentPolicy, directory: Path | None = None) -> Path:
@@ -108,7 +108,7 @@ def load_policy(agent: str, directory: Path | None = None) -> AgentPolicy:
     policy = AgentPolicy.model_validate(raw)
     # Operational override (12-factor): e.g. evaluation runs, which exceed a production daily cap by design.
     # "none" lifts the cap; the evaluation summary records the value used.
-    override = os.environ.get("ASG_BUDGET_TIER2_DAILY_TOKENS")
+    override = os.environ.get("INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS")
     if override:
         policy.budgets.daily_tokens_tier2 = None if override.lower() == "none" else int(override)
     return policy

@@ -9,10 +9,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.engine import Engine
-from asg_core.llm.router import ChatResult
-from asg_core.store import Store
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.engine import Engine
+from intentseal_core.llm.router import ChatResult
+from intentseal_core.store import Store
 from research_agent.render import to_pdf
 
 ADMIN, PROJECT, PUBLIC = "admin-key-123456", "proj-key-123456", "public-key-123456"
@@ -47,10 +47,10 @@ def tc(name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    monkeypatch.setenv("ASG_API_KEYS", f"admin:{ADMIN}:admin,proj:{PROJECT}:project")
-    monkeypatch.setenv("ASG_PUBLIC_KEY", PUBLIC)
-    monkeypatch.setenv("ASG_CORS_ORIGINS", "https://console.example.test")
-    monkeypatch.setenv("ASG_CANARIES", "sk-canary-unit-test-0001")
+    monkeypatch.setenv("INTENTSEAL_API_KEYS", f"admin:{ADMIN}:admin,proj:{PROJECT}:project")
+    monkeypatch.setenv("INTENTSEAL_PUBLIC_KEY", PUBLIC)
+    monkeypatch.setenv("INTENTSEAL_CORS_ORIGINS", "https://console.example.test")
+    monkeypatch.setenv("INTENTSEAL_CANARIES", "sk-canary-unit-test-0001")
     reports = tmp_path / "reports"
     reports.mkdir()
     (reports / "r.json").write_text(json.dumps({"suite": "headline", "protection": "on", "overall": {"asr": 0.0}}))
@@ -58,15 +58,15 @@ def env(monkeypatch, tmp_path):
     scen.mkdir()
     (scen / "s8.yaml").write_text("id: S8\ntitle: Benign article\nchannel: web\ncontent: Solar costs fell 12 percent this year.\n"
                                   "task: Summarise https://fixtures.test/incoming.html\n")
-    monkeypatch.setenv("ASG_SCENARIO_DIR", str(scen))
+    monkeypatch.setenv("INTENTSEAL_SCENARIO_DIR", str(scen))
     return tmp_path
 
 
 def make_client(env, router: FakeRouter | None = None, judge: float = 0.0):
     import importlib
 
-    import asg_gateway.app as appmod
-    import asg_gateway.demo as demomod
+    import intentseal_gateway.app as appmod
+    import intentseal_gateway.demo as demomod
     importlib.reload(demomod)
     router = router or FakeRouter()
     store = router.store
@@ -89,8 +89,8 @@ def test_health_open_and_auth_required(env):
 
 
 def test_rate_limit_and_body_limit(env, monkeypatch):
-    monkeypatch.setenv("ASG_PUBLIC_RATE_LIMIT_PER_MIN", "3")
-    monkeypatch.setenv("ASG_MAX_BODY_BYTES", "2000")
+    monkeypatch.setenv("INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN", "3")
+    monkeypatch.setenv("INTENTSEAL_MAX_BODY_BYTES", "2000")
     with make_client(env) as c:
         codes = [c.get("/v1/decisions", headers=H(PUBLIC)).status_code for _ in range(4)]
         assert codes[-1] == 429
@@ -178,7 +178,7 @@ def test_proxy_stream_and_upstream_down(env):
 
     class Down(FakeRouter):
         async def chat(self, role, req):
-            from asg_core.llm.router import AllProvidersFailed
+            from intentseal_core.llm.router import AllProvidersFailed
             raise AllProvidersFailed(role, [])
 
     with make_client(env, Down()) as c:
@@ -209,12 +209,12 @@ def test_request_id_and_invalid_agent_id(env):
 
 def test_policy_put_is_admin_only_validated_and_versioned(env, monkeypatch):
     import shutil
-    from asg_core.config import repo_root
+    from intentseal_core.config import repo_root
 
     pdir = env / "policies"
     pdir.mkdir()
     shutil.copy(repo_root() / "policies" / "research-agent.yaml", pdir)
-    monkeypatch.setenv("ASG_POLICY_DIR", str(pdir))
+    monkeypatch.setenv("INTENTSEAL_POLICY_DIR", str(pdir))
     with make_client(env) as c:
         pol = c.get("/v1/policies/research-agent", headers=H(PUBLIC)).json()
         pol["mode"] = "monitor"
@@ -341,7 +341,7 @@ def test_demo_proxy_scenario_off_monitors_on_enforces(env):
 
 def test_empty_env_values_mean_defaults(env, monkeypatch):
     # Copying .env.example leaves optional settings empty; the gateway must start with defaults, not crash on int("").
-    for k in ("ASG_RATE_LIMIT_PER_MIN", "ASG_PUBLIC_RATE_LIMIT_PER_MIN", "ASG_MAX_BODY_BYTES", "ASG_EXTRACT_TIMEOUT_S"):
+    for k in ("INTENTSEAL_RATE_LIMIT_PER_MIN", "INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN", "INTENTSEAL_MAX_BODY_BYTES", "INTENTSEAL_EXTRACT_TIMEOUT_S"):
         monkeypatch.setenv(k, "")
     with make_client(env) as c:
         assert c.get("/healthz").status_code == 200
@@ -374,7 +374,7 @@ def test_policy_round_trip_keeps_redacted_canaries(env, monkeypatch):
     pdir.mkdir()
     (pdir / "demo-agent.yaml").write_text(_yaml.safe_dump({"agent": "demo-agent", "mode": "enforce",
                                                              "sensitive_data": {"canaries": ["from_env", "sk-literal-canary-0001"]}}))
-    monkeypatch.setenv("ASG_POLICY_DIR", str(pdir))
+    monkeypatch.setenv("INTENTSEAL_POLICY_DIR", str(pdir))
     with make_client(env) as c:
         got = c.get("/v1/policies/demo-agent", headers=H(PUBLIC)).json()
         assert got["sensitive_data"]["canaries"] == ["from_env", "[REDACTED]"]

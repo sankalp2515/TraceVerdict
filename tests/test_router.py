@@ -8,11 +8,11 @@ import httpx
 import pytest
 import respx
 
-from asg_core.config import ModelRef, ProviderConfig, RoleConfig, Settings
-from asg_core.llm.adapters import ChatRequest
-from asg_core.llm.router import AllProvidersFailed, Router
-from asg_core.secrets import ApiKey, install_log_redaction, load_keys, redact, registry
-from asg_core.store import Store
+from intentseal_core.config import ModelRef, ProviderConfig, RoleConfig, Settings
+from intentseal_core.llm.adapters import ChatRequest
+from intentseal_core.llm.router import AllProvidersFailed, Router
+from intentseal_core.secrets import ApiKey, install_log_redaction, load_keys, redact, registry
+from intentseal_core.store import Store
 
 OK = {"choices": [{"message": {"content": "hi", "tool_calls": []}, "finish_reason": "stop"}],
       "usage": {"prompt_tokens": 10, "completion_tokens": 2}}

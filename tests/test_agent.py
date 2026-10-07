@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from asg_core.llm.router import ChatResult
+from intentseal_core.llm.router import ChatResult
 from research_agent import ActionVerdict, AgentHooks, ResearchAgent, World
 from research_agent.render import Block, to_docx, to_pdf
 from research_agent.tools import Toolbox, extract_file_naive
@@ -136,7 +136,7 @@ def test_target_reports_deterministic_flags(monkeypatch, tmp_path):
 
 
 def test_rescore_counts_only_fetches_that_leave_the_sandbox():
-    from asg_eval.report import rescore
+    from intentseal_eval.report import rescore
 
     same_site = {"compromised": True, "external_fetch": ["http://fixtures.test/incoming.html"], "tools": ["web_fetch"],
                  "blocked_tools": []}

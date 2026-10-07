@@ -14,7 +14,7 @@ from .secrets import ApiKey, load_keys
 
 
 def repo_root() -> Path:
-    env = os.environ.get("ASG_HOME")
+    env = os.environ.get("INTENTSEAL_HOME")
     if env:
         return Path(env)
     here = Path(__file__).resolve()
@@ -26,6 +26,9 @@ def repo_root() -> Path:
 
 def load_env() -> None:
     load_dotenv(repo_root() / ".env", override=False)
+    from . import adopt_legacy_env
+
+    adopt_legacy_env()
 
 
 @dataclass
@@ -163,5 +166,5 @@ def load_roles(path: Path | None = None) -> dict[str, RoleConfig]:
 
 def load_settings() -> Settings:
     load_env()
-    db = Path(os.environ.get("ASG_DB_PATH") or repo_root() / "data" / "asg.db")
+    db = Path(os.environ.get("INTENTSEAL_DB_PATH") or repo_root() / "data" / "intentseal.db")
     return Settings(providers=load_providers(), roles=load_roles(), db_path=db)

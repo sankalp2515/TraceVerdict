@@ -21,14 +21,14 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
-from asg_core.engine import Engine
-from asg_core.llm.router import Router
-from asg_core.policy import AgentPolicy, load_policy
-from asg_core.session import Session
-from asg_core.types import ActionResult, Decision, InspectResult
+from intentseal_core.engine import Engine
+from intentseal_core.llm.router import Router
+from intentseal_core.policy import AgentPolicy, load_policy
+from intentseal_core.session import Session
+from intentseal_core.types import ActionResult, Decision, InspectResult
 
-log = logging.getLogger("asg.sdk")
-_current: contextvars.ContextVar[Session | None] = contextvars.ContextVar("asg_session", default=None)
+log = logging.getLogger("intentseal.sdk")
+_current: contextvars.ContextVar[Session | None] = contextvars.ContextVar("intentseal_session", default=None)
 
 
 class ToolBlocked(Exception):
@@ -194,7 +194,7 @@ class Guard:
 
 
     def protect_tools(self, tools: Any, inspect_outputs: bool = True) -> list[Any]:
-        """SDK-7: wrap LangChain / LangGraph tools (see asg_sdk.langchain)."""
+        """SDK-7: wrap LangChain / LangGraph tools (see intentseal.langchain)."""
         from .langchain import protect_tools
         return protect_tools(self, tools, inspect_outputs)
 
@@ -206,8 +206,8 @@ def _warm_up() -> None:
 
         from PIL import Image, ImageDraw
 
-        from asg_core import extract as _extract
-        from asg_core.classifier import local_classifier
+        from intentseal_core import extract as _extract
+        from intentseal_core.classifier import local_classifier
 
         local_classifier()
         img = Image.new("RGB", (160, 40), "white")

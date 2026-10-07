@@ -10,12 +10,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.engine import Engine
-from asg_core.policy import load_policy
-from asg_core.store import Store
-from asg_core.types import Decision
-from asg_sdk import Guard
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.engine import Engine
+from intentseal_core.policy import load_policy
+from intentseal_core.store import Store
+from intentseal_core.types import Decision
+from intentseal import Guard
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY = "proj-key-123456"
@@ -48,8 +48,8 @@ def load(path: Path, name: str):
 
 @pytest.fixture
 def gateway(monkeypatch):
-    monkeypatch.setenv("ASG_API_KEYS", f"proj:{KEY}:project")
-    import asg_gateway.app as appmod
+    monkeypatch.setenv("INTENTSEAL_API_KEYS", f"proj:{KEY}:project")
+    import intentseal_gateway.app as appmod
     with TestClient(appmod.create_app(engine=make_engine())) as c:
         yield c
 
@@ -134,7 +134,7 @@ def test_every_surface_goes_through_engine_inspect(gateway, monkeypatch):
     assert seen[-1] == "pdf"
     class Upstream:   # proxy upstream stub: inbound inspection is what this test proves
         async def chat(self, role, req):
-            from asg_core.llm.router import ChatResult
+            from intentseal_core.llm.router import ChatResult
             return ChatResult(content="ok", tool_calls=[], finish_reason="stop", provider="fake", model="m", key_alias=None,
                               input_tokens=1, output_tokens=1, latency_ms=1, est_cost_usd=0, cached=False, attempts=[])
 

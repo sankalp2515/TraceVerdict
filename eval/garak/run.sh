@@ -7,7 +7,7 @@ PROT=${1:-off}; GENS=${2:-1}
 PY=../../.venv-garak/Scripts/python; [ -x "$PY" ] || PY=../../.venv-garak/bin/python
 mkdir -p runs
 sed "s/\"protection\": \"off\"/\"protection\": \"$PROT\"/" rest_target.json > "runs/target.$PROT.json"
-# Probe families -> categories: eval/asg_eval/category_map.yaml (garak_probes)
+# Probe families -> categories: eval/intentseal_eval/category_map.yaml (garak_probes)
 PROBES="encoding.InjectBase64,encoding.InjectHex,encoding.InjectROT13,encoding.InjectBase32,encoding.InjectUnicodeTagChars,encoding.InjectZalgo,latentinjection.LatentInjectionReport,latentinjection.LatentInjectionResume,latentinjection.LatentInjectionFactSnippetEiffel,latentinjection.LatentInjectionFactSnippetLegal,latentinjection.LatentWhois,dan.DanInTheWild"
 # garak resolves a relative --report_prefix against its own run directory: pass an absolute path.
 RUNS="$(cd runs && (pwd -W 2>/dev/null || pwd))"

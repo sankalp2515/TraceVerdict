@@ -2,7 +2,7 @@
 generated attack payloads. The held-out benign set (eval/corpus/v1) is never read here (D-025).
 
 Attack payload text is read from generator output and passed to the judge; it is never printed.
-Usage: python -m asg_eval.judge_tune [--variants current v2] [--attacks 40]
+Usage: python -m intentseal_eval.judge_tune [--variants current v2] [--attacks 40]
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from asg_core.decision_model import _SYSTEM, CATEGORY_GUIDE, GenerativeJudge
-from asg_core.llm.router import Router
+from intentseal_core.decision_model import _SYSTEM, CATEGORY_GUIDE, GenerativeJudge
+from intentseal_core.llm.router import Router
 
 ROOT = Path(__file__).resolve().parents[2]
 DEV = ROOT / "eval" / "corpus" / "v0" / "hard_benign.yaml"

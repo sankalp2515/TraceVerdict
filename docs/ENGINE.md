@@ -1,6 +1,6 @@
 # Engine decision flow
 
-`asg_core.engine.Engine` is the shared SDK/API/proxy boundary. It uses the existing
+`intentseal_core.engine.Engine` is the shared SDK/API/proxy boundary. It uses the existing
 extractor, normaliser, session registry, action guard, judge interface, router and
 decision logger. Model/provider configuration stays in the existing YAML loaders;
 all decision thresholds come from `AgentPolicy`.
@@ -94,4 +94,4 @@ benign documents. They require no model downloads or network access.
 | False-positive mark | `memory.py` | exact content, per agent: skips Tier 1/2; structural rules (`drop-non-visible`) and the action guard still apply |
 | `human-approved` | `Engine.check_action` | an approved ESCALATE for the same session + tool + arguments allows the call once; never overrides BLOCK |
 | Raw-text fallback | `extract.py` | a structured parse that yields nothing for non-empty text input falls back to the raw text (DEF-016) |
-| `ASG_BUDGET_TIER2_DAILY_TOKENS` | `policy.load_policy` | operational override of the daily Tier 2 cap (`none` lifts it); used by evaluation runs and recorded in the summary |
+| `INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS` | `policy.load_policy` | operational override of the daily Tier 2 cap (`none` lifts it); used by evaluation runs and recorded in the summary |

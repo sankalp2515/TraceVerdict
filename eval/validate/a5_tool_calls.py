@@ -11,8 +11,8 @@ import json
 import logging
 from pathlib import Path
 
-from asg_core.llm.adapters import ChatRequest, ProviderError
-from asg_core.llm.router import Router
+from intentseal_core.llm.adapters import ChatRequest, ProviderError
+from intentseal_core.llm.router import Router
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 

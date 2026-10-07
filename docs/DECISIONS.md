@@ -1,6 +1,6 @@
 # Decisions log
 
-Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032, 7 Oct). Code namespace `asg`
+Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032, 7 Oct). Code namespace `intentseal` (D-038; `asg_*` before 8 Oct)
 (from the earlier working name) stays until a planned mechanical rename (backlog).
 
 | # | Date | Decision | Why | By |

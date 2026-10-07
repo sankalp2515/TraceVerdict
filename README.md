@@ -50,7 +50,7 @@ before the agent sees it (blocked calls become a notice, pinned fields are rewri
 **Python SDK (deepest protection).**
 
 ```python
-from asg_sdk import Guard
+from intentseal import Guard
 
 guard = Guard("research-agent")                                  # or Guard(..., remote=URL, api_key=KEY)
 with guard.session(user_id="u1", task="Summarise my inbox", trusted={"customer_id": "C-1042"}):
@@ -84,7 +84,7 @@ Python 3.11. Commands use the Windows venv layout (`.venv/Scripts/`); on Linux o
 python -m venv .venv && .venv/Scripts/pip install -r requirements.lock
 .venv/Scripts/pip install --no-deps -e packages/core -e packages/sdk -e agents -e services/gateway -e eval
 cp .env.example .env                          # free-tier provider keys (Groq, Gemini, NVIDIA, OpenRouter)
-.venv/Scripts/python -m asg_core providers check
+.venv/Scripts/python -m intentseal_core providers check
 .venv/Scripts/python scripts/dev_gateway.py   # API + proxy + demo on :8000 (PORT to change), docs at /docs
 .venv/Scripts/python -m pytest -q             # offline test suite
 ```
@@ -93,8 +93,8 @@ Console: `npm --prefix apps/console install && npm --prefix apps/console run dev
 
 Reproduce the evaluation (needs free-tier keys; about two hours on free quotas): generate attack cases with
 `eval/promptfoo/make_configs.py` + `npx promptfoo redteam generate` and harvest garak probes (`eval/garak/run.sh`
-notes) → `eval/promptfoo/build_suites.py` → `eval/run_protected.sh` → `python -m asg_eval.summary` →
-`python -m asg_eval.readme`. Each file documents its usage at the top.
+notes) → `eval/promptfoo/build_suites.py` → `eval/run_protected.sh` → `python -m intentseal_eval.summary` →
+`python -m intentseal_eval.readme`. Each file documents its usage at the top.
 
 ## Limitations (honest)
 

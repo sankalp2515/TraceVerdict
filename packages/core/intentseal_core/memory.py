@@ -52,7 +52,7 @@ def shingles(text: str) -> set[int]:
         words = words + [""] * (SHINGLE - len(words)) if words else []
     out = set()
     for i in range(max(0, len(words) - SHINGLE + 1)):
-        h = hashlib.blake2b(" ".join(words[i:i + SHINGLE]).encode(), digest_size=8, key=b"asg-memory-v1")
+        h = hashlib.blake2b(" ".join(words[i:i + SHINGLE]).encode(), digest_size=8, key=b"asg-memory-v1")   # fixed key: changing it invalidates stored fingerprints
         out.add(int.from_bytes(h.digest(), "big") >> 1)   # fits SQLite/JSON integers
     return out
 

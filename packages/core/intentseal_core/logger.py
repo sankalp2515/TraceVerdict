@@ -1,7 +1,7 @@
 """CORE-10 Decision logger: every decision, with evidence, in the event store (PRD §10).
 
 Privacy: content is stored as a hash plus a short redacted preview (or hash only when
-ASG_STORE_PREVIEWS=0, e.g. public demo); user references are hashed; secrets, canaries and keys are
+INTENTSEAL_STORE_PREVIEWS=0, e.g. public demo); user references are hashed; secrets, canaries and keys are
 redacted before anything is written.
 """
 
@@ -64,7 +64,7 @@ class DecisionLogger:
         except Exception:
             pass   # column already present
         self.extra_secrets = [s for s in secrets_to_redact if s]
-        self.previews = os.environ.get("ASG_STORE_PREVIEWS", "1") != "0"
+        self.previews = os.environ.get("INTENTSEAL_STORE_PREVIEWS", "1") != "0"
         self._seq: dict[str, int] = {}
 
     def add_secrets(self, values: Iterable[str]) -> None:

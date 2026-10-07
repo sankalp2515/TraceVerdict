@@ -1,6 +1,6 @@
 # Architecture
 
-Working name: Agent Security Gateway (code namespace `asg`). PRD: `docs/11-PRD-complete.md`. Decisions: `docs/DECISIONS.md`.
+Product: IntentSeal (code: `intentseal` SDK, `intentseal_core`, `intentseal_gateway`, `intentseal_eval`). PRD: `docs/11-PRD-complete.md`. Decisions: `docs/DECISIONS.md`.
 
 **Principle: rules decide, AI advises.** Every decision is made by a deterministic policy rule. Classifiers and the
 LLM judge produce signals; no AI signal alone can allow high-risk content or a high-risk action.
@@ -12,7 +12,7 @@ LLM judge produce signals; no AI signal alone can allow high-risk content or a h
                          \                            |                      |                     /
                           +---------------------------+----------------------+--------------------+
                                                       |
-                                              Core Engine (asg_core)
+                                              Core Engine (intentseal_core)
               inspect(content, source, agent, session)        check_action(tool, args, agent, session)
                                                       |
                                   decision log (SQLite) -> replay, decisions feed, scorecard, metrics
@@ -20,11 +20,11 @@ LLM judge produce signals; no AI signal alone can allow high-risk content or a h
 
 | Surface | Code | How an agent adopts it |
 |---|---|---|
-| Python SDK, embedded | `packages/sdk/asg_sdk/guard.py` | `Guard("agent")`, `guard.inspect(...)`, `@guard.tool()`, `guard.session(...)` |
-| Python SDK, remote (SDK-6) | `asg_sdk/remote.py` | `Guard("agent", remote=URL, api_key=KEY)`: same API, decisions by the gateway |
-| LangChain / LangGraph (SDK-7) | `asg_sdk/langchain.py` | `tools = guard.protect_tools(tools)` (8 added or changed lines in `examples/langgraph_agent`, two of them its own docstring) |
-| Gateway API | `services/gateway/asg_gateway/app.py` | HTTP, any language; OpenAPI at `/docs` |
-| LLM proxy | `services/gateway/asg_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`) |
+| Python SDK, embedded | `packages/sdk/intentseal/guard.py` | `Guard("agent")`, `guard.inspect(...)`, `@guard.tool()`, `guard.session(...)` |
+| Python SDK, remote (SDK-6) | `intentseal/remote.py` | `Guard("agent", remote=URL, api_key=KEY)`: same API, decisions by the gateway |
+| LangChain / LangGraph (SDK-7) | `intentseal/langchain.py` | `tools = guard.protect_tools(tools)` (8 added or changed lines in `examples/langgraph_agent`, two of them its own docstring) |
+| Gateway API | `services/gateway/intentseal_gateway/app.py` | HTTP, any language; OpenAPI at `/docs` |
+| LLM proxy | `services/gateway/intentseal_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`) |
 
 All surfaces call `Engine.inspect` / `Engine.check_action` (CORE-1; `tests/test_sdk_surfaces.py` proves it per surface).
 
@@ -89,7 +89,7 @@ are used only if a key is rejected (D-004).
 
 ## 7. Trainability (PRD §7.2) and review
 
-`asg_core/memory.py`: confirmed attacks (reviewer `POST /v1/feedback`, adversary-loop misses) are stored as
+`intentseal_core/memory.py`: confirmed attacks (reviewer `POST /v1/feedback`, adversary-loop misses) are stored as
 keyed hashes of word 5-shingles, never as text. Later content whose shingles contain ≥ 60% of a stored attack
 is blocked at Tier 0 (`known-attack-match`) without an AI call, including when it is embedded in a larger
 document. False-positive marks are exact-content and per agent; they skip the AI tiers but never structural
@@ -121,7 +121,7 @@ request ids on every response and in a structured access log, secrets only from 
 promptfoo (MIT) / garak (Apache-2.0)  ->  attack cases (we never author attack text: D-005, D-014)
 eval/promptfoo/build_suites.py        ->  each indirect payload delivered through every channel (incl. hidden text)
 eval/targets/agent_target.py          ->  protection off | on (reference agent) | detect (content checkpoint only)
-python -m asg_eval.summary            ->  eval/reports/<date>-summary.json + docs/EVALUATION.md (grid claim by §15 rule)
+python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.json + docs/EVALUATION.md (grid claim by §15 rule)
 ```
 
 Outcomes are deterministic (EVAL-5): canary checks, sandbox outbox, executed tool calls. False positives are
@@ -130,4 +130,4 @@ measured on a development benign set and on a held-out benign set written before
 ## 10. Data (SQLite, Postgres-portable)
 
 `sessions`, `events`, `findings`, `decisions`, `actions`, `approvals`, `memory`, `llm_usage`, `llm_cache`.
-No raw content is stored: content hash + redacted preview (or hash only with `ASG_STORE_PREVIEWS=0`).
+No raw content is stored: content hash + redacted preview (or hash only with `INTENTSEAL_STORE_PREVIEWS=0`).

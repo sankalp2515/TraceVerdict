@@ -15,8 +15,8 @@ from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from asg_core.llm.adapters import ChatRequest
-from asg_core.llm.router import AllProvidersFailed, Router
+from intentseal_core.llm.adapters import ChatRequest
+from intentseal_core.llm.router import AllProvidersFailed, Router
 
 from .tools import READ_TOOLS, SCHEMAS, Toolbox
 from .world import World

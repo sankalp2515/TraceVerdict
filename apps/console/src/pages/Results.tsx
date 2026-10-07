@@ -195,7 +195,7 @@ export function Results() {
         lede={data ? <>Evaluation of {data.date} · commit <span className="mono">{data.git_sha}</span>. Generated from raw results; numbers below target are shown as they are.</> : "Every number is generated from raw evaluation results."} />
       {loading && <Loading />}
       {error && <ErrorNote>{error}</ErrorNote>}
-      {!loading && !error && !data && <Empty>No evaluation summary yet. Run python -m asg_eval.summary.</Empty>}
+      {!loading && !error && !data && <Empty>No evaluation summary yet. Run python -m intentseal_eval.summary.</Empty>}
       {data && (
         <>
           <Claim s={data} />

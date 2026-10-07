@@ -5,12 +5,12 @@ from __future__ import annotations
 import base64
 import codecs
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.decode import decode_views
-from asg_core.engine import Engine
-from asg_core.policy import load_policy
-from asg_core.store import Store
-from asg_core.types import Decision
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.decode import decode_views
+from intentseal_core.engine import Engine
+from intentseal_core.policy import load_policy
+from intentseal_core.store import Store
+from intentseal_core.types import Decision
 
 SENTENCE = "the quarterly report is ready for review and the team will meet on thursday"
 LOGO = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="

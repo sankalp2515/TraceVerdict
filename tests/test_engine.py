@@ -8,11 +8,11 @@ import time
 
 import pytest
 
-from asg_core.decision_model import StaticDecisionModel
-from asg_core.engine import Engine
-from asg_core.policy import load_policy
-from asg_core.store import Store
-from asg_core.types import ATTACK_TYPES, Decision
+from intentseal_core.decision_model import StaticDecisionModel
+from intentseal_core.engine import Engine
+from intentseal_core.policy import load_policy
+from intentseal_core.store import Store
+from intentseal_core.types import ATTACK_TYPES, Decision
 
 MARKER = "REVIEW_MARKER"
 FLAGGED = '<p>Quarterly report ready.</p><span hidden>' + MARKER + '</span>'
@@ -326,7 +326,7 @@ async def test_outbound_secrets_redacted_everywhere_and_session_risk_persisted(p
 
 
 async def test_preview_disabled_still_redacts_metadata(policy, monkeypatch):
-    monkeypatch.setenv("ASG_STORE_PREVIEWS", "0")
+    monkeypatch.setenv("INTENTSEAL_STORE_PREVIEWS", "0")
     e = engine(policy)
     secret = "private-reference"
     e.register_secrets([secret])
@@ -409,11 +409,11 @@ async def test_homoglyph_text_reaches_judge_ascii_folded(policy):
 
 
 def test_budget_override_from_environment(monkeypatch):
-    monkeypatch.setenv("ASG_BUDGET_TIER2_DAILY_TOKENS", "none")
+    monkeypatch.setenv("INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS", "none")
     assert load_policy("research-agent").budgets.daily_tokens_tier2 is None
-    monkeypatch.setenv("ASG_BUDGET_TIER2_DAILY_TOKENS", "5000")
+    monkeypatch.setenv("INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS", "5000")
     assert load_policy("research-agent").budgets.daily_tokens_tier2 == 5000
-    monkeypatch.delenv("ASG_BUDGET_TIER2_DAILY_TOKENS")
+    monkeypatch.delenv("INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS")
     assert load_policy("research-agent").budgets.daily_tokens_tier2 == 200000
 
 

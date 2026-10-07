@@ -1,6 +1,6 @@
 """CORE-3 normalisation wrapper (benign inputs only)."""
 
-from asg_core.normalise import normalise
+from intentseal_core.normalise import normalise
 
 
 def test_plain_text_unchanged():

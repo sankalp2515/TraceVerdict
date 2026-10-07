@@ -1,10 +1,10 @@
 """Gateway self-security (API-8, API-9, NFR §12): API keys (hashed at rest), scopes, rate limits,
 request-size limits. Keys come from the environment only.
 
-ASG_API_KEYS     comma list of name:key:scope  (scope: admin | project), e.g. "dev:abc123:admin"
-ASG_PUBLIC_KEY   optional read-only key for the public Console (scope: public)
-ASG_RATE_LIMIT_PER_MIN / ASG_PUBLIC_RATE_LIMIT_PER_MIN   requests per minute per key
-ASG_MAX_BODY_BYTES   max request body (default 2 MB)
+INTENTSEAL_API_KEYS     comma list of name:key:scope  (scope: admin | project), e.g. "dev:abc123:admin"
+INTENTSEAL_PUBLIC_KEY   optional read-only key for the public Console (scope: public)
+INTENTSEAL_RATE_LIMIT_PER_MIN / INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN   requests per minute per key
+INTENTSEAL_MAX_BODY_BYTES   max request body (default 2 MB)
 """
 
 from __future__ import annotations
@@ -35,16 +35,16 @@ def _h(key: str) -> str:
 class KeyRing:
     def __init__(self) -> None:
         self._keys: dict[str, Principal] = {}
-        for item in filter(None, (s.strip() for s in os.environ.get("ASG_API_KEYS", "").split(","))):
+        for item in filter(None, (s.strip() for s in os.environ.get("INTENTSEAL_API_KEYS", "").split(","))):
             parts = item.split(":")
             if len(parts) == 3 and parts[2] in SCOPES:
                 self._keys[_h(parts[1])] = Principal(parts[0], parts[2])
-        pub = os.environ.get("ASG_PUBLIC_KEY")
+        pub = os.environ.get("INTENTSEAL_PUBLIC_KEY")
         if pub:
             self._keys[_h(pub)] = Principal("public", "public")
         self._buckets: dict[str, list[float]] = {}
-        self.limit = int(os.environ.get("ASG_RATE_LIMIT_PER_MIN") or "120")
-        self.public_limit = int(os.environ.get("ASG_PUBLIC_RATE_LIMIT_PER_MIN") or "20")
+        self.limit = int(os.environ.get("INTENTSEAL_RATE_LIMIT_PER_MIN") or "120")
+        self.public_limit = int(os.environ.get("INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN") or "20")
 
     def add(self, key: str, principal: Principal) -> None:
         """Register an in-process key (e.g. the demo runner's ephemeral key for calling its own proxy)."""
@@ -96,7 +96,7 @@ def require(scope: str):
 class BodySizeLimit(BaseHTTPMiddleware):
     def __init__(self, app, max_bytes: int | None = None) -> None:
         super().__init__(app)
-        self.max = max_bytes or int(os.environ.get("ASG_MAX_BODY_BYTES") or 2 * 1024 * 1024)
+        self.max = max_bytes or int(os.environ.get("INTENTSEAL_MAX_BODY_BYTES") or 2 * 1024 * 1024)
 
     async def dispatch(self, request: Request, call_next):
         cl = request.headers.get("content-length")

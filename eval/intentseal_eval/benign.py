@@ -1,6 +1,6 @@
 """Benign end-to-end suite (utility, G3b): our own tasks with deterministic checks.
 
-Usage: python -m asg_eval.benign [--protection off|on] [--role agent_eval]
+Usage: python -m intentseal_eval.benign [--protection off|on] [--role agent_eval]
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from asg_core.llm.router import Router
+from intentseal_core.llm.router import Router
 from research_agent import ResearchAgent, World
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -73,7 +73,7 @@ def main() -> None:
     a = ap.parse_args()
     factory = None
     if a.protection == "on":
-        from asg_eval.protection import guard_hooks
+        from intentseal_eval.protection import guard_hooks
         factory = guard_hooks
     res = asyncio.run(run_suite(a.protection, a.role, factory, a.only))
     out = ROOT / "data" / "eval_runs" / f"benign.{a.protection}.{a.role}{'.subset' if a.only else ''}.json"

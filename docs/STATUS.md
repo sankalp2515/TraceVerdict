@@ -6,7 +6,7 @@ Tests: **148 passing** offline (`.venv/Scripts/python -m pytest -q`) · lint cle
 ## 1. Headline numbers
 
 Generated, never hand-typed: `docs/EVALUATION.md` and the README results block come from
-`python -m asg_eval.summary` (then `python -m asg_eval.readme`). See §3 for what each number is measured on.
+`python -m intentseal_eval.summary` (then `python -m intentseal_eval.readme`). See §3 for what each number is measured on.
 
 **Grid position by the PRD §15 rule: none / none** (0 of 9 attack types at recall ≥ 85% with FPR ≤ 5%). The self-declaration is the team's decision, made from these numbers.
 
@@ -63,7 +63,7 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 | CORE-9 | ✅ | Action guard + approvals (one-shot, never overrides BLOCK) |
 | CORE-10 | ✅ | Decision log; approvals table; memory stores fingerprints only |
 | CORE-11/12/13 | ✅ | Router, fail-safe holds, DecisionModel adapters |
-| CORE-14 | ✅ | Budgets + overhead ratio (`/v1/costs`, summary); eval override `ASG_BUDGET_TIER2_DAILY_TOKENS` |
+| CORE-14 | ✅ | Budgets + overhead ratio (`/v1/costs`, summary); eval override `INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS` |
 | CORE-15 | ✅ | Monitor/enforce; S9 OFF uses the monitor-mode twin policy |
 | CORE-16 (P1) | 🟡 | Chunking + body limit; no span re-mapping across chunks |
 | CORE-17 (P2) | 🟡 | Entity provenance only |
@@ -72,7 +72,7 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 | ID | State | Evidence |
 |---|---|---|
 | SDK-1…5 | ✅ | As before; remote inspection failure withholds content |
-| SDK-6 (P1) | ✅ | `asg_sdk/remote.py`; same decisions as embedded (test) |
+| SDK-6 (P1) | ✅ | `intentseal/remote.py`; same decisions as embedded (test) |
 | SDK-7 (P1) | ✅ | `guard.protect_tools(...)`; `examples/langgraph_agent` protected with ≤ 10 added lines (test counts the diff) |
 
 ### Gateway API / proxy
@@ -91,7 +91,7 @@ CON-6 cost data ✅ (`/v1/costs`, `/v1/costs/{agent}`) · CON-7 policy view/edit
 | ID | State | Evidence |
 |---|---|---|
 | EVAL-1 | ✅ | v2 corpus: promptfoo user + roles sets, garak probe attempts, pooled indirect payloads × 14 delivery channels; hard-benign dev (v0) + held-out (v1) |
-| EVAL-2/3 | ✅ | `asg_eval.summary`: recall per type at its §14 checkpoint, coverage map, FPR (dev + held-out), latency p50/p95, ASR off/on, utility, cost overhead, grid claim; fail-safe holds excluded; engine fingerprint per suite |
+| EVAL-2/3 | ✅ | `intentseal_eval.summary`: recall per type at its §14 checkpoint, coverage map, FPR (dev + held-out), latency p50/p95, ASR off/on, utility, cost overhead, grid claim; fail-safe holds excluded; engine fingerprint per suite |
 | EVAL-4 (P1) | 🟡 | Backend done (memory, `/v1/feedback`, `Engine.feedback`); the adaptive generation round itself is left to the owner's generator choice (D-005/D-014) |
 | EVAL-5 | ✅ | Deterministic outcomes; exact re-scoring rules DEF-014, DEF-019 |
 | EVAL-6 (P2) | ❌ | Jev deferred |
@@ -134,4 +134,4 @@ The full, prioritised list lives in **`docs/BACKLOG.md`**. Summary:
 1. **Owner:** product name (Q1); Console UI/UX; Docker + hosting + public links; deck and video; EVAL-4 adaptive round
    (generator choice per D-005/D-014; the memory/feedback backend is ready).
 2. Optional engineering (P1/P2): PRX-6 incremental streaming; CORE-16 span re-mapping; API-12; EVAL-6 (Jev).
-3. Before submission: rerun `eval/run_protected.sh` + `python -m asg_eval.summary` on the final commit; commit the reports.
+3. Before submission: rerun `eval/run_protected.sh` + `python -m intentseal_eval.summary` on the final commit; commit the reports.

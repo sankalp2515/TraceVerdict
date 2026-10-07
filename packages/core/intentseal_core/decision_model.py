@@ -30,6 +30,7 @@ class Assessment:
     est_cost: float = 0.0
     degraded: bool = False                            # judge unavailable / unparseable
     error: str | None = None
+    spans: list[tuple[int, int]] = field(default_factory=list)   # original spans of the windows judged malicious
 
 
 class DecisionModel(Protocol):

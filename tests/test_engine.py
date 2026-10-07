@@ -473,3 +473,95 @@ def test_event_sequence_continues_after_restart(policy):
     restarted = engine(policy, store=store)
     restarted.logger.event("sess-1", policy.agent, "content_in", "web", "c")
     assert [r["seq"] for r in restarted.logger.session_events("sess-1")] == [1, 2, 3]
+
+
+# ---- CORE-16: long documents are judged in windows; evidence maps back to original offsets ------------------
+
+class MarkerJudge:
+    """Malicious only when the marker is in the window it reads; quotes the marker sentence as evidence."""
+
+    name = "marker"
+
+    def __init__(self, quote: str | None = MARKER + " planted line.") -> None:
+        self.quote, self.seen = quote, []
+
+    async def assess(self, content, source, task=""):
+        from intentseal_core.decision_model import Assessment
+        self.seen.append(content)
+        if MARKER in content:
+            return Assessment(0.7, {"Indirect Prompt Injection": 0.7}, [self.quote] if self.quote else [])
+        return Assessment(0.0)
+
+
+def _long_doc(paragraphs: int = 70, marker_at: int = 60) -> str:
+    body = [f"Paragraph {i}: the committee reviewed the quarterly logistics figures and noted steady volumes. " * 6
+            for i in range(paragraphs)]
+    body[marker_at] += MARKER + " planted line."
+    return "\n\n".join(body)
+
+
+async def test_long_document_is_judged_past_the_first_window(policy):
+    policy.thresholds.judge_untrusted = "classifier"
+    doc = _long_doc()
+    assert doc.index(MARKER) > 6000 * 4
+    judge = MarkerJudge()
+    e = engine(policy, decision_model=judge)
+    r = await e.inspect(doc, "web", policy.agent)
+    assert r.decision == Decision.NEUTRALISE and r.policy_rule == "judge-neutralise"
+    assert all(len(seen) <= e.judge_window_chars for seen in judge.seen) and any(MARKER in s for s in judge.seen)
+    span = next(f.span for f in r.findings if f.signal == "judge")
+    assert doc[span[0]:span[1]] == MARKER + " planted line."          # exact original offsets
+    assert MARKER not in r.cleaned_content and "Paragraph 69" in r.cleaned_content and "[QUARANTINED]" in r.cleaned_content
+
+
+async def test_unquoted_evidence_quarantines_only_the_malicious_window(policy):
+    policy.thresholds.judge_untrusted = "classifier"
+    doc = _long_doc()
+    e = engine(policy, decision_model=MarkerJudge(quote="text the judge paraphrased"))
+    r = await e.inspect(doc, "web", policy.agent)
+    spans = [f.span for f in r.findings if f.signal == "judge"]
+    assert spans and all(s[1] - s[0] <= e.segment_chars for s in spans)
+    assert any(s[0] <= doc.index(MARKER) < s[1] for s in spans)
+    assert "Paragraph 1:" in r.cleaned_content and "Paragraph 69" in r.cleaned_content
+
+
+async def test_window_cap_judges_the_most_suspicious_and_holds_unjudged_hot_chunks(policy):
+    policy.thresholds.judge_untrusted = "classifier"
+    body = [f"Paragraph {i}: the committee reviewed figures and noted steady volumes. " * 14 for i in range(40)]
+    body[5] += " " + MARKER
+    body[35] += " " + MARKER
+    doc = "\n\n".join(body)
+    judge = MarkerJudge()
+    e = engine(policy, decision_model=judge, judge_window_chars=1500, judge_max_windows=1)
+    r = await e.inspect(doc, "web", policy.agent)
+    assert len(judge.seen) == 1
+    assert any(f.signal.startswith("judge-coverage-partial") for f in r.findings)
+    assert r.decision == Decision.BLOCK and r.policy_rule == "oversize-hold"
+
+
+async def test_always_policy_long_benign_document_beyond_cap_uses_tier1_for_the_rest(policy):
+    doc = _long_doc(paragraphs=80, marker_at=0).replace(MARKER + " planted line.", "")
+    judge = MarkerJudge()
+    e = engine(policy, decision_model=judge, judge_max_windows=3)
+    r = await e.inspect(doc, "web", policy.agent)
+    assert len(judge.seen) == 3 and r.decision == Decision.ALLOW
+    assert any(f.signal.startswith("judge-coverage-partial") for f in r.findings)
+
+
+async def test_content_over_the_size_limit_is_refused(policy):
+    e = engine(policy, max_text_chars=1000)
+    r = await e.inspect("x " * 600, "web", policy.agent)
+    assert r.decision == Decision.BLOCK and r.policy_rule == "content-too-large"
+    r = await e.inspect("y" * 5000, "web", policy.agent)
+    assert r.policy_rule == "content-too-large"
+
+
+async def test_large_html_document_inspected_without_timeouts(policy):
+    """CORE-16 acceptance: a large document goes through every tier inside its time budgets."""
+    rows = "".join(f"<tr><td>Item {i}</td><td>{i * 3} units shipped on schedule</td></tr>" for i in range(4000))
+    html = f"<html><body><h1>Inventory</h1><table>{rows}</table></body></html>"
+    assert len(html) > 250_000
+    e = engine(policy, tier0_timeout_s=10.0)
+    t0 = time.perf_counter()
+    r = await e.inspect(html, "web", policy.agent)
+    assert not r.degraded and r.decision == Decision.ALLOW and time.perf_counter() - t0 < 10

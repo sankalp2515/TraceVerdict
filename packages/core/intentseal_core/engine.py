@@ -11,6 +11,7 @@ import hashlib
 import inspect as inspectlib
 import json
 import math
+import os
 import re
 import time
 from collections import OrderedDict
@@ -68,6 +69,7 @@ class Engine:
                  policy_directory: Path | None = None, tier0_timeout_s: float = 2.0,
                  tier1_timeout_s: float = 1.0, tier2_timeout_s: float = 15.0,
                  segment_chars: int = 1000, encoded_min_chars: int = 48,
+                 judge_window_chars: int = 6000, judge_max_windows: int | None = None, max_text_chars: int | None = None,
                  cache_size: int = 256, cache_ttl_s: float = 3600,
                  clock: Callable[[], float] = time.time) -> None:
         if min(tier0_timeout_s, tier1_timeout_s, tier2_timeout_s, segment_chars, encoded_min_chars) <= 0:
@@ -92,6 +94,11 @@ class Engine:
         self.tier0_timeout_s, self.tier1_timeout_s, self.tier2_timeout_s = (
             tier0_timeout_s, tier1_timeout_s, tier2_timeout_s)
         self.segment_chars = segment_chars
+        self.judge_window_chars = judge_window_chars
+        self.judge_max_windows = judge_max_windows or int(os.environ.get("INTENTSEAL_JUDGE_MAX_WINDOWS") or 8)
+        self.tier1_per_chunk_s = float(os.environ.get("INTENTSEAL_TIER1_PER_CHUNK_S") or 0.75)
+        self.tier1_max_s = float(os.environ.get("INTENTSEAL_TIER1_MAX_S") or 30)
+        self.max_text_chars = max_text_chars or int(os.environ.get("INTENTSEAL_MAX_TEXT_CHARS") or 1_000_000)
         self._encoded = re.compile(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{" + str(encoded_min_chars) + r",}={0,2}")
         self.cache_size, self.cache_ttl_s, self.clock = cache_size, cache_ttl_s, clock
         self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
@@ -227,50 +234,124 @@ class Engine:
                                 "WHERE agent_id = ? AND created_at >= ?", (agent_id, start))
         return int(rows[0]["tokens"])
 
-    async def _judge(self, scan: _Scan, source: str, task: str, policy: AgentPolicy,
-                     agent_id: str) -> tuple[Assessment, bool]:
-        # Agent/policy/task/source isolate assessments; state and enforcement are recomputed.
-        key = self._key("judge", scan.view, source, task, agent_id, policy.model_dump())
-        cached = self._get(key)
-        if cached is not None:
-            return Assessment(**{**cached.__dict__, "input_tokens": 0, "output_tokens": 0, "est_cost": 0.0}), False
+    def _judge_windows(self, scan: _Scan, priority: dict[tuple[int, int], float] | None = None
+                       ) -> tuple[list[tuple[str, list[tuple[int, int]]]], list[tuple[int, int]]]:
+        """CORE-16: what the judge reads. A document whose detection view fits one window is judged whole (with its
+        context). A longer one is judged as windows of its flagged chunks, in document order, each window carrying
+        the original spans it covers; at most `judge_max_windows` windows, the most suspicious first. Returns the
+        windows and the spans that did not fit (never silently dropped: the caller decides on them)."""
+        flagged = sorted({(c[0], c[1]) for c in scan.chunks})
+        if len(scan.view) <= self.judge_window_chars:
+            return [(scan.view, flagged)], []
+        views: dict[tuple[int, int], list[str]] = {}
+        for start, end, _, text in scan.chunks:
+            views.setdefault((start, end), []).append(text)
+        windows: list[tuple[str, list[tuple[int, int]]]] = []
+        text, spans = "", []
+        for span in flagged:
+            piece = "\n".join(dict.fromkeys(views[span]))[: self.judge_window_chars]
+            if text and len(text) + len(piece) + 1 > self.judge_window_chars:
+                windows.append((text, spans))
+                text, spans = "", []
+            text, spans = (text + "\n" + piece if text else piece), spans + [span]
+        if text:
+            windows.append((text, spans))
+        if len(windows) <= self.judge_max_windows:
+            return windows, []
+        rank = lambda w: max((priority or {}).get(s, 1.0) for s in w[1])   # unscored (structural) chunks first
+        ordered = sorted(range(len(windows)), key=lambda i: (-rank(windows[i]), i))
+        keep = sorted(ordered[: self.judge_max_windows])
+        dropped = [s for i in ordered[self.judge_max_windows:] for s in windows[i][1]]
+        return [windows[i] for i in keep], dropped
+
+    async def _judge(self, scan: _Scan, source: str, task: str, policy: AgentPolicy, agent_id: str,
+                     priority: dict[tuple[int, int], float] | None = None
+                     ) -> tuple[Assessment, bool, list[tuple[int, int]]]:
+        """Tier 2 over the judge windows. Returns the combined assessment (highest risk wins; usage summed; degraded
+        if any window could not be assessed), whether the daily budget stopped it, and the spans left unjudged."""
+        windows, unjudged = self._judge_windows(scan, priority)
         cap = policy.budgets.daily_tokens_tier2
-        if cap is not None and self._tokens_today(agent_id) >= cap:
-            return Assessment(0, degraded=True), True
-        try:
-            model = self.decision_model
+        results: list[Assessment | None] = []
+        pending: list[tuple[int, str, str]] = []
+        for i, (text, _) in enumerate(windows):
+            # Agent/policy/task/source isolate assessments; state and enforcement are recomputed.
+            key = self._key("judge", text, source, task, agent_id, policy.model_dump())
+            cached = self._get(key)
+            results.append(None if cached is None else
+                           Assessment(**{**cached.__dict__, "input_tokens": 0, "output_tokens": 0, "est_cost": 0.0}))
+            if cached is None:
+                pending.append((i, key, text))
+        if pending and cap is not None and self._tokens_today(agent_id) >= cap:
+            return Assessment(0, degraded=True), True, unjudged
+        if pending:
+            model = self._decision_model(policy)
+            sem = asyncio.Semaphore(3)
+
+            async def one(i: int, key: str, text: str) -> None:
+                async with sem:
+                    results[i] = await self._assess(model, key, text, source, task)
+
+            await asyncio.gather(*(one(*p) for p in pending))
+        combined = Assessment(0.0)
+        for (_, spans), a in zip(windows, results):
+            assert a is not None
+            combined.degraded |= a.degraded
+            combined.input_tokens += a.input_tokens
+            combined.output_tokens += a.output_tokens
+            combined.est_cost += a.est_cost
+            combined.model = combined.model or a.model
+            if a.degraded:
+                continue
+            for k, v in a.categories.items():
+                combined.categories[k] = max(v, combined.categories.get(k, 0.0))
+            if a.malicious > 0:
+                combined.evidence += [q for q in a.evidence if q not in combined.evidence]
+                combined.spans += [s for s in spans if s not in combined.spans]
+            combined.malicious = max(combined.malicious, a.malicious)
+        return combined, False, unjudged
+
+    def _decision_model(self, policy: AgentPolicy) -> DecisionModel:
+        model = self.decision_model
+        if model is None:
+            model = self._models.get(policy.decision_model)
             if model is None:
-                model = self._models.get(policy.decision_model)
-                if model is None:
-                    if policy.decision_model == "generative_free" and self.router is None:
-                        self.router = Router(store=self.store)
-                    model = make_decision_model(policy.decision_model, self.router)
-                    self._models[policy.decision_model] = model
-            assessment = await asyncio.wait_for(model.assess(scan.view, source, task), self.tier2_timeout_s)
+                if policy.decision_model == "generative_free" and self.router is None:
+                    self.router = Router(store=self.store)
+                model = make_decision_model(policy.decision_model, self.router)
+                self._models[policy.decision_model] = model
+        return model
+
+    async def _assess(self, model: DecisionModel, key: str, text: str, source: str, task: str) -> Assessment:
+        try:
+            assessment = await asyncio.wait_for(model.assess(text, source, task), self.tier2_timeout_s)
             _probability(assessment.malicious)
             for value in assessment.categories.values():
                 _probability(value)
             if assessment.input_tokens < 0 or not math.isfinite(assessment.est_cost) or assessment.est_cost < 0:
                 raise ValueError("invalid judge usage")
         except Exception:
-            return Assessment(0, degraded=True), False
+            return Assessment(0, degraded=True)
         if not assessment.degraded:
             self._put(key, deepcopy(assessment))
-        return assessment, False
+        return assessment
 
     @staticmethod
     def _judge_findings(scan: _Scan, assessment: Assessment, labels: list[str]) -> list[Finding]:
+        # Evidence quotes are located in the original text, inside the windows the judge called malicious
+        # (the whole document when it was judged whole); never detection-view offsets.
+        regions = sorted(assessment.spans) or [(0, len(scan.doc.text))]
+        whole = len(regions) == 1 and regions[0] == (0, len(scan.doc.text))
         spans: set[tuple[int, int]] = set()
         for quote in assessment.evidence:
             if not quote:
                 continue
-            start = 0
-            while (pos := scan.doc.text.find(quote, start)) >= 0:
-                spans.add((pos, pos + len(quote)))
-                start = pos + len(quote)
-        # Normalisation can change lengths; never treat detection-view offsets as original offsets.
-        if not spans:
-            spans = {(start, end) for start, end, _, _ in scan.chunks}
+            for lo, hi in ([(0, len(scan.doc.text))] if whole or not assessment.spans else regions):
+                start = lo
+                while (pos := scan.doc.text.find(quote, start, hi + len(quote))) >= 0:
+                    spans.add((pos, pos + len(quote)))
+                    start = pos + len(quote)
+        if not spans:   # quote not found verbatim (normalised/decoded view): the windows' own chunk spans
+            spans = set(assessment.spans) or {(start, end) for start, end, _, _ in scan.chunks}
         return [Finding(span=span, preview=scan.doc.text[span[0]:span[1]],
                         origin=next((s.origin for s in scan.doc.segments if s.start <= span[0] < s.end), ""),
                         signal="judge", labels=labels, score=assessment.malicious, tier=2)
@@ -331,9 +412,15 @@ class Engine:
             session.task = task
             session.note_trusted(task)
         assessment, tier, degraded, budget_degraded = Assessment(0), 0, False, False
+        unjudged: list[tuple[int, int]] = []
+        oversize_hold = False
         key = self._key("scan", hashlib.sha256(content if isinstance(content, bytes) else content.encode()).hexdigest(),
                         source, filename, fmt)
         scan = self._get(key)
+        too_large = len(content) > 4 * self.max_text_chars   # CORE-16 input limit (raw size, before any parsing)
+        if too_large:
+            scan = _Scan(ExtractedDoc(fmt or "text"), "", [], [])
+            scan.doc.warnings.append("content too large to inspect")
         if scan is None:
             try:
                 scan = await asyncio.wait_for(asyncio.to_thread(self._scan, content, source, filename, fmt),
@@ -344,6 +431,7 @@ class Engine:
                 raw = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
                 scan = _Scan(ExtractedDoc(fmt or "text", text=raw), "", [], [])
                 scan.doc.warnings.append("inspection unavailable")
+        too_large = too_large or len(scan.doc.text) > self.max_text_chars
         findings = [f.model_copy(deep=True) for f in scan.findings]
         if scan.doc.warnings:
             degraded = True
@@ -378,8 +466,13 @@ class Engine:
             findings.extend(f.model_copy(deep=True) for f in scored)
             # Structural suspicion always needs resolution; low classifier scores cannot clear it.
             tier = 2
-            assessment, budget_degraded = await self._judge(scan, source, session.task or policy.task_scope, policy, agent_id)
+            assessment, budget_degraded, unjudged = await self._judge(scan, source, session.task or policy.task_scope,
+                                                                      policy, agent_id)
             degraded |= assessment.degraded
+            if unjudged:   # structurally flagged chunks beyond the judge's window cap: never cleared unjudged
+                findings.append(Finding(signal=f"judge-coverage-partial:{len(unjudged)}-chunks",
+                                        labels=["Indirect Prompt Injection"] if source != "user" else ["Instruction Override"]))
+                oversize_hold = True
         elif scan.all_chunks and source != "system":
             # No structural signal: Tier 1 scores every chunk; only chunks at or above the policy's
             # escalation threshold go to the Tier 2 judge (D-011: the classifier never decides alone).
@@ -389,7 +482,9 @@ class Engine:
             tier1_failed = False
             if scored is None:
                 try:
-                    scored = await asyncio.wait_for(self._scores(scan.all_chunks), self.tier1_timeout_s * 4)
+                    # CORE-16: the budget grows with the document (measured ~0.7 s per 1,000-character chunk on CPU)
+                    budget = min(self.tier1_max_s, self.tier1_timeout_s * 4 + self.tier1_per_chunk_s * len(scan.all_chunks))
+                    scored = await asyncio.wait_for(self._scores(scan.all_chunks), budget)
                     self._put(score_key, scored)
                 except Exception:
                     degraded = tier1_failed = True
@@ -410,20 +505,33 @@ class Engine:
                 if source != "user":
                     session.flagged_untrusted = True
                 tier = 2
-                assessment, budget_degraded = await self._judge(scan, source, session.task or policy.task_scope, policy, agent_id)
+                priority = {f.span: f.score for f in scored if f.span}
+                assessment, budget_degraded, unjudged = await self._judge(
+                    scan, source, session.task or policy.task_scope, policy, agent_id, priority)
                 degraded |= assessment.degraded
+                # Chunks beyond the judge's window cap: cleared only by a Tier 1 score below the escalation band
+                # (the `classifier` rule); anything else there is held (CORE-16).
+                band = policy.thresholds.escalate_band[0]
+                unjudged_hot = [s for s in unjudged if tier1_failed or priority.get(s, 1.0) >= band]
+                if unjudged:
+                    findings.append(Finding(signal=f"judge-coverage-partial:{len(unjudged)}-chunks",
+                                            labels=["Indirect Prompt Injection"] if source != "user" else ["Instruction Override"]))
+                    oversize_hold = bool(unjudged_hot)
         judge_labels = sorted(k for k, score in assessment.categories.items() if k in ATTACK_TYPES and score > 0)
         judge_labels = judge_labels or (["Instruction Override"] if source == "user" else ["Indirect Prompt Injection"])
-        if assessment.malicious > 0 and not assessment.degraded:
+        if assessment.malicious > 0:   # a degraded window scores 0; the others still count
             findings.extend(self._judge_findings(scan, assessment, judge_labels))
         hidden = [(f.span[0], f.span[1]) for f in findings
                   if f.signal == "non-visible-content" and f.span and policy.sensitive_data.drop_non_visible]
-        risk = max(assessment.malicious if not assessment.degraded else 0.0,
+        risk = max(assessment.malicious,
                    policy.thresholds.neutralise if hidden else 0.0,
                    policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
         labels = sorted({label for f in findings for label in f.labels})
         session.add_risk(risk, labels)
-        if scan.doc.warnings:
+        if too_large:
+            decision, rule, reason = (Decision.BLOCK, "content-too-large",
+                                      f"Content exceeds the inspection limit ({self.max_text_chars} characters)")
+        elif scan.doc.warnings:
             decision, rule, reason = Decision.BLOCK, "extraction-failed", "Content could not be fully inspected"
         elif known is not None and known.kind == "attack":
             decision, rule, reason = (Decision.BLOCK, "known-attack-match",
@@ -435,6 +543,9 @@ class Engine:
         elif assessment.degraded and scan.chunks:
             decision, rule, reason = (Decision.BLOCK, "budget-hold" if budget_degraded else "judge-unavailable-hold",
                                       "Flagged content is held until it can be assessed")
+        elif oversize_hold:
+            decision, rule, reason = (Decision.BLOCK, "oversize-hold",
+                                      "Flagged parts of a long document exceed what the judge can assess; held")
         elif session.risk >= policy.session.escalate_at:
             decision, rule, reason = Decision.ESCALATE, "session-risk-escalate", "Accumulated session risk requires review"
         elif hidden:

@@ -10,6 +10,7 @@ import { Policy } from "./pages/Policy";
 import { Replay } from "./pages/Replay";
 import { Results } from "./pages/Results";
 import { Review } from "./pages/Review";
+import { Setup } from "./pages/Setup";
 
 // Dark is the primary IntentSeal theme; an explicit choice is remembered. Applied before first paint.
 try {
@@ -32,6 +33,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/review" element={<Review />} />
           <Route path="/policy" element={<Policy />} />
+          <Route path="/setup" element={<Setup />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

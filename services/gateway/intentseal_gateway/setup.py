@@ -52,7 +52,7 @@ async def providers(request: Request, p: Principal = require("public")) -> list[
     if settings is None:
         return []
     return [{"name": n, "type": c.type, "configured": c.active, "base_url": c.base_url}
-            for n, c in sorted(settings.providers.items(), key=lambda kv: kv[1].priority) if c.type != "jev"]
+            for n, c in sorted(settings.providers.items(), key=lambda kv: kv[1].priority) if c.enabled and c.type != "jev"]
 
 
 @router.get("/v1/agents")

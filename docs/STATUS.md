@@ -13,16 +13,18 @@ Generated, never hand-typed: `docs/EVALUATION.md` and the README results block c
 
 | Metric | Result |
 |---|---|
-| Detection recall, third-party content (426 generated attacks through 14 document/data channels; 33 payloads the channel could not deliver excluded) | 96.5% |
-| Detection recall, direct user-turn attacks (399 cases) | 60.4% |
-| False-positive rate, held-out hard-benign set (39 cases) | 10.3% |
-| Fast-path latency p95 (isolated) | 108.8 ms |
-| Attack success on the reference agent, `headline` suite (27 / 30 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `mt3` suite (40 / 40 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `v2e` suite (144 / 144 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `broad` suite (219 / 219 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) · protected run from the 5 Oct engine (before fingerprinting); rerun pending |
+| Detection recall, third-party content (426 generated attacks through 14 document/data channels; 33 payloads the channel could not deliver excluded) | 96.9% |
+| Detection recall, direct user-turn attacks (444 cases) | 59.9% |
+| False-positive rate, held-out hard-benign set (40 cases) | 7.5% |
+| Fast-path latency p95 (isolated) | 143.6 ms |
+| Attack success on the reference agent, `headline` suite (27 / 29 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `v2e` suite (144 / 67 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `broad` suite (219 / 203 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `mt3` suite (40 / 20 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
 | Benign task utility retained | 100.0% |
-| Security cost per agent cost, `headline` suite (30 protected runs, list prices) | 35% (security tokens per agent token: 1.02) |
+| Security cost per agent cost, `headline` suite (29 protected runs, list prices) | 23% (security tokens per agent token: 1.131) |
+
+Final run (B3, D-046): engine `0e473daf3561`, commit `15d310f`, 8 Oct. Protected end-to-end suites scored fewer tests than unprotected ones because the **agent's own free-tier model** failed on those tests ("all providers failed" for the agent role: 77/144 v2e, 20/40 mt3, 28/231 broad, 1/30 headline) after Groq's daily quota ran out; these are agent errors, not gateway decisions, and are unscored by rule (EVAL-5). No canary leaked and no verified harmful action succeeded in any scored protected test. Engine changes made after this run (D-047…D-049) need one more run after the free quotas reset.
 
 What these numbers mean (details and method in `docs/EVALUATION.md`):
 - **Strong:** indirect injection in documents and data is detected at 91–100% per channel (PDF, DOCX, HTML, hidden text,

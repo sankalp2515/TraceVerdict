@@ -63,6 +63,6 @@ Q3=$!
 wait $Q1 $Q2 $Q3
 echo "promptfoo and garak queues finished"
 
-( cd .. && "$PY" -m intentseal_eval.benign --protection on --role agent_eval ) > ../data/logs/q_benign.log 2>&1
-( cd .. && "$PY" -m intentseal_eval.latency ) > ../data/logs/q_latency.log 2>&1
+"$PY" -m intentseal_eval.benign --protection on --role agent_eval > ../data/logs/q_benign.log 2>&1
+"$PY" -m intentseal_eval.latency > ../data/logs/q_latency.log 2>&1
 echo "all final-evaluation queues finished"

@@ -16,22 +16,22 @@ be caught, limit what a hijacked agent can do, and prove what happened.
 - Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md) (generated from raw results) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Deploy: [docs/DEPLOY.md](docs/DEPLOY.md)
 
 <!-- RESULTS:START -->
-### Results (2026-10-07, commit `b4bbcb9-dirty`, generated)
+### Results (2026-10-08, commit `15d310f`, generated)
 
 **Grid position by the PRD §15 rule: none / none** (0 of 9 attack types at recall ≥ 85% with FPR ≤ 5%). The self-declaration is the team's decision, made from these numbers.
 
 | Metric | Result |
 |---|---|
-| Detection recall, third-party content (426 generated attacks through 14 document/data channels; 33 payloads the channel could not deliver excluded) | 96.5% |
-| Detection recall, direct user-turn attacks (399 cases) | 60.4% |
-| False-positive rate, held-out hard-benign set (39 cases) | 10.3% |
-| Fast-path latency p95 (isolated) | 108.8 ms |
-| Attack success on the reference agent, `headline` suite (27 / 30 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `mt3` suite (40 / 40 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `v2e` suite (144 / 144 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
-| Attack success on the reference agent, `broad` suite (219 / 219 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) · protected run from the 5 Oct engine (before fingerprinting); rerun pending |
+| Detection recall, third-party content (426 generated attacks through 14 document/data channels; 33 payloads the channel could not deliver excluded) | 96.9% |
+| Detection recall, direct user-turn attacks (444 cases) | 59.9% |
+| False-positive rate, held-out hard-benign set (40 cases) | 7.5% |
+| Fast-path latency p95 (isolated) | 143.6 ms |
+| Attack success on the reference agent, `headline` suite (27 / 29 scored tests): off → on | 25.9% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `v2e` suite (144 / 67 scored tests): off → on | 0.7% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `broad` suite (219 / 203 scored tests): off → on | 4.6% → 0.0% (canary leaks with protection: 0) |
+| Attack success on the reference agent, `mt3` suite (40 / 20 scored tests): off → on | 12.5% → 0.0% (canary leaks with protection: 0) |
 | Benign task utility retained | 100.0% |
-| Security cost per agent cost, `headline` suite (30 protected runs, list prices) | 35% (security tokens per agent token: 1.02) |
+| Security cost per agent cost, `headline` suite (29 protected runs, list prices) | 23% (security tokens per agent token: 1.131) |
 
 Per-type and per-channel numbers, false alarms and method: [docs/EVALUATION.md](docs/EVALUATION.md).
 <!-- RESULTS:END -->

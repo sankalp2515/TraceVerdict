@@ -13,7 +13,7 @@ that browser tab's session storage (D-037).
 ## 1. Settings
 
 All configuration is environment variables; no secret is ever written into the image or the repository.
-Settings named `ASG_*` before 8 Oct 2026 still work when the new `INTENTSEAL_*` name is unset (D-038).
+Settings named `ASG_*` (the names used until 7 Oct 2026) still work when the new `INTENTSEAL_*` name is unset (D-038).
 
 | Variable | Required | Purpose |
 |---|---|---|

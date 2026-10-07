@@ -13,7 +13,7 @@ be caught, limit what a hijacked agent can do, and prove what happened.
 
 - Demo (Security Console): _link added at deployment_
 - Video: _link added at submission_
-- Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md) (generated from raw results) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md) (generated from raw results) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Deploy: [docs/DEPLOY.md](docs/DEPLOY.md)
 
 <!-- RESULTS:START -->
 ### Results (2026-10-07, commit `b4bbcb9-dirty`, generated)
@@ -45,7 +45,8 @@ OPENAI_BASE_URL=https://<gateway>/proxy/research-agent/v1 OPENAI_API_KEY=<gatewa
 ```
 
 User and tool messages are inspected before they reach the model; every tool call the model returns is checked
-before the agent sees it (blocked calls become a notice, pinned fields are rewritten).
+before the agent sees it (blocked calls become a notice, pinned fields are rewritten). Streaming works: text
+streams through, tool calls are held until complete, checked, then released.
 
 **Python SDK (deepest protection).**
 
@@ -63,10 +64,14 @@ tools = guard.protect_tools(langchain_tools)                     # LangChain / L
 ```
 
 **Gateway API (any language).** `POST /v1/inspect`, `POST /v1/actions/check`, sessions, decisions, replay,
-scorecard, approvals, feedback, metrics. OpenAPI at `/docs`.
+scorecard, approvals, feedback, metrics, SIEM export (`/v1/export/decisions`, JSON Lines or CEF). OpenAPI at `/docs`.
+Keys are scoped (public, project, admin) and can belong to an organisation, so one gateway can serve several teams.
+
+**Run the gateway.** `docker compose up --build` (SQLite in a volume; PostgreSQL optional). Hosting, settings and
+operations: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 Policies are YAML per agent (`policies/research-agent.yaml`): allowed tools, pinned fields, recipient and domain
-allow-lists, thresholds, session risk, budgets, `monitor` or `enforce` mode.
+allow-lists, thresholds, session risk, budgets, data-flow (taint) rule, organisation, `monitor` or `enforce` mode.
 
 ## How it works
 
@@ -93,7 +98,7 @@ Console: `npm --prefix apps/console install && npm --prefix apps/console run dev
 
 Reproduce the evaluation (needs free-tier keys; about two hours on free quotas): generate attack cases with
 `eval/promptfoo/make_configs.py` + `npx promptfoo redteam generate` and harvest garak probes (`eval/garak/run.sh`
-notes) → `eval/promptfoo/build_suites.py` → `eval/run_protected.sh` → `python -m intentseal_eval.summary` →
+notes) → `eval/promptfoo/build_suites.py` → `eval/run_final.sh` → `python -m intentseal_eval.summary` →
 `python -m intentseal_eval.readme`. Each file documents its usage at the top.
 
 ## Limitations (honest)
@@ -103,6 +108,10 @@ notes) → `eval/promptfoo/build_suites.py` → `eval/run_protected.sh` → `pyt
 - The generated attack corpus is finite (promptfoo/garak seeds delivered through every channel). No adaptive-attacker round has been run yet.
 - Direct user-turn attacks are detected less often than third-party content (user turns keep a fast, weaker filter), and the held-out false-positive rate is above the 5% target; see the results above.
 - Images are covered through OCR text only.
+- Long documents: on a CPU host about 25 KB of text is fully inspected in ~12 s; documents whose flagged parts exceed
+  the judge's window cap (8 × 6,000 characters by default) are held unless the classifier clears the rest
+  (`oversize-hold`), so very large documents are blocked rather than passed unchecked.
+- One gateway process per container (sessions and rate limits live in the process); scale out with PostgreSQL.
 - Agent identity, MCP server vetting and non-adversarial data mix-ups are out of scope.
 
 ## Credits and licences

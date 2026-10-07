@@ -1,7 +1,8 @@
 # Status
 
-Updated: **Tue 7 Oct 2026 (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
-Tests: **148 passing** offline (`.venv/Scripts/python -m pytest -q`) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
+Updated: **Tue 7 Oct 2026, evening (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
+Tests: **205 passing** offline (`.venv/Scripts/python -m pytest -q`; storage contract tests also on PostgreSQL when
+`INTENTSEAL_TEST_DATABASE_URL` is set, as in CI) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
 
 ## 1. Headline numbers
 
@@ -65,8 +66,8 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 | CORE-11/12/13 | ✅ | Router, fail-safe holds, DecisionModel adapters |
 | CORE-14 | ✅ | Budgets + overhead ratio (`/v1/costs`, summary); eval override `INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS` |
 | CORE-15 | ✅ | Monitor/enforce; S9 OFF uses the monitor-mode twin policy |
-| CORE-16 (P1) | 🟡 | Chunking + body limit; no span re-mapping across chunks |
-| CORE-17 (P2) | 🟡 | Entity provenance only |
+| CORE-16 (P1) | ✅ | Judge windows over long documents with original-offset spans, `oversize-hold`, `content-too-large`, Tier 1 budget per chunk (D-041); `tests/test_engine.py::test_large_html_document_inspected_without_timeouts` and the window tests |
+| CORE-17 (P2) | ✅ | Entity provenance + argument-to-origin taint tracing, flagged-content rule, stored for replay (D-042); `tests/test_engine.py` taint tests |
 
 ### SDK
 | ID | State | Evidence |
@@ -80,9 +81,9 @@ What these numbers mean (details and method in `docs/EVALUATION.md`):
 |---|---|---|
 | API-1…5, 7…11 | ✅ | `tests/test_gateway.py` (21 tests); scorecard serves the summary + grid claim |
 | API-6 | ✅ | GET + admin PUT (validated, versioned, atomic write) |
-| API-12 (P2) | ❌ | |
+| API-12 (P2) | ✅ | PostgreSQL store (`tests/test_store_backends.py` on both backends), organisations (`tests/test_tenancy.py`), SIEM pull/push (`tests/test_siem.py`) (D-043, D-044) |
 | PRX-1…5 | ✅ | Unmodified OpenAI-SDK agent protected by `OPENAI_BASE_URL` alone (`examples/openai_agent`, test with the real `openai` client) |
-| PRX-6 (P1) | 🟡 | Single-chunk streaming compatibility; no incremental upstream streaming |
+| PRX-6 (P1) | ✅ | Text streams through, tool calls buffered, checked, released (D-040); the OpenAI SDK streaming client gets the checked call (`tests/test_gateway.py`); verified live on Groq and NVIDIA |
 
 ### Console backends (UI excluded)
 CON-6 cost data ✅ (`/v1/costs`, `/v1/costs/{agent}`) · CON-7 policy view/edit ✅ API · CON-8 mark FP / confirm attack ✅ API · CON-9 approvals ✅ API.
@@ -107,8 +108,10 @@ S9 runs the unmodified OpenAI-SDK agent through the gateway's own proxy (OFF = m
 | CI | ✅ `.github/workflows/ci.yml`: pinned install, ruff, secret scan, fixtures, tests |
 | Dependencies | ✅ `requirements.lock` (exact); package metadata now declares real runtime deps |
 | Observability | ✅ request ids, structured access log, `/v1/metrics` |
-| Docs | ✅ README, ARCHITECTURE.md, EVALUATION.md (generated), ENGINE.md, DECISIONS D-021…D-028 |
-| Docker / hosting / Console UI | Owner (excluded from this pass) |
+| Docs | ✅ README, ARCHITECTURE.md, EVALUATION.md (generated), ENGINE.md, DEPLOY.md, DECISIONS up to D-046 |
+| Docker | ✅ `Dockerfile`, `docker-compose.yml`, `/readyz`; verified locally (cold start 44 s, live judge/proxy/demo, restart keeps data) |
+| Hosting / public links | Owner (DEPLOY.md §2–3 has the steps) |
+| Console UI | Owner / Console session |
 | Deck, video | Owner |
 
 ## 4. Defects found and fixed today
@@ -125,13 +128,24 @@ S9 runs the unmodified OpenAI-SDK agent through the gateway's own proxy (OFF = m
 | DEF-023 | Low | `secret_scan.py --all` scanned nothing; garak `run.sh` report path invalid; test wrote into `data/eval_runs` | Fixed |
 | DEF-024 | Low | Core package metadata omitted runtime dependencies | Fixed |
 
-Open from before: DEF-013 (Groq rejects some malformed tool calls), DEF-015 (Console visual quality → owner).
+| DEF-025 | **High (security)** | URL allow-list bypass: `https://evil.example#.allowed.test` passed `_domain_ok` (fragment / user part / backslash posed as the host) | Fixed: host parsed with `urlsplit`, ambiguous URLs rejected + regression tests |
+| DEF-026 | **High (security)** | Recipient allow-list bypass: `Name <x@evil.example>@allowed.test` passed; mailers deliver to x@evil.example | Fixed: addresses parsed with `getaddresses`, every one must pass |
+| DEF-027 | **High (security)** | Tier 1 failure (model not loaded, timeout) allowed unflagged untrusted content without the judge, even with `judge_untrusted: always`; a failed load was cached for the life of the process | Fixed: every chunk to the judge, judge down → held; load retried; `/readyz` reports it |
+| DEF-028 | **High (security)** | The judge read only the first 6,000 characters of a document | Fixed by CORE-16 windows (D-041) |
+| DEF-029 | High | An agent id without a policy ran the default monitor policy (nothing enforced) through the Gateway, silently | Fixed: 404; SDK warns |
+| DEF-030 | Med (security) | Body limit buffered chunked bodies fully before checking (unauthenticated memory use); public key could read every agent's evidence | Fixed: streamed limit; organisations + `INTENTSEAL_PUBLIC_AGENTS` |
+| DEF-031 | Low | Cached scan object mutated by an inspection; unbounded in-process sessions/caches; event sequence restarted at 1 after a restart | Fixed |
+
+DEF-025…031 come from the 7 Oct production-readiness audit (D-039). Open from before: DEF-013 (Groq rejects some
+malformed tool calls), DEF-015 (Console visual quality → owner).
 
 ## 5. What is left
 
 The full, prioritised list lives in **`docs/BACKLOG.md`**. Summary:
 
-1. **Owner:** product name (Q1); Console UI/UX; Docker + hosting + public links; deck and video; EVAL-4 adaptive round
-   (generator choice per D-005/D-014; the memory/feedback backend is ready).
-2. Optional engineering (P1/P2): PRX-6 incremental streaming; CORE-16 span re-mapping; API-12; EVAL-6 (Jev).
-3. Before submission: rerun `eval/run_protected.sh` + `python -m intentseal_eval.summary` on the final commit; commit the reports.
+1. **Owner:** hosting accounts and public links (DEPLOY.md), Console UI/UX follow-ups (BACKLOG F1), deck and video,
+   grid self-declaration from the final numbers, EVAL-4 adaptive round (needs a verified promptfoo account, D-036), LICENSE.
+2. Engineering left: E4 (PyPI packaging: default config + starter policy inside the package, per-user data dir,
+   `[embedded]` extra, LICENSE, TestPyPI dry run) and E6 (Jev comparison), both excluded from this pass.
+3. Final evaluation (B3, D-046) ran on engine `0e473daf3561`; rerun `sh eval/run_final.sh` only if engine, SDK or
+   policy code changes again.

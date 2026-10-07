@@ -15,7 +15,7 @@ LLM judge produce signals; no AI signal alone can allow high-risk content or a h
                                               Core Engine (intentseal_core)
               inspect(content, source, agent, session)        check_action(tool, args, agent, session)
                                                       |
-                                  decision log (SQLite) -> replay, decisions feed, scorecard, metrics
+                   decision log (SQLite or PostgreSQL) -> replay, decisions feed, scorecard, metrics, SIEM export
 ```
 
 | Surface | Code | How an agent adopts it |
@@ -24,7 +24,7 @@ LLM judge produce signals; no AI signal alone can allow high-risk content or a h
 | Python SDK, remote (SDK-6) | `intentseal/remote.py` | `Guard("agent", remote=URL, api_key=KEY)`: same API, decisions by the gateway |
 | LangChain / LangGraph (SDK-7) | `intentseal/langchain.py` | `tools = guard.protect_tools(tools)` (8 added or changed lines in `examples/langgraph_agent`, two of them its own docstring) |
 | Gateway API | `services/gateway/intentseal_gateway/app.py` | HTTP, any language; OpenAPI at `/docs` |
-| LLM proxy | `services/gateway/intentseal_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`) |
+| LLM proxy | `services/gateway/intentseal_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`); streaming supported (PRX-6) |
 
 All surfaces call `Engine.inspect` / `Engine.check_action` (CORE-1; `tests/test_sdk_surfaces.py` proves it per surface).
 
@@ -41,10 +41,11 @@ raw bytes/text
   -> Tier 0 structural       non-visible content, encoded runs, invisible/mixed-script characters
   -> Tier 1 classifier       local open classifier (ONNX) on every chunk; an escalation signal only (D-011)
   -> Tier 2 judge            DecisionModel (free LLMs via the router); content passed as data between random
-                             boundary markers; no tools; returns probability, 9-type labels, evidence quotes
+                             boundary markers; no tools; returns probability, 9-type labels, evidence quotes.
+                             Long documents are judged in windows (CORE-16, below)
   -> policy (CORE-7)         named rules: extraction-failed, known-attack-match, content-risk-block,
-                             session-risk-block, judge-unavailable-hold / budget-hold, session-risk-escalate,
-                             drop-non-visible, judge-neutralise, allow
+                             session-risk-block, judge-unavailable-hold / budget-hold, oversize-hold,
+                             session-risk-escalate, drop-non-visible, judge-neutralise, allow; content-too-large first
   -> neutraliser (CORE-8)    quarantine only the offending spans; wrap the rest in fresh untrusted-data markers
   -> decision log (CORE-10)  hashes + redacted previews only; secrets/canaries redacted; user refs hashed
 ```
@@ -53,14 +54,33 @@ When the judge is called: on any structural signal; on a Tier 1 score in the esc
 whose policy sets `judge_untrusted: always` (agents with high-risk tools), on every untrusted document of at
 least `judge_min_chars`. User turns and short tool output stay on the fast path. Reason: the open classifier is
 near-binary and misses paraphrased third-party instructions (DEF-017, measured in docs/EVALUATION.md).
+If Tier 1 itself fails (model not loaded, timeout), nothing can clear content on the fast path: every chunk goes
+to the judge, and an unavailable judge holds it (audit F3, D-039).
+
+**Long documents (CORE-16, D-041).** A document whose detection view fits one judge window (6,000 characters) is
+judged whole, with its context. A longer one is judged as windows of its flagged chunks, in document order, at
+most `INTENTSEAL_JUDGE_MAX_WINDOWS` (8) windows, most suspicious first. Evidence quotes are located in the
+original text inside the windows judged malicious, so quarantine spans are exact original offsets; a quote that
+is not verbatim quarantines only that window's chunks. Chunks beyond the window cap are cleared only by a Tier 1
+score below the escalation band, otherwise the document is held (`oversize-hold`). Tier 1's time budget grows
+with the document (about 0.7 s per 1,000-character chunk on CPU). Text over `INTENTSEAL_MAX_TEXT_CHARS` is
+refused (`content-too-large`). Measured on CPU: 25 KB of HTML fully inspected in 12 s; ~100 KB and larger is held.
 
 ## 3. Actions: `Engine.check_action` (CORE-9)
 
 Deterministic checks, worst result wins: tool allowed → pinned fields rewritten from trusted session context →
 outbound scan (canaries, registered secrets, detect-secrets patterns) → recipient allow-list → URL domain
-allow-list → sandbox paths → provenance (a high-risk target that appears only in untrusted content) → session risk.
+allow-list → sandbox paths → provenance (a high-risk target that appears only in untrusted content) → session risk
+→ data flow (CORE-17, below). Allow-lists use the host and addresses a real client would use (`urlsplit`,
+`email.utils.getaddresses`): fragment, user-part, backslash and display-name tricks fail (audit F1/F2, D-039).
 `ESCALATE` creates a pending approval (CON-9). A reviewer approval lets the *same* call in the *same* session run
 once (`human-approved`); approvals can never override a `BLOCK`.
+
+**Data flow / taint (CORE-17, D-042).** Every inspected piece of untrusted content is remembered per session as
+a fingerprint (hashed word 5-shingles, no text) with its origin (source channel, event id, flagged or not); the
+user's own words are recorded as trusted and never count as taint. Each string argument of a tool call is traced
+to its origins; text copied from flagged content into a high-risk tool is escalated (policy `taint.flagged_to_high_risk`:
+escalate | block | record), and every traced flow is returned with the decision and stored for replay.
 
 ## 4. Session risk (CORE-6)
 
@@ -74,6 +94,8 @@ Action violations add risk too, and high-risk tools are held in a risky session.
 |---|---|
 | Tier time budgets (CORE-12) | extraction, Tier 1, Tier 2 each bounded; failures mark `degraded` |
 | Judge down / unparseable | flagged content is held (`judge-unavailable-hold`), never silently allowed |
+| Tier 1 down / timed out | every chunk goes to the judge; judge also down → held. A failed classifier load is retried every 60 s and reported by `/readyz` |
+| Unknown agent id | the Gateway answers 404 instead of running the default (monitor) policy; the SDK warns when it falls back to monitor mode |
 | Budget cap (CORE-14) | rules continue; flagged content held (`budget-hold`, `budget_degraded`) |
 | Extraction failure | `extraction-failed` → BLOCK; an empty parse of non-empty text falls back to raw text (DEF-016) |
 | SDK failure policy (SDK-5) | write/send tools fail closed, read tools fail open (logged); remote inspection failure withholds content |
@@ -108,12 +130,27 @@ rules or the action guard.
 | `POST /v1/feedback`, `GET /v1/memory`, `DELETE /v1/memory/{id}` | admin / public / admin | CON-8 backend |
 | `GET /v1/metrics` (decisions by rule/label, escalation rate, latency p50/p95 by tier, provider errors) | public | NFR observability |
 | `GET /demo/scenarios`, `POST /demo/run` | public | API-7 |
-| `POST /proxy/v1/chat/completions`, `POST /proxy/{agent}/v1/chat/completions` | project | PRX-1..5 |
-| `GET /healthz` | open | API-10 |
+| `POST /proxy/v1/chat/completions`, `POST /proxy/{agent}/v1/chat/completions` (streaming: text streams through, tool calls buffered, checked, then released) | project | PRX-1..6 |
+| `GET /v1/export/decisions?since=&format=jsonl\|cef` (SIEM pull, resumable) | project | API-12 |
+| `GET /v1/whoami` (scope, organisation, visible agents) | public | D-037 |
+| `GET /healthz` (liveness), `GET /readyz` (database, policies, Tier 1 classifier; LLM providers reported) | open | API-10, B1 |
 
-Gateway self-security: API keys hashed at rest, scopes (public < project < admin), per-key rate limits, body size
-limit, CORS restricted to the Console origin, agent ids validated (no path traversal into the policy directory),
-request ids on every response and in a structured access log, secrets only from the environment.
+Gateway self-security: API keys hashed at rest, scopes (public < project < admin), per-key rate limits (the
+public key also per client address), a global hourly cap on live demo runs, body size limit enforced while the body
+streams in (before authentication), CORS restricted to the Console origin, agent ids validated (no path traversal
+into the policy directory), request ids on every response and in a structured access log, secrets only from the
+environment.
+
+**Organisations (API-12, D-043).** An agent's policy names its organisation (`org`, default `default`); a key is
+`name:key:scope[:org[:agent|agent]]` (org `*` = all). Every endpoint that names an agent, or reads decisions,
+sessions, approvals, memory, metrics, costs or exports, is limited to the key's agents; others answer 404.
+`INTENTSEAL_PUBLIC_AGENTS` narrows the public Console key to the demo agents. A deployment whose keys and policies
+are all in the default organisation behaves as a single tenant.
+
+**SIEM (API-12).** Decisions as ECS-style JSON Lines or CEF: pulled from `/v1/export/decisions`, or pushed by
+`INTENTSEAL_SIEM_SINKS` to a rotating JSONL file, an HTTP webhook (batched, retried) or syslog, asynchronously
+through a bounded queue (delivery counters in `/v1/metrics`). Records carry redacted reasons and scores, never
+content or arguments.
 
 ## 9. Evaluation
 
@@ -127,7 +164,19 @@ python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.jso
 Outcomes are deterministic (EVAL-5): canary checks, sandbox outbox, executed tool calls. False positives are
 measured on a development benign set and on a held-out benign set written before any tuning.
 
-## 10. Data (SQLite, Postgres-portable)
+## 10. Data (SQLite or PostgreSQL)
 
-`sessions`, `events`, `findings`, `decisions`, `actions`, `approvals`, `memory`, `llm_usage`, `llm_cache`.
-No raw content is stored: content hash + redacted preview (or hash only with `INTENTSEAL_STORE_PREVIEWS=0`).
+`sessions`, `events`, `findings`, `decisions`, `actions` (incl. data-flow taint), `approvals`, `memory`,
+`llm_usage`, `llm_cache`. SQLite by default; PostgreSQL with `INTENTSEAL_DATABASE_URL` (psycopg 3, optional extra
+`intentseal-core[postgres]`). Application SQL is written once in a portable subset; the PostgreSQL store adapts
+placeholders and table definitions in one place, and the storage contract tests run on both (CI starts PostgreSQL).
+Schema changes are additive only, so an older image runs on a newer database (rollback).
+No raw content is stored: content hash + redacted preview (or hash only with `INTENTSEAL_STORE_PREVIEWS=0`, the
+Docker image default).
+
+## 11. Deployment
+
+`Dockerfile` (gateway; classifier baked in, uid 1000, `/data` volume, HEALTHCHECK on `/readyz`),
+`docker-compose.yml` (optional PostgreSQL profile), `python -m intentseal_gateway` (one worker: sessions, rate limits
+and proxy state are in process; scale with more containers on a shared PostgreSQL and session affinity).
+Step-by-step guide, settings reference and operations runbook: `docs/DEPLOY.md`.

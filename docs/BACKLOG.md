@@ -1,7 +1,7 @@
 # IntentSeal backlog
 
-Updated 7 Oct 2026 (Day 3 of 7, sections C and D worked) · deadline Sat 11 Oct, 11:59 PM IST. Frontend rebuilt first (D-032); everything
-below is what remains. Status of built work: `docs/STATUS.md`. Measured results: `docs/EVALUATION.md` (generated).
+Updated 7 Oct 2026 evening (Day 3 of 7: sections C and D, then B1, B2 engineering, B3 and E worked) · deadline Sat 11 Oct,
+11:59 PM IST. Frontend rebuilt first (D-032); everything below is what remains. Status of built work: `docs/STATUS.md`. Measured results: `docs/EVALUATION.md` (generated).
 
 Legend: **Owner** = needs Sankalp's decision or account · **Eng** = engineering can do it · size S < 2 h, M ≈ half a
 day, L ≈ a day.
@@ -19,9 +19,9 @@ day, L ≈ a day.
 
 | # | Item | Who | Size |
 |---|---|---|---|
-| B1 | Dockerfile for the gateway (API + proxy + demo; engine, local classifier, OCR, SQLite) and a warm-up on start | Eng | M |
-| B2 | Deploy backend + Console; public read-only demo key; CORS to the Console origin; "waking up" state verified | Owner + Eng | M |
-| B3 | Final evaluation on the final commit: `eval/run_protected.sh` → `python -m intentseal_eval.summary` → `python -m intentseal_eval.readme`; commit reports | Eng | M (mostly waiting) |
+| B1 | ~~Dockerfile for the gateway~~ Done 7 Oct: `Dockerfile` (classifier baked in, uid 1000, `/data` volume, HEALTHCHECK on `/readyz`), `docker-compose.yml`, `python -m intentseal_gateway` (warm-up, seeded policies, graceful shutdown). Verified: cold start to ready 44 s; live judge, proxy streaming and demo run through the container; data survives restart (D-045) | Eng | ✅ |
+| B2 | Deploy backend + Console; public read-only demo key; CORS to the Console origin; "waking up" state verified. **Engineering part done 7 Oct**: `docs/DEPLOY.md` (Hugging Face Spaces and Docker steps, every setting, post-deploy checks), public key narrowed with `INTENTSEAL_PUBLIC_AGENTS`, CORS and waking-up banner verified locally against the container. **Owner**: create the Space and the static-host project, set the secrets, run the checks in DEPLOY.md §2 | Owner (+ Eng done) | S |
+| B3 | Final evaluation on the final engine: `sh eval/run_final.sh` → `python -m intentseal_eval.summary --attack v3 --dev hb3 --holdout ho1 --e2e headline v2e broad mt3` → `python -m intentseal_eval.readme`; reports committed (D-046). Rerun only if engine, SDK or policy code changes again | Eng | see STATUS |
 | B4 | Pitch deck (10–12 slides) from the generated numbers, with real Console screenshots | Owner (+ Eng draft) | M |
 | B5 | Demo video 2–4 min following PRD §16 storyline; record against a warm backend | Owner | M |
 | B6 | Incognito link check of repo, Console, video, deck; submit on Unstop | Owner | S |
@@ -56,10 +56,17 @@ IntentSeal flagged; (c) both: S7 for the compromise, S2/S3 for detection on docu
 
 | # | Item | PRD | Size |
 |---|---|---|---|
-| E1 | PRX-6 incremental streaming (buffer tool-call chunks, stream text) | P1 | M |
-| E2 | CORE-16 span re-mapping across chunks for long documents | P1 | M |
-| E3 | Rename code namespace `asg_*` → `intentseal` (packages, imports, CLI) | — | M |
+| E1 | ~~PRX-6 incremental streaming~~ ✅ 7 Oct (D-040) | P1 | ✅ |
+| E2 | ~~CORE-16 long documents~~ ✅ 7 Oct: judge windows, original-offset spans, input limits, `oversize-hold` (D-041) | P1 | ✅ |
+| E3 | ~~Rename code namespace~~ ✅ 7 Oct: `intentseal`, `intentseal_core`, `intentseal_gateway`, `intentseal_eval`, CLI `intentseal`, `INTENTSEAL_*` settings (D-038) | — | ✅ |
 | E4 | PyPI: ship default config + starter policy (enforce), per-user data dir, `[embedded]` extra, LICENSE, TestPyPI dry run; publish after A4 | — | M |
-| E5 | API-12 SIEM export / multi-tenant / Postgres | P2 | L |
+| E5 | ~~API-12 SIEM export / multi-tenant / Postgres~~ ✅ 7 Oct (D-043, D-044) | P2 | ✅ |
 | E6 | EVAL-6 Jev comparison | P2 | L |
-| E7 | CORE-17 full taint tracking | P2 | L |
+| E7 | ~~CORE-17 taint tracking~~ ✅ 7 Oct: argument-to-origin tracing, flagged-content rule, replay (D-042) | P2 | ✅ |
+
+## F. Found while working B/E (7 Oct)
+
+| # | Item | Who | Size |
+|---|---|---|---|
+| F1 | Console: the Overview does not refetch its figures when the backend comes back from "waking up" (needs a page reload); keep "waking up" for ~2–3 minutes instead of switching to "unavailable" after ~45 s (a free Space plus classifier load can take longer). Both in `apps/console/src/components/Layout.tsx` / `pages/Overview.tsx`, which were being edited in another session | Owner / Console session | S |
+| F2 | Hosting with persistent data: the free Spaces tier has no persistent disk; use a free hosted PostgreSQL (`INTENTSEAL_DATABASE_URL`) if decisions must survive restarts | Owner | S |

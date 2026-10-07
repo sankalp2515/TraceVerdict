@@ -90,7 +90,7 @@ class RoleConfig:
 class Settings:
     providers: dict[str, ProviderConfig]
     roles: dict[str, RoleConfig]
-    db_path: Path
+    db_path: Path | str                 # SQLite file, or a postgresql:// URL (INTENTSEAL_DATABASE_URL)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -166,5 +166,6 @@ def load_roles(path: Path | None = None) -> dict[str, RoleConfig]:
 
 def load_settings() -> Settings:
     load_env()
-    db = Path(os.environ.get("INTENTSEAL_DB_PATH") or repo_root() / "data" / "intentseal.db")
+    url = os.environ.get("INTENTSEAL_DATABASE_URL", "").strip()
+    db: Path | str = url or Path(os.environ.get("INTENTSEAL_DB_PATH") or repo_root() / "data" / "intentseal.db")
     return Settings(providers=load_providers(), roles=load_roles(), db_path=db)

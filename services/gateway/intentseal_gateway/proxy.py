@@ -26,6 +26,7 @@ from intentseal_core.llm.router import AllProvidersFailed
 from intentseal_core.types import Decision
 
 from .security import Principal, require
+from .tenancy import require_agent
 
 router = APIRouter(tags=["proxy"])
 PROXY_ROLE = "proxy_upstream"
@@ -55,18 +56,16 @@ def _conversation_id(agent_id: str, messages: list[dict[str, Any]]) -> str:
 
 @router.post("/proxy/v1/chat/completions")
 async def chat_completions(request: Request, p: Principal = require("project")) -> Any:
-    return await _complete(request, request.headers.get("x-agent-id", "default-agent"))
+    return await _complete(request, request.headers.get("x-agent-id", "default-agent"), p)
 
 
 @router.post("/proxy/{agent_id}/v1/chat/completions")
 async def agent_chat_completions(agent_id: str, request: Request, p: Principal = require("project")) -> Any:
-    return await _complete(request, agent_id)
+    return await _complete(request, agent_id, p)
 
 
-async def _complete(request: Request, agent_id: str) -> Any:
-    from .app import known_agent
-
-    known_agent(request, agent_id)
+async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
+    require_agent(request, p, agent_id)
     try:
         body = await request.json()
     except ValueError:

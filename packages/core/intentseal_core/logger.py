@@ -13,8 +13,9 @@ import os
 import re
 import time
 import uuid
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
+from . import siem
 from .secrets import redact
 from .store import Store
 from .types import ActionResult, InspectResult
@@ -68,6 +69,7 @@ class DecisionLogger:
         self.extra_secrets = [s for s in secrets_to_redact if s]
         self.previews = os.environ.get("INTENTSEAL_STORE_PREVIEWS", "1") != "0"
         self._seq: dict[str, int] = {}
+        self.org_of: Callable[[str], str | None] | None = None   # set by the engine: agent -> organisation (SIEM)
 
     def add_secrets(self, values: Iterable[str]) -> None:
         self.extra_secrets += [v for v in values if v]
@@ -90,7 +92,8 @@ class DecisionLogger:
 
     # ---- writers ---------------------------------------------------------------------------
     def session(self, session_id: str, agent_id: str, user_ref: str | None, task: str) -> None:
-        self.store.execute("INSERT OR IGNORE INTO sessions (id, agent_id, user_ref, task_preview, started_at) VALUES (?,?,?,?,?)",
+        self.store.execute("INSERT INTO sessions (id, agent_id, user_ref, task_preview, started_at) VALUES (?,?,?,?,?) "
+                           "ON CONFLICT (id) DO NOTHING",
                            (session_id, self._redact(agent_id), user_ref, self.scrub(task), time.time()))
 
     def event(self, session_id: str, agent_id: str, kind: str, source: str, content: str = "") -> str:
@@ -118,7 +121,7 @@ class DecisionLogger:
                  self._redact(f.signal), json.dumps(f.labels), f.score, f.tier))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        r.risk, r.session_risk, r.tier, r.latency_ms, r.degraded, r.budget_degraded, model, input_tokens, est_cost,
-                       output_tokens)
+                       output_tokens, kind="content_in", source=source)
         self.store.execute("UPDATE sessions SET risk = ? WHERE id = ?", (r.session_risk, session_id))
         return eid
 
@@ -131,7 +134,7 @@ class DecisionLogger:
                             self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None,
                             json.dumps(r.taint) if r.taint else None))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
-                       0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0)
+                       0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0, kind="action", source=f"tool:{tool}")
         if r.decision.value == "ESCALATE":
             self.store.execute("INSERT INTO approvals (event_id, session_id, agent_id, tool, args_hash, reason, created_at) "
                                "VALUES (?,?,?,?,?,?,?)", (eid, session_id, self._redact(agent_id), self._redact(tool),
@@ -139,7 +142,8 @@ class DecisionLogger:
         return eid
 
     # ---- approvals (CON-9) -------------------------------------------------------------------
-    def approvals(self, status: str | None = "pending", agent: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    def approvals(self, status: str | None = "pending", agent: str | None = None, limit: int = 100,
+                  agents: Iterable[str] | None = None) -> list[dict[str, Any]]:
         q = ("SELECT a.event_id, a.session_id, a.agent_id, a.tool, a.reason, a.status, a.reviewer, a.note, a.created_at, "
              "a.resolved_at, a.used_at, x.args_redacted, d.policy_rule, d.labels FROM approvals a "
              "LEFT JOIN actions x ON x.event_id = a.event_id LEFT JOIN decisions d ON d.event_id = a.event_id WHERE 1=1")
@@ -148,6 +152,9 @@ class DecisionLogger:
             q += " AND a.status = ?"; p.append(status)
         if agent:
             q += " AND a.agent_id = ?"; p.append(agent)
+        if agents is not None:   # tenancy: only these agents (API-12)
+            allowed = sorted(agents) or [None]
+            q += f" AND a.agent_id IN ({', '.join('?' for _ in allowed)})"; p.extend(allowed)
         q += " ORDER BY a.created_at DESC LIMIT ?"; p.append(limit)
         rows = self.store.query(q, tuple(p))
         for r in rows:
@@ -172,7 +179,8 @@ class DecisionLogger:
         return rows[0]["event_id"]
 
     def _decision(self, eid, agent_id, session_id, decision, enforced, rule, reason, labels, risk, session_risk, tier,
-                  latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, output_tokens=0) -> None:
+                  latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, output_tokens=0,
+                  kind: str = "", source: str = "") -> None:
         self.store.execute(
             "INSERT INTO decisions (event_id, agent_id, session_id, decision, enforced, policy_rule, reason, labels, risk, "
             "session_risk, tier, latency_ms, degraded, budget_degraded, model, input_tokens, est_cost, created_at, output_tokens) "
@@ -180,6 +188,18 @@ class DecisionLogger:
             (eid, self._redact(agent_id), session_id, decision, enforced, self._redact(rule), self.scrub(reason, 400), json.dumps(labels), risk,
              session_risk, tier, latency_ms, int(degraded), int(budget_degraded), self._redact(model) if model else None,
              input_tokens, est_cost, time.time(), output_tokens))
+        fw = siem.forwarder()
+        if fw is not None:   # API-12 push export (asynchronous, bounded; never blocks or fails a decision)
+            try:
+                org = self.org_of(agent_id) if self.org_of else None
+                fw.submit(siem.record({
+                    "event_id": eid, "agent_id": agent_id, "session_id": session_id, "decision": decision,
+                    "enforced": enforced, "policy_rule": rule, "reason": self.scrub(reason, 400), "labels": labels,
+                    "risk": risk, "session_risk": session_risk, "tier": tier, "latency_ms": latency_ms,
+                    "degraded": degraded, "budget_degraded": budget_degraded, "model": model, "input_tokens": input_tokens,
+                    "output_tokens": output_tokens, "kind": kind, "source": self._redact(source), "created_at": time.time()}, org))
+            except Exception:
+                pass
 
     # ---- readers (API / Console) ------------------------------------------------------------
     def session_events(self, session_id: str) -> list[dict[str, Any]]:
@@ -199,7 +219,9 @@ class DecisionLogger:
         return rows
 
     def decisions(self, decision: str | None = None, label: str | None = None, agent: str | None = None,
-                  since: float | None = None, limit: int = 200, before: float | None = None) -> list[dict[str, Any]]:
+                  since: float | None = None, limit: int = 200, before: float | None = None,
+                  agents: Iterable[str] | None = None, until: float | None = None,
+                  ascending: bool = False) -> list[dict[str, Any]]:
         q, p = "SELECT d.*, e.source, e.kind, e.preview FROM decisions d JOIN events e ON e.id = d.event_id WHERE 1=1", []
         if decision:
             q += " AND d.decision = ?"; p.append(decision)
@@ -209,9 +231,14 @@ class DecisionLogger:
             q += " AND d.created_at >= ?"; p.append(since)
         if before:   # keyset pagination: pass the oldest created_at of the previous page
             q += " AND d.created_at < ?"; p.append(before)
+        if until:
+            q += " AND d.created_at <= ?"; p.append(until)
         if label:
             q += " AND d.labels LIKE ?"; p.append(f'%"{label}"%')
-        q += " ORDER BY d.created_at DESC LIMIT ?"; p.append(limit)
+        if agents is not None:   # tenancy: only these agents (API-12)
+            allowed = sorted(agents) or [None]
+            q += f" AND d.agent_id IN ({', '.join('?' for _ in allowed)})"; p.extend(allowed)
+        q += f" ORDER BY d.created_at {'ASC' if ascending else 'DESC'} LIMIT ?"; p.append(limit)
         rows = self.store.query(q, tuple(p))
         for r in rows:
             r["labels"] = json.loads(r["labels"] or "[]")

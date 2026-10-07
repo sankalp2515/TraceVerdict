@@ -89,6 +89,7 @@ class Engine:
         self.sessions = sessions or SessionStore()
         self.policy_loader = (lambda agent: load_policy(agent, policy_directory)) if policy_directory else policy_loader
         self._policy_files = (policy_directory, policy_directory is not None or policy_loader is load_policy)
+        self.logger.org_of = self._org_of
         self.decision_model = decision_model
         self.classifiers = None if classifiers is None else list(classifiers)
         self.tier0_timeout_s, self.tier1_timeout_s, self.tier2_timeout_s = (
@@ -110,6 +111,12 @@ class Engine:
         policy = self.policy_loader(agent_id)
         self.register_secrets(policy.canary_values())
         return policy
+
+    def _org_of(self, agent_id: str) -> str | None:
+        try:
+            return self.policy_loader(agent_id).org
+        except Exception:
+            return None
 
     def has_policy(self, agent_id: str) -> bool:
         """Is this agent configured? Policies come from files unless a custom loader was given."""

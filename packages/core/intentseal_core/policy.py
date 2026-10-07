@@ -66,6 +66,7 @@ class TaintPolicy(BaseModel):
 
 class AgentPolicy(BaseModel):
     agent: str
+    org: str = "default"                                # organisation (multi-tenant gateway, API-12)
     mode: str = "monitor"                               # monitor | enforce
     task_scope: str = ""
     tools: dict[str, ToolPolicy] = Field(default_factory=dict)
@@ -96,7 +97,17 @@ def policy_path(agent: str, directory: Path | None = None) -> Path:
     """policies/<agent>.yaml; agent ids are restricted so a request can never name a file outside the directory."""
     if not AGENT_ID.match(agent or "") or ".." in agent:
         raise ValueError("invalid agent id")
-    return (directory or Path(os.environ.get("INTENTSEAL_POLICY_DIR") or repo_root() / "policies")) / f"{agent}.yaml"
+    return policy_dir(directory) / f"{agent}.yaml"
+
+
+def policy_dir(directory: Path | None = None) -> Path:
+    return directory or Path(os.environ.get("INTENTSEAL_POLICY_DIR") or repo_root() / "policies")
+
+
+def list_policies(directory: Path | None = None) -> list[str]:
+    """Agent ids with a policy file."""
+    d = policy_dir(directory)
+    return sorted(f.stem for f in d.glob("*.yaml") if AGENT_ID.match(f.stem)) if d.exists() else []
 
 
 def policy_exists(agent: str, directory: Path | None = None) -> bool:

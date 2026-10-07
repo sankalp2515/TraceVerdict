@@ -1,9 +1,14 @@
-"""Gateway self-security (API-8, API-9, NFR §12): API keys (hashed at rest), scopes, rate limits,
-request-size limits. Keys come from the environment only.
+"""Gateway self-security (API-8, API-9, API-12, NFR §12): API keys (hashed at rest), scopes, organisations,
+rate limits, request-size limits. Keys come from the environment only.
 
-INTENTSEAL_API_KEYS     comma list of name:key:scope  (scope: admin | project), e.g. "dev:abc123:admin"
-INTENTSEAL_PUBLIC_KEY   optional read-only key for the public Console (scope: public)
-INTENTSEAL_RATE_LIMIT_PER_MIN / INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN   requests per minute per key
+INTENTSEAL_API_KEYS     comma list of name:key:scope[:org[:agent|agent...]]   (scope: admin | project)
+                        e.g. "ops:abc123:admin:*"  (org "*" = every organisation)
+                             "acme-ci:def456:project:acme:support-bot|billing-bot"
+                        Without an org a key belongs to the "default" organisation, like every policy without one.
+INTENTSEAL_PUBLIC_KEY   optional read-only key for the public Console (scope: public, org default)
+INTENTSEAL_PUBLIC_AGENTS   comma list: the only agents the public key can see (e.g. the demo agents)
+INTENTSEAL_RATE_LIMIT_PER_MIN / INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN   requests per minute per key (the public
+                        key is limited per client address as well, so one visitor cannot use up everyone's quota)
 INTENTSEAL_MAX_BODY_BYTES   max request body (default 2 MB)
 """
 
@@ -19,16 +24,28 @@ from fastapi import Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 SCOPES = {"public": 0, "project": 1, "admin": 2}
+ALL_ORGS = "*"
 
 
 @dataclass(frozen=True)
 class Principal:
     name: str
     scope: str
+    org: str = "default"
+    agents: frozenset[str] | None = None     # None: every agent of the organisation
+
+    @property
+    def all_orgs(self) -> bool:
+        return self.org == ALL_ORGS
 
 
 def _h(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _agents(value: str) -> frozenset[str] | None:
+    names = frozenset(a.strip() for a in value.split("|") if a.strip())
+    return names or None
 
 
 class KeyRing:
@@ -36,11 +53,14 @@ class KeyRing:
         self._keys: dict[str, Principal] = {}
         for item in filter(None, (s.strip() for s in os.environ.get("INTENTSEAL_API_KEYS", "").split(","))):
             parts = item.split(":")
-            if len(parts) == 3 and parts[2] in SCOPES:
-                self._keys[_h(parts[1])] = Principal(parts[0], parts[2])
+            if 3 <= len(parts) <= 5 and parts[2] in SCOPES and parts[0] and parts[1]:
+                org = parts[3].strip() if len(parts) > 3 and parts[3].strip() else "default"
+                agents = _agents(parts[4]) if len(parts) > 4 else None
+                self._keys[_h(parts[1])] = Principal(parts[0], parts[2], org, agents)
         pub = os.environ.get("INTENTSEAL_PUBLIC_KEY")
         if pub:
-            self._keys[_h(pub)] = Principal("public", "public")
+            self._keys[_h(pub)] = Principal("public", "public", "default",
+                                            _agents(os.environ.get("INTENTSEAL_PUBLIC_AGENTS", "").replace(",", "|")))
         self._buckets: dict[str, list[float]] = {}
         self.limit = int(os.environ.get("INTENTSEAL_RATE_LIMIT_PER_MIN") or "120")
         self.public_limit = int(os.environ.get("INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN") or "20")
@@ -48,6 +68,9 @@ class KeyRing:
     def add(self, key: str, principal: Principal) -> None:
         """Register an in-process key (e.g. the demo runner's ephemeral key for calling its own proxy)."""
         self._keys[_h(key)] = principal
+
+    def orgs(self) -> set[str]:
+        return {p.org for p in self._keys.values()}
 
     def lookup(self, key: str | None) -> Principal | None:
         if not key:
@@ -58,15 +81,19 @@ class KeyRing:
                 return p
         return None
 
-    def allow(self, p: Principal) -> bool:
+    def allow(self, p: Principal, client: str = "") -> bool:
         now = time.time()
-        bucket = [t for t in self._buckets.get(p.name, []) if now - t < 60]
+        bucket_id = f"{p.name}@{client}" if p.scope == "public" else p.name
+        bucket = [t for t in self._buckets.get(bucket_id, []) if now - t < 60]
         limit = self.public_limit if p.scope == "public" else self.limit
         if len(bucket) >= limit:
-            self._buckets[p.name] = bucket
+            self._buckets[bucket_id] = bucket
             return False
         bucket.append(now)
-        self._buckets[p.name] = bucket
+        self._buckets[bucket_id] = bucket
+        if len(self._buckets) > 10000:   # drop idle client buckets
+            for k in [k for k, v in self._buckets.items() if not v or now - v[-1] >= 60]:
+                del self._buckets[k]
         return True
 
 
@@ -85,7 +112,7 @@ def require(scope: str):
             raise HTTPException(401, "missing or invalid API key")
         if SCOPES[p.scope] < SCOPES[scope]:
             raise HTTPException(403, f"this key cannot access {scope}-scoped endpoints")
-        if not ring.allow(p):
+        if not ring.allow(p, request.client.host if request.client else ""):
             raise HTTPException(429, "rate limit exceeded", headers={"Retry-After": "60"})
         return p
 

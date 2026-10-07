@@ -25,7 +25,11 @@ def overhead(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def usage_by_role(store: Any, since: float, until: float | None = None) -> list[dict[str, Any]]:
     q = ("SELECT role, provider, model, COUNT(*) AS calls, SUM(cached) AS cached, SUM(input_tokens) AS input_tokens, "
-         "SUM(output_tokens) AS output_tokens, ROUND(SUM(est_cost_usd), 6) AS est_cost_usd, ROUND(AVG(latency_ms)) AS avg_latency_ms, "
+         "SUM(output_tokens) AS output_tokens, SUM(est_cost_usd) AS est_cost_usd, AVG(latency_ms) AS avg_latency_ms, "
          "SUM(CASE WHEN status NOT IN ('ok', 'cached') THEN 1 ELSE 0 END) AS errors "
          "FROM llm_usage WHERE ts >= ?" + (" AND ts < ?" if until else "") + " GROUP BY role, provider, model ORDER BY calls DESC")
-    return store.query(q, (since, until) if until else (since,))
+    rows = store.query(q, (since, until) if until else (since,))
+    for r in rows:   # rounded here, not in SQL: ROUND(x, n) is not portable to PostgreSQL doubles
+        r["est_cost_usd"] = round(r["est_cost_usd"] or 0, 6)
+        r["avg_latency_ms"] = round(r["avg_latency_ms"]) if r["avg_latency_ms"] is not None else None
+    return rows

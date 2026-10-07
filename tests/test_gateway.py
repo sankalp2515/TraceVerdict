@@ -392,7 +392,7 @@ def test_decisions_feed_pages_with_before_cursor(env):
 
 def test_whoami_reports_scope_for_console_sign_in(env):
     with make_client(env) as c:
-        assert c.get("/v1/whoami", headers=H(ADMIN)).json() == {"name": "admin", "scope": "admin"}
+        assert c.get("/v1/whoami", headers=H(ADMIN)).json() == {"name": "admin", "scope": "admin", "org": "default", "agents": None}
         assert c.get("/v1/whoami", headers=H(PUBLIC)).json()["scope"] == "public"
         assert c.get("/v1/whoami", headers=H("nope")).status_code == 401
 

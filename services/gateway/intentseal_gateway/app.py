@@ -17,16 +17,19 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
+from intentseal_core import siem
 from intentseal_core.config import repo_root
 from intentseal_core.costs import overhead, usage_by_role
 from intentseal_core.engine import Engine
 from intentseal_core.llm.router import Router
 from intentseal_core.policy import AgentPolicy, load_policy, save_policy
 
-from .security import BodySizeLimit, KeyRing, Principal, require
+from . import tenancy
+from .security import ALL_ORGS, BodySizeLimit, KeyRing, Principal, require
+from .tenancy import agent_filter, require_agent, visible_agents
 
 
 class InspectRequest(BaseModel):
@@ -79,12 +82,6 @@ def _percentile(values: list[float], q: float) -> float | None:
     return round(values[min(len(values) - 1, int(q * len(values)))], 1) if values else None
 
 
-def known_agent(request: Request, agent_id: str) -> None:
-    """An agent with no policy would run the default (monitor) policy, i.e. unprotected: refuse it instead (F4)."""
-    if not request.app.state.engine.has_policy(agent_id):
-        raise HTTPException(404, f"no policy for agent '{agent_id[:64]}'; add policies/<agent>.yaml (or PUT /v1/policies/<agent>)")
-
-
 def build_engine() -> Engine:
     router = Router()
     return Engine(router=router, store=router.store, tier0_timeout_s=float(os.environ.get("INTENTSEAL_EXTRACT_TIMEOUT_S") or "10"))
@@ -103,7 +100,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         # Ephemeral key for the demo runner's own calls to the proxy (S9); random per process, never exposed.
         import secrets as _secrets
         app.state.internal_key = _secrets.token_urlsafe(24)
-        app.state.keys.add(app.state.internal_key, Principal("internal-demo", "project"))
+        app.state.keys.add(app.state.internal_key, Principal("internal-demo", "project", ALL_ORGS))
         app.state.reports = reports_dir or repo_root() / "eval" / "reports"
         app.state.started = time.time()
         yield
@@ -140,14 +137,15 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         return {"ok": True, "uptime_s": round(time.time() - request.app.state.started, 1)}
 
     @app.get("/v1/whoami", tags=["ops"])
-    async def whoami(p: Principal = require("public")) -> dict[str, str]:
+    async def whoami(request: Request, p: Principal = require("public")) -> dict[str, Any]:
         """Which key is this? Lets the Console confirm a reviewer key is admin-scoped before showing reviewer actions."""
-        return {"name": p.name, "scope": p.scope}
+        agents = visible_agents(request, p)
+        return {"name": p.name, "scope": p.scope, "org": p.org, "agents": None if agents is None else sorted(agents)}
 
     # ---- API-1 inspect ------------------------------------------------------------------------
     @app.post("/v1/inspect", tags=["engine"])
     async def inspect(body: InspectRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
-        known_agent(request, body.agent_id)
+        require_agent(request, p, body.agent_id)
         if body.content is None and body.content_b64 is None:
             raise HTTPException(422, "provide content or content_b64")
         try:
@@ -161,20 +159,24 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     # ---- API-2 action check -------------------------------------------------------------------
     @app.post("/v1/actions/check", tags=["engine"])
     async def check(body: ActionRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
-        known_agent(request, body.agent_id)
+        require_agent(request, p, body.agent_id)
         r = await request.app.state.engine.check_action(body.tool, body.args, body.agent_id, session_id=body.session_id)
         return r.model_dump(mode="json")
 
     # ---- API-3 sessions -----------------------------------------------------------------------
     @app.post("/v1/sessions", tags=["sessions"])
     async def new_session(body: SessionRequest, request: Request, p: Principal = require("project")) -> dict[str, str]:
-        known_agent(request, body.agent_id)
+        require_agent(request, p, body.agent_id)
         s = request.app.state.engine.start_session(body.agent_id, user_ref=body.user_ref, task=body.task, trusted=body.trusted)
         return {"session_id": s.session_id}
 
     @app.get("/v1/sessions/{session_id}/events", tags=["sessions"])
     async def session_events(session_id: str, request: Request, p: Principal = require("public")) -> list[dict[str, Any]]:
-        return request.app.state.engine.logger.session_events(session_id)
+        e = request.app.state.engine
+        owner = e.store.query("SELECT agent_id FROM sessions WHERE id = ?", (session_id,))
+        if owner and not tenancy.can_see(request, p, owner[0]["agent_id"]):
+            raise HTTPException(404, "unknown session")
+        return e.logger.session_events(session_id)
 
     # ---- API-4 decisions feed -----------------------------------------------------------------
     @app.get("/v1/decisions", tags=["evidence"])
@@ -182,7 +184,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
                         agent: str | None = None, since: float | None = None, before: float | None = None,
                         limit: int = Query(100, ge=1, le=500), p: Principal = require("public")) -> list[dict[str, Any]]:
         return request.app.state.engine.logger.decisions(decision=decision, label=label, agent=agent, since=since,
-                                                         limit=limit, before=before)
+                                                         limit=limit, before=before, agents=visible_agents(request, p))
 
     # ---- API-5 scorecard ----------------------------------------------------------------------
     @app.get("/v1/scorecard/{agent}", tags=["evidence"])
@@ -204,33 +206,57 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     # ---- API-6 policy (read) ------------------------------------------------------------------
     @app.get("/v1/policies/{agent}", tags=["policy"])
     async def policy(agent: str, request: Request, p: Principal = require("public")) -> dict[str, Any]:
-        known_agent(request, agent)
+        require_agent(request, p, agent)
         pol = load_policy(agent).model_dump(mode="json")
         pol["sensitive_data"]["canaries"] = [c if c == "from_env" else "[REDACTED]" for c in pol["sensitive_data"]["canaries"]]
         return pol
 
     # ---- API-11 costs (P1) --------------------------------------------------------------------
     @app.get("/v1/costs", tags=["evidence"])
-    async def costs(request: Request, days: int = Query(7, le=90), p: Principal = require("public")) -> dict[str, Any]:
-        rows = usage_by_role(request.app.state.engine.store, time.time() - days * 86400)
-        return {"days": days, "by_model": rows, "overhead": overhead(rows)}
+    async def costs(request: Request, days: int = Query(7, ge=1, le=90), p: Principal = require("public")) -> dict[str, Any]:
+        since = time.time() - days * 86400
+        if p.all_orgs or tenancy.single_tenant(request):   # deployment-wide LLM usage (agent + security roles)
+            rows = usage_by_role(request.app.state.engine.store, since)
+            return {"days": days, "by_model": rows, "overhead": overhead(rows)}
+        cond, args = agent_filter("agent_id", visible_agents(request, p))   # multi-tenant: this org's security spend
+        rows = request.app.state.engine.store.query(
+            "SELECT model, COUNT(*) AS calls, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, "
+            "SUM(est_cost) AS est_cost_usd FROM decisions WHERE created_at >= ? AND model IS NOT NULL" + cond +
+            " GROUP BY model ORDER BY calls DESC", (since, *args))
+        for r in rows:
+            r.update(role="judge", provider=(r.pop("model") or "/").split("/", 1)[0], est_cost_usd=round(r["est_cost_usd"] or 0, 6))
+        return {"days": days, "by_model": rows, "overhead": None}
 
     @app.get("/v1/costs/{agent}", tags=["evidence"])
-    async def agent_costs(agent: str, request: Request, days: int = Query(7, le=90),
+    async def agent_costs(agent: str, request: Request, days: int = Query(7, ge=1, le=90),
                           p: Principal = require("public")) -> dict[str, Any]:
         """Security spend attributed to one agent: decisions and judge tokens/cost by tier (CORE-14)."""
+        if not tenancy.can_see(request, p, agent):
+            raise HTTPException(404, "unknown agent")
         since = time.time() - days * 86400
         rows = request.app.state.engine.store.query(
-            "SELECT tier, COUNT(*) AS decisions, SUM(input_tokens) AS judge_input_tokens, ROUND(SUM(est_cost), 6) AS est_cost_usd, "
+            "SELECT tier, COUNT(*) AS decisions, SUM(input_tokens) AS judge_input_tokens, SUM(est_cost) AS est_cost_usd, "
             "SUM(degraded) AS degraded, SUM(budget_degraded) AS budget_degraded FROM decisions "
             "WHERE agent_id = ? AND created_at >= ? GROUP BY tier ORDER BY tier", (agent, since))
+        for r in rows:
+            r["est_cost_usd"] = round(r["est_cost_usd"] or 0, 6)
         return {"agent": agent, "days": days, "by_tier": rows}
 
     # ---- API-6 policy write (admin, P1) -------------------------------------------------------
     @app.put("/v1/policies/{agent}", tags=["policy"])
-    async def put_policy(agent: str, body: dict[str, Any], p: Principal = require("admin")) -> dict[str, Any]:
-        """Replace an agent's policy. Validated against the policy schema, version bumped, written atomically."""
+    async def put_policy(agent: str, body: dict[str, Any], request: Request, p: Principal = require("admin")) -> dict[str, Any]:
+        """Replace an agent's policy. Validated against the policy schema, version bumped, written atomically.
+        A new agent joins the key's organisation; only an all-organisations key can move an agent between them."""
+        exists = request.app.state.engine.has_policy(agent)
+        if exists and not tenancy.can_see(request, p, agent):
+            raise HTTPException(404, "unknown agent")
+        if p.agents is not None and agent not in p.agents:
+            raise HTTPException(404, "unknown agent")
         old = load_policy(agent)
+        org = body.get("org") or (old.org if exists else ("default" if p.all_orgs else p.org))
+        if not p.all_orgs and org != p.org:
+            raise HTTPException(403, "this key cannot assign an agent to another organisation")
+        body = {**body, "org": org}
         # GET returns literal canaries as "[REDACTED]"; a round-tripped policy keeps the stored values, never the mask.
         sd = dict(body.get("sensitive_data") or {})
         if "[REDACTED]" in (sd.get("canaries") or []):
@@ -243,7 +269,8 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
             raise HTTPException(422, json.loads(e.json(include_url=False))[:5]) from None
         new.version = str(int(old.version) + 1) if old.version.isdigit() else old.version + ".1"
         save_policy(new)
-        access.info(json.dumps({"event": "policy_updated", "agent": agent, "version": new.version, "by": p.name}))
+        tenancy.refresh(request)
+        access.info(json.dumps({"event": "policy_updated", "agent": agent, "org": new.org, "version": new.version, "by": p.name}))
         return {"agent": agent, "version": new.version, "mode": new.mode}
 
     # ---- CON-8 reviewer feedback -> trainability memory (fingerprints only) --------------------
@@ -251,6 +278,18 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     async def feedback(body: FeedbackRequest, request: Request, p: Principal = require("admin")) -> dict[str, Any]:
         if not body.event_id and not body.content:
             raise HTTPException(422, "provide event_id or content")
+        e = request.app.state.engine
+        recent = e._recent.get(body.event_id or "")
+        if recent is not None and not tenancy.can_see(request, p, recent[0]):
+            raise HTTPException(404, "event is no longer in recent memory; send the content instead")
+        if body.agent_id == "*" and visible_agents(request, p) is not None:
+            if recent is None:   # a "*" entry would apply to every organisation's agents
+                if body.event_id:
+                    raise HTTPException(404, "event is no longer in recent memory; send the content instead")
+                raise HTTPException(422, "name the agent (agent_id) this verdict applies to")
+            body.agent_id = recent[0]
+        elif body.agent_id != "*" and not tenancy.can_see(request, p, body.agent_id):
+            raise HTTPException(404, "unknown agent")
         try:
             mid = request.app.state.engine.feedback(body.verdict, event_id=body.event_id, content=body.content,
                                                     agent_id=body.agent_id, labels=body.labels,
@@ -265,10 +304,19 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     async def memory(request: Request, kind: str | None = Query(None, pattern="^(attack|benign)$"),
                      p: Principal = require("public")) -> dict[str, Any]:
         m = request.app.state.engine.memory
-        return {"stats": m.stats(), "entries": m.entries(kind)}
+        agents = visible_agents(request, p)
+        if agents is None:
+            return {"stats": m.stats(), "entries": m.entries(kind)}
+        entries = [x for x in m.entries(kind, limit=1000) if x["agent_id"] in agents or x["agent_id"] == "*"]
+        stats = {k: sum(1 for x in entries if x["kind"] == k) for k in ("attack", "benign")}
+        return {"stats": stats, "entries": entries[:100]}
 
     @app.delete("/v1/memory/{memory_id}", tags=["review"])
     async def forget(memory_id: str, request: Request, p: Principal = require("admin")) -> dict[str, bool]:
+        owner = request.app.state.engine.store.query("SELECT agent_id FROM memory WHERE id = ?", (memory_id,))
+        if owner and visible_agents(request, p) is not None and (
+                owner[0]["agent_id"] == "*" or not tenancy.can_see(request, p, owner[0]["agent_id"])):
+            raise HTTPException(404, "unknown memory entry")
         if not request.app.state.engine.memory.remove(memory_id):
             raise HTTPException(404, "unknown memory entry")
         return {"removed": True}
@@ -277,11 +325,14 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     @app.get("/v1/approvals", tags=["review"])
     async def approvals(request: Request, status: str | None = Query("pending", pattern="^(pending|approved|denied)$"),
                         agent: str | None = None, p: Principal = require("public")) -> list[dict[str, Any]]:
-        return request.app.state.engine.logger.approvals(status=status, agent=agent)
+        return request.app.state.engine.logger.approvals(status=status, agent=agent, agents=visible_agents(request, p))
 
     @app.post("/v1/approvals/{event_id}", tags=["review"])
     async def resolve(event_id: str, body: ApprovalRequest, request: Request, p: Principal = require("admin")) -> dict[str, Any]:
         """Approve or deny one escalated action. An approval lets the same call in the same session run once."""
+        owner = request.app.state.engine.store.query("SELECT agent_id FROM approvals WHERE event_id = ?", (event_id,))
+        if owner and not tenancy.can_see(request, p, owner[0]["agent_id"]):
+            raise HTTPException(404, "no pending approval with this id")
         if not request.app.state.engine.logger.resolve_approval(event_id, body.approve, p.name, body.note):
             raise HTTPException(404, "no pending approval with this id")
         return {"event_id": event_id, "status": "approved" if body.approve else "denied"}
@@ -293,8 +344,14 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         """Decisions by type and rule, tier escalation rate, latency p50/p95 by tier, provider errors, memory."""
         e = request.app.state.engine
         since = time.time() - hours * 3600
+        agents = visible_agents(request, p)
+        cond, args = agent_filter("d.agent_id", agents)
         rows = e.store.query("SELECT d.decision, d.policy_rule, d.tier, d.latency_ms, d.degraded, d.labels, ev.kind "
-                             "FROM decisions d JOIN events ev ON ev.id = d.event_id WHERE d.created_at >= ?", (since,))
+                             "FROM decisions d JOIN events ev ON ev.id = d.event_id WHERE d.created_at >= ?" + cond,
+                             (since, *args))
+        providers = (e.store.query("SELECT provider, status, COUNT(*) AS n FROM llm_usage WHERE ts >= ? "
+                                   "GROUP BY provider, status ORDER BY provider, status", (since,))
+                     if p.all_orgs or tenancy.single_tenant(request) else [])
         content = [r for r in rows if r["kind"] == "content_in"]
         count = lambda key: {k: sum(1 for r in rows if r[key] == k) for k in sorted({r[key] for r in rows})}
         labels: dict[str, int] = {}
@@ -312,10 +369,39 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
                             "degraded": sum(1 for r in content if r["degraded"])},
             "latency_ms": {"fast_path": latency([r for r in content if (r["tier"] or 0) < 2]),
                            "judge_path": latency([r for r in content if r["tier"] == 2])},
-            "providers": e.store.query("SELECT provider, status, COUNT(*) AS n FROM llm_usage WHERE ts >= ? "
-                                       "GROUP BY provider, status ORDER BY provider, status", (since,)),
-            "memory": e.memory.stats(), "approvals_pending": len(e.logger.approvals("pending")),
+            "providers": providers,
+            "memory": e.memory.stats() if agents is None else None,
+            "siem": dict(siem.forwarder().stats) if agents is None and siem.forwarder() else None,
+            "approvals_pending": len(e.logger.approvals("pending", agents=agents)),
         }
+
+    # ---- API-12 SIEM export (pull) ---------------------------------------------------------------
+    @app.get("/v1/export/decisions", tags=["evidence"])
+    async def export(request: Request, since: float | None = None, until: float | None = None,
+                     format: str = Query("jsonl", pattern="^(jsonl|cef)$"), limit: int = Query(10000, ge=1, le=100000),
+                     p: Principal = require("project")) -> StreamingResponse:
+        """Decisions as security events for a SIEM, oldest first: JSON Lines (ECS-style fields) or CEF lines.
+        Continue with `since` = the last record's `intentseal.ts`. Limited to this key's agents."""
+        e = request.app.state.engine
+        lo, hi = since if since is not None else time.time() - 86400, until if until is not None else time.time()
+        cond, args = agent_filter("d.agent_id", visible_agents(request, p))
+
+        def lines():
+            cursor, last_id, sent = lo, (2 ** 62 if since is not None else -1), 0   # `since` is exclusive
+            while sent < limit:
+                rows = e.store.query(
+                    "SELECT d.*, ev.kind, ev.source FROM decisions d JOIN events ev ON ev.id = d.event_id "
+                    "WHERE (d.created_at > ? OR (d.created_at = ? AND d.id > ?)) AND d.created_at <= ?" + cond +
+                    " ORDER BY d.created_at ASC, d.id ASC LIMIT ?", (cursor, cursor, last_id, hi, *args, min(1000, limit - sent)))
+                if not rows:
+                    return
+                for row in rows:
+                    rec = siem.record(row, e._org_of(row["agent_id"]))
+                    yield (siem.cef(rec) if format == "cef" else json.dumps(rec, default=str)) + "\n"
+                sent += len(rows)
+                cursor, last_id = rows[-1]["created_at"], rows[-1]["id"]
+
+        return StreamingResponse(lines(), media_type="text/plain" if format == "cef" else "application/x-ndjson")
 
     # ---- API-7 demo runner --------------------------------------------------------------------
     @app.get("/demo/scenarios", tags=["demo"])

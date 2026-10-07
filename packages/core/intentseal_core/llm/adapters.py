@@ -141,8 +141,12 @@ class OpenAICompatibleAdapter:
     """Any provider exposing POST {base_url}/chat/completions in the OpenAI format."""
 
     def _headers(self, provider: ProviderConfig, key: ApiKey) -> dict[str, str]:
-        return {"Authorization": f"Bearer {key.value}", "Content-Type": "application/json",
-                **provider.extra_headers}
+        auth: dict[str, str] = {}
+        if key.value:   # keyless local servers (Ollama, vLLM, LM Studio) send no credentials
+            # Azure OpenAI takes the key in an `api-key` header; everyone else uses a bearer token.
+            header = provider.options.get("auth_header", "authorization")
+            auth = {"api-key": key.value} if header == "api-key" else {"Authorization": f"Bearer {key.value}"}
+        return {**auth, "Content-Type": "application/json", **provider.extra_headers}
 
     async def chat(self, provider: ProviderConfig, key: ApiKey, model: str, req: ChatRequest,
                    client: httpx.AsyncClient, params: dict[str, Any] | None = None) -> AdapterResponse:
@@ -251,8 +255,15 @@ class JevAdapter:
         return []
 
 
+def _anthropic() -> Any:
+    from .anthropic_adapter import AnthropicAdapter   # imported lazily: the SDK is an optional extra
+
+    return AnthropicAdapter()
+
+
 _REGISTRY: dict[str, Callable[[], Any]] = {
     "openai_compatible": OpenAICompatibleAdapter,
+    "anthropic": _anthropic,
     "jev": JevAdapter,
 }
 

@@ -23,6 +23,9 @@ class ToolPolicy(BaseModel):
     allowed_domains: list[str] = Field(default_factory=list)      # for URL-taking tools
     url_arg: str = "url"
     path_arg: str | None = None                         # argument holding a file path (sandbox check)
+    # Explicit intent (docs/13 L1, confused deputy): when set, the user's own words in this session must contain one of
+    # these terms (word prefix match: "send" matches "sending") or the call is escalated for approval.
+    intent_terms: list[str] = Field(default_factory=list)
 
 
 class Thresholds(BaseModel):
@@ -51,6 +54,7 @@ class SensitiveData(BaseModel):
     patterns: list[str] = Field(default_factory=lambda: ["api_key", "credential"])
     canaries: list[str] = Field(default_factory=list)   # literal values; "from_env" reads INTENTSEAL_CANARIES
     drop_non_visible: bool = True                       # untrusted docs: the model sees what a human sees
+    strip_role_markers: bool = True                     # remove forged role/tool-call markers (not from source code)
 
 
 class MemoryPolicy(BaseModel):
@@ -62,6 +66,19 @@ class TaintPolicy(BaseModel):
     enabled: bool = True                                # CORE-17: trace tool-argument text to its origin
     min_coverage: float = 0.3                           # share of an argument's shingles from one origin
     flagged_to_high_risk: str = "escalate"              # escalate | block | record: flagged content into a high-risk tool
+
+
+class UpstreamPolicy(BaseModel):
+    """Where the LLM proxy forwards this agent's model calls (docs/INTEGRATION.md).
+
+    provider: a provider name from config/providers.yaml (openai, anthropic, gemini, groq, azure_openai, ollama, ...).
+              Unset: the gateway's own `proxy_upstream` role (free-tier models; demo and evaluation).
+    model:    override the model the client asks for (unset: forward the client's model).
+    key:      "gateway" - the gateway's configured key for that provider; "client" - the agent's own provider key,
+              sent in the X-Upstream-Key header and never stored."""
+    provider: str | None = None
+    model: str | None = None
+    key: str = "gateway"
 
 
 class AgentPolicy(BaseModel):
@@ -77,6 +94,7 @@ class AgentPolicy(BaseModel):
     budgets: Budgets = Field(default_factory=Budgets)
     memory: MemoryPolicy = Field(default_factory=MemoryPolicy)
     taint: TaintPolicy = Field(default_factory=TaintPolicy)
+    upstream: UpstreamPolicy = Field(default_factory=UpstreamPolicy)
     decision_model: str = "generative_free"
     version: str = "1"
 

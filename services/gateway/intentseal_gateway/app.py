@@ -445,6 +445,8 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
 
     from .proxy import router as proxy_router
     app.include_router(proxy_router)
+    from .setup import router as setup_router
+    app.include_router(setup_router)
     return app
 
 

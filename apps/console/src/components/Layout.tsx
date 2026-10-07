@@ -71,6 +71,7 @@ function ThemeToggle() {
 
 const NAV = [
   { to: "/", label: "Overview" },
+  { to: "/setup", label: "Set up" },
   { to: "/playground", label: "Playground" },
   { to: "/replay", label: "Replay" },
   { to: "/results", label: "Results" },

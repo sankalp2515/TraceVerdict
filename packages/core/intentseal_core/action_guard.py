@@ -139,6 +139,12 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
                                   f"session risk {session.risk:.2f} after untrusted content",
                                   sorted(session.labels) or ["Multi-Step Jailbreaks"]))
 
+    # 8b. explicit intent (reported after the more specific rules above) (docs/13 L1): a share/destructive tool the user never asked for is held for approval
+    if tp.intent_terms and not session.user_asked_for(tp.intent_terms):
+        checks.append(ActionCheck("action-not-requested", Decision.ESCALATE,
+                                  f"the user's messages do not ask for this action ({', '.join(tp.intent_terms[:4])}…)",
+                                  ["Tool Abuse"]))
+
     # 9. data flow (CORE-17): where each argument's text came from; flagged content into a high-risk tool
     taint = session.taint.trace(args, policy.taint.min_coverage) if policy.taint.enabled else []
     flagged = sorted({h.arg for h in taint if h.flagged})

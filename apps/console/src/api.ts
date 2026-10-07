@@ -174,6 +174,25 @@ export interface Metrics {
   providers: { provider: string; status: string; n: number }[];
 }
 
+export interface AgentSummary {
+  agent: string; org: string; mode: string; version: string; task_scope: string; tools: Record<string, string>;
+  upstream: { provider: string | null; model: string | null; key: string };
+}
+export interface ProviderInfo { name: string; type: string; configured: boolean; base_url: string }
+export interface PolicyTemplate { id: string; title: string; description: string; tools: Record<string, string>; mode: string }
+export interface Integration { id: string; title: string; when: string; language: string; code: string }
+export interface Connect {
+  agent: string; gateway_url: string; mode: string; upstream: AgentSummary["upstream"]; integrations: Integration[]; next: string[];
+}
+export interface SelfTest {
+  agent: string; mode: string; passed: boolean; note: string; ms: number;
+  checks: { check: string; decision: Decision; rule: string; passed: boolean; session_id: string }[];
+}
+export interface NewAgent {
+  agent: string; template: string; mode: "monitor" | "enforce"; task_scope?: string;
+  upstream: { provider: string | null; model: string | null; key: "gateway" | "client" };
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -221,6 +240,10 @@ export const api = {
   metrics: (hours = 24) => call<Metrics>(`/v1/metrics?hours=${hours}`),
   costs: (days = 7) => call<Costs>(`/v1/costs?days=${days}`),
   whoami: (key: string) => call<{ name: string; scope: string }>("/v1/whoami", undefined, key),
+  agents: () => call<AgentSummary[]>("/v1/agents"),
+  providers: () => call<ProviderInfo[]>("/v1/providers"),
+  templates: () => call<PolicyTemplate[]>("/v1/setup/templates"),
+  connect: (agent: string) => call<Connect>(`/v1/agents/${encodeURIComponent(agent)}/connect`),
 };
 
 /** Reviewer (admin-key) actions. The key is the reviewer's own, typed at sign-in; it is never part of the build. */
@@ -231,6 +254,10 @@ export const admin = {
     call<{ memory_id: string }>("/v1/feedback", { method: "POST", body: JSON.stringify({ verdict, event_id: eventId, labels, note }) }, key),
   forget: (key: string, memoryId: string) =>
     call<{ removed: boolean }>(`/v1/memory/${encodeURIComponent(memoryId)}`, { method: "DELETE" }, key),
+  createAgent: (key: string, body: NewAgent) =>
+    call<{ agent: string; mode: string; version: string; tools: string[] }>("/v1/agents", { method: "POST", body: JSON.stringify(body) }, key),
+  selfTest: (key: string, agent: string) =>
+    call<SelfTest>(`/v1/agents/${encodeURIComponent(agent)}/self-test`, { method: "POST" }, key),
   putPolicy: (key: string, agent: string, body: unknown) =>
     call<{ version: string; mode: string }>(`/v1/policies/${encodeURIComponent(agent)}`, { method: "PUT", body: JSON.stringify(body) }, key),
 };

@@ -38,15 +38,37 @@ Per-type and per-channel numbers, false alarms and method: [docs/EVALUATION.md](
 
 ## Protect an agent
 
-**Zero code, any language (LLM proxy).** Point the agent's OpenAI-compatible base URL at the gateway:
+Step-by-step for teams (who does what, provider keys, monitor → enforce): [docs/INTEGRATION.md](docs/INTEGRATION.md).
+In the Console, **Set up** registers an agent, gives the snippet for its stack, and runs a self-test.
+
+**Zero code, any language (LLM proxy).** Point the agent's model client at the gateway:
 
 ```bash
-OPENAI_BASE_URL=https://<gateway>/proxy/research-agent/v1 OPENAI_API_KEY=<gateway project key> python examples/openai_agent/agent.py
+# OpenAI SDK or any OpenAI-compatible client (LangChain, LlamaIndex, CrewAI, AutoGen, Vercel AI SDK, ...)
+OPENAI_BASE_URL=https://<gateway>/proxy/<agent>/v1  OPENAI_API_KEY=<IntentSeal project key>
+# Anthropic SDK (Claude)
+ANTHROPIC_BASE_URL=https://<gateway>/proxy/<agent>/anthropic  ANTHROPIC_API_KEY=<IntentSeal project key>
 ```
 
-User and tool messages are inspected before they reach the model; every tool call the model returns is checked
-before the agent sees it (blocked calls become a notice, pinned fields are rewritten). Streaming works: text
-streams through, tool calls are held until complete, checked, then released.
+User messages and tool results are inspected before they reach the model; every tool call the model returns is
+checked before the agent sees it (blocked calls become a notice, pinned fields are rewritten). Streaming works on
+both: text streams through, tool calls are held until complete, checked, then released. The agent's policy chooses
+the real model provider (`upstream:`), with the gateway's key or the agent's own (`X-Upstream-Key`, never stored).
+
+### Model providers
+
+| Provider | Agent traffic through the proxy | Gateway's own judge / roles |
+|---|---|---|
+| OpenAI | ✅ OpenAI path | ✅ |
+| Anthropic (Claude) | ✅ native Anthropic path (thinking, documents, cache control pass through), or the OpenAI path | ✅ native adapter (official SDK) |
+| Google Gemini | ✅ OpenAI path (Gemini's OpenAI-compatible endpoint) | ✅ (default free tier) |
+| Groq, Mistral, OpenRouter, NVIDIA NIM | ✅ OpenAI path | ✅ (default free tiers) |
+| Azure OpenAI | ✅ OpenAI path (`api-key` header) | ✅ |
+| DeepSeek, xAI, Together, any OpenAI-compatible API | ✅ OpenAI path | ✅ (one block in `config/providers.yaml`) |
+| Local models: Ollama, vLLM, LM Studio, llama.cpp | ✅ OpenAI path, no key | ✅ |
+| AWS Bedrock, Vertex AI native SDKs | Use the SDK or REST path | Not yet |
+
+The **SDK and REST paths work with any provider**: they inspect content and check tool calls, not the model call.
 
 **Python SDK (deepest protection).**
 
@@ -70,8 +92,13 @@ Keys are scoped (public, project, admin) and can belong to an organisation, so o
 **Run the gateway.** `docker compose up --build` (SQLite in a volume; PostgreSQL optional). Hosting, settings and
 operations: [docs/DEPLOY.md](docs/DEPLOY.md).
 
-Policies are YAML per agent (`policies/research-agent.yaml`): allowed tools, pinned fields, recipient and domain
-allow-lists, thresholds, session risk, budgets, data-flow (taint) rule, organisation, `monitor` or `enforce` mode.
+Policies are YAML per agent (`policies/research-agent.yaml`, starters in `config/policy-templates/`): allowed tools,
+pinned fields, recipient and domain allow-lists, explicit-intent terms for high-risk tools, thresholds, session risk,
+budgets, data-flow (taint) rule, upstream provider, organisation, `monitor` or `enforce` mode.
+
+Why IntentSeal and not a prompt classifier: it checks what the agent reads **and** what it does, links the two
+(where an argument's text came from), keeps working when detection misses, and records evidence. Market, moat and
+lessons from the 2025–2026 Kaggle agent-security competitions: [docs/13-market-moat-and-competition-lessons.md](docs/13-market-moat-and-competition-lessons.md).
 
 ## How it works
 

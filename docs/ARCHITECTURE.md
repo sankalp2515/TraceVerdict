@@ -24,7 +24,9 @@ LLM judge produce signals; no AI signal alone can allow high-risk content or a h
 | Python SDK, remote (SDK-6) | `intentseal/remote.py` | `Guard("agent", remote=URL, api_key=KEY)`: same API, decisions by the gateway |
 | LangChain / LangGraph (SDK-7) | `intentseal/langchain.py` | `tools = guard.protect_tools(tools)` (8 added or changed lines in `examples/langgraph_agent`, two of them its own docstring) |
 | Gateway API | `services/gateway/intentseal_gateway/app.py` | HTTP, any language; OpenAPI at `/docs` |
-| LLM proxy | `services/gateway/intentseal_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`); streaming supported (PRX-6) |
+| LLM proxy, OpenAI-compatible | `services/gateway/intentseal_gateway/proxy.py` | one setting: `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` (`examples/openai_agent`); streaming supported (PRX-6) |
+| LLM proxy, Anthropic Messages | same | one setting: `ANTHROPIC_BASE_URL=<gateway>/proxy/<agent>/anthropic`; native pass-through, streaming supported |
+| Onboarding | `services/gateway/intentseal_gateway/setup.py`, Console **Set up** | register from a template, copy the connection, run the self-test (docs/INTEGRATION.md) |
 
 All surfaces call `Engine.inspect` / `Engine.check_action` (CORE-1; `tests/test_sdk_surfaces.py` proves it per surface).
 
@@ -38,7 +40,8 @@ raw bytes/text
   -> normalise (CORE-3)      NFKC + ftfy, format characters removed, ASCII folding of look-alikes (detection views)
   -> decode (CORE-3)         base64/base64url, hex, Unicode tag characters, %-encoding, rot13 -> extra views
   -> memory (trainability)   reviewer-confirmed attack fingerprints -> rules block at Tier 0, no AI call
-  -> Tier 0 structural       non-visible content, encoded runs, invisible/mixed-script characters
+  -> Tier 0 structural       non-visible content, encoded runs, invisible/mixed-script characters, forged role /
+                             tool-call markers (chat-template tokens; stripped by policy, source code exempt)
   -> Tier 1 classifier       local open classifier (ONNX) on every chunk; an escalation signal only (D-011)
   -> Tier 2 judge            DecisionModel (free LLMs via the router); content passed as data between random
                              boundary markers; no tools; returns probability, 9-type labels, evidence quotes.
@@ -71,7 +74,9 @@ refused (`content-too-large`). Measured on CPU: 25 KB of HTML fully inspected in
 Deterministic checks, worst result wins: tool allowed → pinned fields rewritten from trusted session context →
 outbound scan (canaries, registered secrets, detect-secrets patterns) → recipient allow-list → URL domain
 allow-list → sandbox paths → provenance (a high-risk target that appears only in untrusted content) → session risk
-→ data flow (CORE-17, below). Allow-lists use the host and addresses a real client would use (`urlsplit`,
+→ explicit intent (`intent_terms`: a high-risk action the user's own words never ask for is escalated; the
+confused-deputy lesson, docs/13) → data flow (CORE-17, below). The outbound scan also reads decoded views of every
+argument (base64, hex, %-encoding, reversed, tag characters). Allow-lists use the host and addresses a real client would use (`urlsplit`,
 `email.utils.getaddresses`): fragment, user-part, backslash and display-name tricks fail (audit F1/F2, D-039).
 `ESCALATE` creates a pending approval (CON-9). A reviewer approval lets the *same* call in the *same* session run
 once (`human-approved`); approvals can never override a `BLOCK`.
@@ -102,14 +107,28 @@ Action violations add risk too, and high-risk tools are held in a risky session.
 | Modes (CORE-15) | `monitor` logs the same decisions as `enforce` but does not enforce them |
 | Caches | scan and judge results cached by content hash and context; enforcement and session state never cached |
 
-## 6. LLM router (CORE-11)
+## 6. Model providers
+
+Two separate questions, both provider-neutral:
+
+- **The gateway's own model calls** (judge, demo agent, default proxy upstream) go through the router (below). Adapters:
+  `openai_compatible` (OpenAI, Azure with an `api-key` header, Gemini, Groq, Mistral, OpenRouter, NVIDIA, DeepSeek, xAI,
+  Together, local servers with `no_auth`) and `anthropic` (native Messages API through the official SDK, translated to
+  and from the router's OpenAI shape, streaming and tool use included).
+- **An agent's own model calls through the proxy** follow its policy `upstream:` (provider, optional model override,
+  `key: gateway | client`). `call_upstream` makes one call to that provider: no failover and no shared cooldown (the
+  customer chose the provider, and a client key's rate limit is that client's); the provider's status code and
+  `Retry-After` are returned to the client. The Anthropic endpoint forwards the client's Messages body natively when
+  the upstream is Anthropic, and translates otherwise.
+
+## 7. LLM router (CORE-11)
 
 `config/providers.yaml` + `config/models.yaml`: roles (agent, judge, proxy upstream, …) map to ordered
 provider/model lists. Failover on 429/5xx/timeouts, circuit breaker, tokens-per-minute throttle, per-provider
 daily budgets, response cache, usage and equivalent cost recorded per call. One key per provider; spare keys
 are used only if a key is rejected (D-004).
 
-## 7. Trainability (PRD §7.2) and review
+## 8. Trainability (PRD §7.2) and review
 
 `intentseal_core/memory.py`: confirmed attacks (reviewer `POST /v1/feedback`, adversary-loop misses) are stored as
 keyed hashes of word 5-shingles, never as text. Later content whose shingles contain ≥ 60% of a stored attack
@@ -117,7 +136,7 @@ is blocked at Tier 0 (`known-attack-match`) without an AI call, including when i
 document. False-positive marks are exact-content and per agent; they skip the AI tiers but never structural
 rules or the action guard.
 
-## 8. Gateway API
+## 9. Gateway API
 
 | Endpoint | Scope | PRD |
 |---|---|---|
@@ -133,6 +152,10 @@ rules or the action guard.
 | `POST /proxy/v1/chat/completions`, `POST /proxy/{agent}/v1/chat/completions` (streaming: text streams through, tool calls buffered, checked, then released) | project | PRX-1..6 |
 | `GET /v1/export/decisions?since=&format=jsonl\|cef` (SIEM pull, resumable) | project | API-12 |
 | `GET /v1/whoami` (scope, organisation, visible agents) | public | D-037 |
+| `GET /v1/agents`, `GET /v1/providers`, `GET /v1/setup/templates`, `GET /v1/agents/{agent}/connect` | public | D-049 |
+| `POST /v1/agents` (create from a template) | admin | D-049 |
+| `POST /v1/agents/{agent}/self-test` | project | D-049 |
+| `POST /proxy/{agent}/anthropic/v1/messages` (Anthropic Messages, streaming) | project | D-048 |
 | `GET /healthz` (liveness), `GET /readyz` (database, policies, Tier 1 classifier; LLM providers reported) | open | API-10, B1 |
 
 Gateway self-security: API keys hashed at rest, scopes (public < project < admin), per-key rate limits (the
@@ -152,7 +175,7 @@ are all in the default organisation behaves as a single tenant.
 through a bounded queue (delivery counters in `/v1/metrics`). Records carry redacted reasons and scores, never
 content or arguments.
 
-## 9. Evaluation
+## 10. Evaluation
 
 ```
 promptfoo (MIT) / garak (Apache-2.0)  ->  attack cases (we never author attack text: D-005, D-014)
@@ -164,7 +187,7 @@ python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.jso
 Outcomes are deterministic (EVAL-5): canary checks, sandbox outbox, executed tool calls. False positives are
 measured on a development benign set and on a held-out benign set written before any tuning.
 
-## 10. Data (SQLite or PostgreSQL)
+## 11. Data (SQLite or PostgreSQL)
 
 `sessions`, `events`, `findings`, `decisions`, `actions` (incl. data-flow taint), `approvals`, `memory`,
 `llm_usage`, `llm_cache`. SQLite by default; PostgreSQL with `INTENTSEAL_DATABASE_URL` (psycopg 3, optional extra
@@ -174,7 +197,7 @@ Schema changes are additive only, so an older image runs on a newer database (ro
 No raw content is stored: content hash + redacted preview (or hash only with `INTENTSEAL_STORE_PREVIEWS=0`, the
 Docker image default).
 
-## 11. Deployment
+## 12. Deployment
 
 `Dockerfile` (gateway; classifier baked in, uid 1000, `/data` volume, HEALTHCHECK on `/readyz`),
 `docker-compose.yml` (optional PostgreSQL profile), `python -m intentseal_gateway` (one worker: sessions, rate limits

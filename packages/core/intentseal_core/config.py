@@ -111,14 +111,16 @@ def load_providers(path: Path | None = None) -> dict[str, ProviderConfig]:
         known = {
             "type", "enabled", "base_url", "keys", "priority", "timeout_s", "connect_timeout_s",
             "retries", "backoff_base_s", "backoff_max_s", "circuit_failures", "circuit_open_s",
-            "key_rotation", "limits", "budget", "extra_headers",
+            "key_rotation", "limits", "budget", "extra_headers", "no_auth",
         }
         out[name] = ProviderConfig(
             name=name,
             type=merged.get("type", "openai_compatible"),
             enabled=bool(merged.get("enabled", True)),
             base_url=str(merged.get("base_url", "")).rstrip("/"),
-            keys=load_keys(name, keys_cfg.get("env_prefix"), keys_cfg.get("env_list")),
+            # `no_auth: true` (local servers such as Ollama or vLLM): one empty key, so the provider is usable.
+            keys=([ApiKey(f"{name}#local", "")] if merged.get("no_auth")
+                  else load_keys(name, keys_cfg.get("env_prefix"), keys_cfg.get("env_list"))),
             priority=int(merged.get("priority", 50)),
             timeout_s=float(merged.get("timeout_s", 30)),
             connect_timeout_s=float(merged.get("connect_timeout_s", 5)),

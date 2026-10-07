@@ -1,0 +1,36 @@
+# Local or single-host deployment of the IntentSeal Gateway (docs/DEPLOY.md).
+#
+#   docker compose up --build                      # gateway on :8000, SQLite in the intentseal-data volume
+#   docker compose --profile postgres up --build   # plus PostgreSQL; set INTENTSEAL_DATABASE_URL (below) in .env
+#
+# Secrets and settings come from .env (copy .env.example). Nothing secret is written here.
+services:
+  gateway:
+    build: .
+    image: intentseal-gateway
+    env_file: .env
+    environment:
+      # INTENTSEAL_DATABASE_URL: postgresql://intentseal:${POSTGRES_PASSWORD}@postgres:5432/intentseal
+      PORT: "8000"
+    ports: ["8000:8000"]
+    volumes: ["intentseal-data:/data"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: intentseal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: intentseal
+    volumes: ["intentseal-pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intentseal"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  intentseal-data:
+  intentseal-pg:

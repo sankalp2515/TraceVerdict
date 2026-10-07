@@ -503,3 +503,31 @@ def test_openai_sdk_streaming_client_gets_checked_tool_call(env):
                 names.append(call.function.name)
                 args += call.function.arguments or ""
         assert names == ["query_db"] and json.loads(args) == {"customer_id": "C-1042"} and text.startswith("Checking")
+
+
+def test_readiness_reports_checks(env):
+    with make_client(env) as c:
+        r = c.get("/readyz")
+        assert r.status_code == 200 and r.json()["ready"] and r.json()["checks"]["database"]
+        assert r.json()["judge"].startswith("unavailable")          # the fake router has no providers configured
+
+
+def test_demo_runs_have_an_hourly_cap(env, monkeypatch):
+    monkeypatch.setenv("INTENTSEAL_DEMO_RUNS_PER_HOUR", "1")
+    router = FakeRouter(content="Costs fell 12%.")
+    with make_client(env, router) as c:
+        assert c.post("/demo/run", json={"scenario_id": "S8", "protection": "off"}, headers=H(PUBLIC)).status_code == 200
+        r = c.post("/demo/run", json={"scenario_id": "S8", "protection": "off"}, headers=H(PUBLIC))
+        assert r.status_code == 429 and int(r.headers["retry-after"]) > 0
+
+
+def test_gateway_entry_point_seeds_a_writable_policy_dir(monkeypatch, tmp_path):
+    from intentseal_gateway.__main__ import seed_policies
+
+    target = tmp_path / "data" / "policies"
+    monkeypatch.setenv("INTENTSEAL_POLICY_DIR", str(target))
+    seed_policies()
+    assert (target / "research-agent.yaml").exists()
+    (target / "research-agent.yaml").write_text("agent: research-agent\nmode: enforce\n", encoding="utf-8")
+    seed_policies()                                                   # never overwrites edited policies
+    assert "mode: enforce" in (target / "research-agent.yaml").read_text(encoding="utf-8")

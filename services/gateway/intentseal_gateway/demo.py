@@ -73,7 +73,9 @@ async def run_proxy_scenario(app: Any, s: dict[str, Any], protection: str) -> di
     import httpx
     from openai import AsyncOpenAI
 
-    sys.path.insert(0, str(repo_root() / "examples" / "openai_agent"))
+    example = str(repo_root() / "examples" / "openai_agent")
+    if example not in sys.path:
+        sys.path.insert(0, example)
     import agent as plain_agent
 
     agent_id = "research-agent" if protection == "on" else "research-agent-monitor"

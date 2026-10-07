@@ -1,0 +1,16 @@
+# Only what the gateway image copies; everything else stays out of the build context.
+*
+!requirements.lock
+!packages/
+!agents/
+!services/
+!config/
+!policies/
+!eval/scenarios/
+!eval/reports/*.json
+!examples/openai_agent/
+**/__pycache__
+**/*.egg-info
+**/*.pyc
+.env
+.env.*

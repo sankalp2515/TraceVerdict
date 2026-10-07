@@ -136,6 +136,25 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     async def healthz(request: Request) -> dict[str, Any]:
         return {"ok": True, "uptime_s": round(time.time() - request.app.state.started, 1)}
 
+    @app.get("/readyz", tags=["ops"])
+    async def readyz(request: Request) -> JSONResponse:
+        """Readiness: database answers, policies load, Tier 1 classifier loaded. LLM providers are reported, not
+        required: without them flagged content is held (fail closed), which is degraded but safe."""
+        e = request.app.state.engine
+        from intentseal_core.classifier import tier1_status
+        from intentseal_core.policy import list_policies
+
+        tier1 = {"loaded": True, "error": ""} if e.classifiers is not None else tier1_status()
+        router = getattr(e, "router", None)
+        settings = getattr(router, "settings", None)
+        providers = sum(1 for p in settings.providers.values() if p.active) if settings else 0
+        checks = {"database": e.store.ping(), "policies": bool(list_policies()) or not e._policy_files[1],
+                  "tier1_classifier": bool(tier1["loaded"]), "llm_providers": providers}
+        ready = checks["database"] and checks["policies"] and checks["tier1_classifier"]
+        body = {"ready": ready, "checks": checks, "tier1_error": tier1["error"] or None,
+                "judge": "available" if providers else "unavailable: flagged content is held"}
+        return JSONResponse(body, status_code=200 if ready else 503)
+
     @app.get("/v1/whoami", tags=["ops"])
     async def whoami(request: Request, p: Principal = require("public")) -> dict[str, Any]:
         """Which key is this? Lets the Console confirm a reviewer key is admin-scoped before showing reviewer actions."""
@@ -412,6 +431,13 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     @app.post("/demo/run", tags=["demo"])
     async def demo_run(body: DemoRequest, request: Request, p: Principal = require("public")) -> dict[str, Any]:
         from .demo import run_scenario
+        # Demo runs spend the deployment's free LLM quota: a global hourly cap on top of the per-client rate limit.
+        now, cap = time.time(), int(os.environ.get("INTENTSEAL_DEMO_RUNS_PER_HOUR") or "60")
+        runs = [t for t in getattr(request.app.state, "demo_runs", []) if now - t < 3600]
+        if len(runs) >= cap:
+            raise HTTPException(429, "the live demo has reached its hourly limit; try again later",
+                                headers={"Retry-After": str(int(3600 - (now - runs[0])) + 1)})
+        request.app.state.demo_runs = runs + [now]
         try:
             return await run_scenario(request.app.state.engine, body.scenario_id, body.protection, app=request.app)
         except KeyError:

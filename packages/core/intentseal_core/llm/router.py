@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 from ..config import ModelRef, ProviderConfig, RoleConfig, Settings, load_settings
-from ..secrets import ApiKey, install_log_redaction
+from ..secrets import ApiKey, install_log_redaction, registry
 from ..store import Store
 from .adapters import AdapterResponse, ChatRequest, ProviderError, get_adapter
 
@@ -372,6 +372,48 @@ class Router:
                               provider=p.name, model=ref.model, key_alias=key.alias,
                               input_tokens=r.input_tokens, output_tokens=r.output_tokens, latency_ms=ms,
                               est_cost_usd=cost, cached=False, attempts=attempts)
+
+    # ---- the proxy's per-agent upstream (the agent's own provider and model) -------------------
+    async def call_upstream(self, provider: str, model: str, req: ChatRequest, client_key: str | None = None,
+                            stream: bool = False, role: str = "proxy_upstream") -> Any:
+        """One provider and one model, chosen by the agent's policy rather than a role list: no failover (the
+        customer chose the provider) and no shared cooldown or circuit state (a client key's rate limit is that
+        client's). Retries transient errors only. Errors propagate as ProviderError so the proxy can answer with
+        the provider's own status. `client_key`: the agent's own provider key (never stored, redacted in logs)."""
+        p = self.settings.providers.get(provider)
+        if p is None or not p.enabled:
+            raise ProviderError("bad_request", f"upstream provider '{provider}' is not configured or disabled")
+        if client_key:
+            registry.register(client_key)
+            key = ApiKey(f"{p.name}#client-{hashlib.sha256(client_key.encode()).hexdigest()[:8]}", client_key)
+        else:
+            keys = self.healthy_keys(p)
+            if not keys:
+                raise ProviderError("auth_failed", f"no key configured on the gateway for upstream '{provider}'")
+            key = keys[0]
+        adapter = get_adapter(p.type)
+        ref = ModelRef(p.name, model)
+        for attempt in range(1 + max(0, p.retries)):
+            t0 = time.perf_counter()
+            try:
+                if stream:
+                    handle = await adapter.open_stream(p, key, model, req, self.client, None)
+                    return ChatStream(self, role, p, ref, key.alias, handle, t0, [])
+                r: AdapterResponse = await adapter.chat(p, key, model, req, self.client, None)
+            except ProviderError as e:
+                self.store.record_usage(role=role, provider=p.name, key_alias=key.alias, model=model, status=e.kind,
+                                        http_status=e.http_status, latency_ms=(time.perf_counter() - t0) * 1000, error=str(e))
+                if e.kind in ("server_error", "timeout") and attempt < p.retries:
+                    await self._sleep(self._backoff(p, attempt + 1))
+                    continue
+                raise
+            ms = (time.perf_counter() - t0) * 1000
+            self.store.record_usage(role=role, provider=p.name, key_alias=key.alias, model=model, status="ok",
+                                    http_status=200, latency_ms=ms, input_tokens=r.input_tokens, output_tokens=r.output_tokens)
+            return ChatResult(content=r.content, tool_calls=r.tool_calls, finish_reason=r.finish_reason, provider=p.name,
+                              model=model, key_alias=key.alias, input_tokens=r.input_tokens, output_tokens=r.output_tokens,
+                              latency_ms=ms, est_cost_usd=0.0, cached=False, attempts=[])
+        raise ProviderError("server_error", "upstream unavailable")   # pragma: no cover - loop always returns or raises
 
     # ---- direct calls (used by `providers check` and validation) ---------------------------
     async def call_direct(self, provider: str, model: str, req: ChatRequest, key: ApiKey | None = None,

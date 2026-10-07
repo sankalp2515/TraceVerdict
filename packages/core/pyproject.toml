@@ -28,6 +28,7 @@ dependencies = [
 classifiers = ["onnxruntime>=1.17", "tokenizers>=0.15", "huggingface_hub>=0.23", "numpy>=1.26"]
 ocr = ["rapidocr-onnxruntime>=1.3", "pillow>=10"]
 postgres = ["psycopg[binary]>=3.2"]
+anthropic = ["anthropic>=1.12"]
 
 [project.scripts]
 intentseal = "intentseal_core.cli:main"

@@ -1,12 +1,20 @@
-"""LLM Proxy (PRX-1…PRX-5): OpenAI-compatible /proxy/v1/chat/completions.
+"""LLM proxy (PRX-1…PRX-6): put IntentSeal between an unmodified agent and its model, by base URL alone.
 
-An unmodified agent changes only its base URL. The agent is named in the URL
-(`/proxy/<agent_id>/v1`, so OPENAI_BASE_URL alone is enough) or by the X-Agent-Id header; the session comes from
-X-Session-Id or, for clients that send neither, from a fingerprint of the conversation's opening messages
-(PRX-5). The proxy inspects user and tool messages before forwarding (PRX-2) - each message once per session;
-its decision, including neutralised text, is re-applied when the client resends the history - forwards through
-the router to free upstream providers (PRX-4), and checks every tool call the model returns (PRX-3): blocked
-calls are removed and replaced by a notice; pinned fields are rewritten. System messages are trusted.
+Two wire formats, one checkpoint:
+  OpenAI-compatible   POST /proxy/<agent>/v1/chat/completions        OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1
+  Anthropic Messages  POST /proxy/<agent>/anthropic/v1/messages      ANTHROPIC_BASE_URL=<gateway>/proxy/<agent>/anthropic
+
+The client authenticates with its gateway key (the SDK's api key). The session comes from X-Session-Id or, for
+clients that send none, from a fingerprint of the conversation's opening (PRX-5). Every user message and every tool
+result is inspected before the model sees it (PRX-2), each once per session; its decision is re-applied when the
+client resends the history. Every tool call the model returns is checked before the agent sees it (PRX-3): blocked
+calls are removed and replaced by a notice, pinned fields are rewritten. Streaming: text streams through, tool calls
+are buffered, checked, then released (PRX-6). System messages are the operator's and are trusted.
+
+Where the call goes (PRX-4) is the agent's policy `upstream:` - its own provider and model (OpenAI, Anthropic,
+Gemini, Groq, Azure OpenAI, a local server, ...) with the gateway's key or the agent's own key (X-Upstream-Key) -
+or, when unset, the gateway's `proxy_upstream` role (free-tier models used by the demo and the evaluation).
+Provider errors are returned with the provider's own status code, so client retry logic keeps working.
 """
 
 from __future__ import annotations
@@ -21,8 +29,9 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from intentseal_core.llm.adapters import ChatRequest
+from intentseal_core.llm.adapters import ChatRequest, ProviderError, get_adapter
 from intentseal_core.llm.router import AllProvidersFailed
+from intentseal_core.secrets import ApiKey, registry
 from intentseal_core.types import Decision
 
 from .security import Principal, require
@@ -30,29 +39,109 @@ from .tenancy import require_agent
 
 router = APIRouter(tags=["proxy"])
 PROXY_ROLE = "proxy_upstream"
+_SEEN_MAX = 2000   # sessions whose per-message decisions are kept in memory
+# Request fields the proxy itself handles; everything else is forwarded to the agent's own upstream unchanged.
+_OPENAI_HANDLED = {"model", "messages", "tools", "tool_choice", "temperature", "max_tokens", "stream", "stream_options", "n"}
+_STATUS = {"rate_limited": 429, "auth_failed": 401, "not_found": 404, "bad_request": 400, "timeout": 504}
 
 
 def _text(content: Any) -> str:
-    if isinstance(content, list):   # OpenAI content parts
+    if isinstance(content, list):   # OpenAI content parts / Anthropic text blocks
         return "\n".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
     return content or ""
 
 
-_SEEN_MAX = 2000   # sessions whose per-message decisions are kept in memory
-
-
-def _seen(request: Request) -> OrderedDict[str, dict[str, tuple[str, dict[str, Any] | None]]]:
+def _seen(request: Request, session_id: str) -> dict[str, tuple[str, dict[str, Any] | None]]:
     state = request.app.state
     if not hasattr(state, "proxy_seen"):
         state.proxy_seen = OrderedDict()
-    return state.proxy_seen
+    seen = state.proxy_seen.setdefault(session_id, {})
+    state.proxy_seen.move_to_end(session_id)
+    while len(state.proxy_seen) > _SEEN_MAX:
+        state.proxy_seen.popitem(last=False)
+    return seen
 
 
-def _conversation_id(agent_id: str, messages: list[dict[str, Any]]) -> str:
-    """Stable id for clients that send no session header: the system prompt + first user message."""
-    opening = [(m.get("role"), _text(m.get("content"))) for m in messages if m.get("role") in ("system", "user")][:2]
-    return "conv-" + hashlib.sha256(json.dumps([agent_id, opening]).encode()).hexdigest()[:16]
+def _session(request: Request, agent_id: str, opening: list[Any], first_user: str) -> str:
+    """X-Session-Id, or a stable id from the system prompt + first user message (PRX-5)."""
+    engine = request.app.state.engine
+    sid = request.headers.get("x-session-id") or (
+        "conv-" + hashlib.sha256(json.dumps([agent_id, opening], default=str).encode()).hexdigest()[:16])
+    if sid not in engine.sessions:
+        engine.start_session(agent_id, task=first_user, session_id=sid)
+    return sid
 
+
+async def _inspect(request: Request, agent_id: str, session_id: str, source: str, text: str,
+                   findings: list[dict[str, Any]]) -> str | None:
+    """PRX-2: the text the model may see instead of `text`, or None when it is allowed unchanged."""
+    if not text:
+        return None
+    seen = _seen(request, session_id)
+    key = hashlib.sha256(f"{source}\n{text}".encode()).hexdigest()
+    if key not in seen:
+        r = await request.app.state.engine.inspect(text, source, agent_id, session_id=session_id)
+        if r.enforced == Decision.ALLOW:
+            seen[key] = (text, None)
+        else:
+            replacement = (r.cleaned_content if r.enforced == Decision.NEUTRALISE
+                           else f"[Content withheld by the security policy: {r.reason}]")
+            seen[key] = (replacement, {"source": source, "decision": r.enforced.value, "rule": r.policy_rule,
+                                       "labels": r.labels, "event_id": r.event_id})
+    replacement, finding = seen[key]
+    if finding is None:
+        return None
+    findings.append(finding)
+    return replacement
+
+
+async def _check(engine: Any, name: str, args: Any, agent_id: str, session_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    """PRX-3: (arguments to release, None) when allowed (pinned fields rewritten), (None, notice) when not."""
+    if not isinstance(args, dict):
+        args = {"_raw": args}
+    ar = await engine.check_action(name, args, agent_id, session_id=session_id)
+    if ar.enforced == Decision.ALLOW:
+        return (ar.final_args if ar.pinned_overrides else args), None
+    return None, ar.notice or f"Tool call '{name}' was blocked by the security policy."
+
+
+async def _check_tool_calls(engine: Any, tool_calls: list[dict[str, Any]], agent_id: str,
+                            session_id: str) -> tuple[list[dict[str, Any]], list[str]]:
+    kept, notices = [], []
+    for tc in tool_calls:
+        fn = tc.get("function") or {}
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except json.JSONDecodeError:
+            args = {"_raw": fn.get("arguments")}
+        final, notice = await _check(engine, fn.get("name", ""), args, agent_id, session_id)
+        if notice:
+            notices.append(notice)
+        else:
+            kept.append({**tc, "function": {**fn, "arguments": json.dumps(final) if final is not args else fn.get("arguments", "{}")}})
+    return kept, notices
+
+
+def _upstream(request: Request, agent_id: str) -> tuple[Any, str | None]:
+    """The agent's upstream policy and the client's own provider key (if the policy asks for one)."""
+    up = request.app.state.engine.policy_loader(agent_id).upstream
+    client_key = request.headers.get("x-upstream-key") if up.key == "client" else None
+    if up.provider and up.key == "client" and not client_key:
+        raise ProviderError("auth_failed", "this agent forwards its own provider key: send it in the X-Upstream-Key header", 401)
+    return up, client_key
+
+
+def _openai_error(e: Exception) -> JSONResponse:
+    if isinstance(e, AllProvidersFailed):
+        return JSONResponse({"error": {"message": "all upstream providers unavailable", "type": "upstream_unavailable",
+                                       "detail": str(e)[:300]}}, status_code=503)
+    kind = getattr(e, "kind", "error")
+    status = getattr(e, "http_status", None) or _STATUS.get(kind, 502)
+    headers = {"Retry-After": str(int(e.retry_after_s))} if getattr(e, "retry_after_s", None) else None
+    return JSONResponse({"error": {"message": str(e)[:300], "type": kind, "code": status}}, status_code=status, headers=headers)
+
+
+# ---- OpenAI-compatible ---------------------------------------------------------------------------------------
 
 @router.post("/proxy/v1/chat/completions")
 async def chat_completions(request: Request, p: Principal = require("project")) -> Any:
@@ -70,63 +159,54 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
         body = await request.json()
     except ValueError:
         body = None
-    if not isinstance(body, dict) or not isinstance(body.get("messages", []), list)             or not all(isinstance(m, dict) for m in body.get("messages", [])):
+    messages_ok = isinstance(body, dict) and isinstance(body.get("messages", []), list) \
+        and all(isinstance(m, dict) for m in body.get("messages", []))
+    if not messages_ok:
         return JSONResponse({"error": {"message": "body must be a chat completion request with a messages list",
                                        "type": "invalid_request_error"}}, status_code=422)
     engine = request.app.state.engine
     messages: list[dict[str, Any]] = [dict(m) for m in body.get("messages", [])]
-    session_id = request.headers.get("x-session-id") or _conversation_id(agent_id, messages)
-    if session_id not in engine.sessions:
-        first_user = next((_text(m.get("content")) for m in messages if m.get("role") == "user"), "")
-        engine.start_session(agent_id, task=first_user, session_id=session_id)
-    seen = _seen(request).setdefault(session_id, {})
-    _seen(request).move_to_end(session_id)
-    while len(_seen(request)) > _SEEN_MAX:
-        _seen(request).popitem(last=False)
+    opening = [(m.get("role"), _text(m.get("content"))) for m in messages if m.get("role") in ("system", "user")][:2]
+    first_user = next((_text(m.get("content")) for m in messages if m.get("role") == "user"), "")
+    session_id = _session(request, agent_id, opening, first_user)
 
-    # PRX-2: inspect user and tool messages (each once per session); tool_call ids give the source label.
     call_names: dict[str, str] = {}
-    findings_summary: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
     for m in messages:
-        role = m.get("role")
         for tc in m.get("tool_calls") or []:
             call_names[tc.get("id", "")] = (tc.get("function") or {}).get("name", "tool")
-        if role not in ("user", "tool"):
+        if m.get("role") not in ("user", "tool"):
             continue
-        source = "user" if role == "user" else f"tool:{call_names.get(m.get('tool_call_id', ''), 'tool')}"
-        text = _text(m.get("content"))
-        if not text:
-            continue
-        key = hashlib.sha256(f"{source}\n{text}".encode()).hexdigest()
-        if key not in seen:
-            r = await engine.inspect(text, source, agent_id, session_id=session_id)
-            if r.enforced == Decision.ALLOW:
-                seen[key] = (text, None)
-            else:
-                replacement = (r.cleaned_content if r.enforced == Decision.NEUTRALISE
-                               else f"[Content withheld by the security policy: {r.reason}]")
-                seen[key] = (replacement, {"source": source, "decision": r.enforced.value, "rule": r.policy_rule,
-                                           "labels": r.labels, "event_id": r.event_id})
-        replacement, finding = seen[key]
-        if finding is not None:
-            findings_summary.append(finding)
+        source = "user" if m["role"] == "user" else f"tool:{call_names.get(m.get('tool_call_id', ''), 'tool')}"
+        replacement = await _inspect(request, agent_id, session_id, source, _text(m.get("content")), findings)
+        if replacement is not None:
             m["content"] = replacement
 
-    req = ChatRequest(messages=messages, tools=body.get("tools"), tool_choice=body.get("tool_choice"),
-                      temperature=body.get("temperature", 0), max_tokens=body.get("max_tokens") or 1024)
-    security = {"session_id": session_id, "inbound": findings_summary}
-    if body.get("stream"):
-        try:
-            upstream = await engine.router.stream_chat(PROXY_ROLE, req)
-        except AllProvidersFailed as e:
-            return _unavailable(e)
-        include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
-        return StreamingResponse(_stream(engine, upstream, agent_id, session_id, security, include_usage),
-                                 media_type="text/event-stream")
     try:
-        res = await engine.router.chat(PROXY_ROLE, req)
-    except AllProvidersFailed as e:
-        return _unavailable(e)
+        up, client_key = _upstream(request, agent_id)
+    except ProviderError as e:
+        return _openai_error(e)
+    if up.provider:   # the agent's own provider and model; its other request fields pass through unchanged
+        req = ChatRequest(messages=messages, tools=body.get("tools"), tool_choice=body.get("tool_choice"),
+                          temperature=body.get("temperature"), max_tokens=body.get("max_tokens"),
+                          extra={k: v for k, v in body.items() if k not in _OPENAI_HANDLED})
+        model = up.model or body.get("model") or ""
+    else:             # the gateway's own free-tier role (demo, evaluation)
+        req = ChatRequest(messages=messages, tools=body.get("tools"), tool_choice=body.get("tool_choice"),
+                          temperature=body.get("temperature", 0), max_tokens=body.get("max_tokens") or 1024)
+        model = ""
+    security = {"session_id": session_id, "inbound": findings}
+    try:
+        if body.get("stream"):
+            upstream = (await engine.router.call_upstream(up.provider, model, req, client_key, stream=True) if up.provider
+                        else await engine.router.stream_chat(PROXY_ROLE, req))
+            include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
+            return StreamingResponse(_stream(engine, upstream, agent_id, session_id, security, include_usage,
+                                             model if up.provider else None), media_type="text/event-stream")
+        res = (await engine.router.call_upstream(up.provider, model, req, client_key) if up.provider
+               else await engine.router.chat(PROXY_ROLE, req))
+    except (AllProvidersFailed, ProviderError) as e:
+        return _openai_error(e)
 
     kept, notices = await _check_tool_calls(engine, res.tool_calls, agent_id, session_id)
     content = res.content or ""
@@ -137,7 +217,7 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
         message["tool_calls"] = kept
     return {
         "id": "chatcmpl-" + uuid.uuid4().hex[:24], "object": "chat.completion", "created": int(time.time()),
-        "model": f"{res.provider}/{res.model}",
+        "model": res.model if up.provider else f"{res.provider}/{res.model}",
         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if kept else "stop"}],
         "usage": {"prompt_tokens": res.input_tokens, "completion_tokens": res.output_tokens,
                   "total_tokens": res.input_tokens + res.output_tokens},
@@ -145,45 +225,17 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
     }
 
 
-def _unavailable(e: Exception) -> JSONResponse:
-    return JSONResponse({"error": {"message": "all upstream providers unavailable", "type": "upstream_unavailable",
-                                   "detail": str(e)[:300]}}, status_code=503)
-
-
-async def _check_tool_calls(engine: Any, tool_calls: list[dict[str, Any]], agent_id: str,
-                            session_id: str) -> tuple[list[dict[str, Any]], list[str]]:
-    """PRX-3: check each tool call before the agent can run it. Blocked calls become notices; pinned fields are
-    rewritten in the released call."""
-    kept, notices = [], []
-    for tc in tool_calls:
-        fn = tc.get("function") or {}
-        try:
-            args = json.loads(fn.get("arguments") or "{}")
-        except json.JSONDecodeError:
-            args = {"_raw": fn.get("arguments")}
-        if not isinstance(args, dict):
-            args = {"_raw": fn.get("arguments")}
-        ar = await engine.check_action(fn.get("name", ""), args, agent_id, session_id=session_id)
-        if ar.enforced == Decision.ALLOW:
-            if ar.pinned_overrides:
-                tc = {**tc, "function": {**fn, "arguments": json.dumps(ar.final_args)}}
-            kept.append(tc)
-        else:
-            notices.append(ar.notice or f"Tool call '{fn.get('name')}' was blocked by the security policy.")
-    return kept, notices
-
-
 def _sse(obj: Any) -> str:
     return f"data: {json.dumps(obj)}\n\n"
 
 
 async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, security: dict[str, Any],
-                  include_usage: bool):
+                  include_usage: bool, model_name: str | None = None):
     """PRX-6: text deltas stream through as they arrive; tool-call deltas are buffered until the upstream stream
     ends, assembled, checked, and only then released (allowed calls) or replaced by a notice (blocked calls).
     If the upstream fails part-way, buffered tool calls are never released."""
     cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
-    model = f"{upstream.provider}/{upstream.model}"
+    model = model_name or f"{upstream.provider}/{upstream.model}"
 
     def chunk(delta: dict[str, Any], finish: str | None = None, **extra: Any) -> str:
         return _sse({"id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
@@ -229,3 +281,228 @@ async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, se
                     "usage": {"prompt_tokens": h.input_tokens, "completion_tokens": h.output_tokens,
                               "total_tokens": h.input_tokens + h.output_tokens}})
     yield "data: [DONE]\n\n"
+
+
+# ---- Anthropic Messages ------------------------------------------------------------------------------------
+
+def _anthropic_error(e: Exception) -> JSONResponse:
+    kind = getattr(e, "kind", "upstream_unavailable" if isinstance(e, AllProvidersFailed) else "error")
+    status = 503 if isinstance(e, AllProvidersFailed) else (getattr(e, "http_status", None) or _STATUS.get(kind, 502))
+    etype = {429: "rate_limit_error", 401: "authentication_error", 403: "permission_error", 404: "not_found_error",
+             400: "invalid_request_error"}.get(status, "api_error")
+    headers = {"Retry-After": str(int(e.retry_after_s))} if getattr(e, "retry_after_s", None) else None
+    return JSONResponse({"type": "error", "error": {"type": etype, "message": str(e)[:300]}}, status_code=status,
+                        headers=headers)
+
+
+@router.post("/proxy/{agent_id}/anthropic/v1/messages")
+async def anthropic_messages(agent_id: str, request: Request, p: Principal = require("project")) -> Any:
+    """Anthropic Messages API, protected: point the Anthropic SDK's base URL at /proxy/<agent>/anthropic."""
+    from intentseal_core.llm import anthropic_adapter as fmt
+
+    require_agent(request, p, agent_id)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("messages"), list) \
+            or not all(isinstance(m, dict) for m in body["messages"]) or not body.get("model"):
+        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error",
+                                                        "message": "body must be a Messages request with model and messages"}},
+                            status_code=400)
+    engine = request.app.state.engine
+    body = json.loads(json.dumps(body))   # private copy: inspection rewrites content in place
+    first_user = next((_text(m["content"]) if isinstance(m.get("content"), list) else str(m.get("content") or "")
+                       for m in body["messages"] if m.get("role") == "user"), "")
+    system = body.get("system")
+    opening = [_text(system) if isinstance(system, list) else system, first_user]
+    session_id = _session(request, agent_id, opening, first_user)
+
+    findings: list[dict[str, Any]] = []
+    tool_names: dict[str, str] = {}
+    for m in body["messages"]:
+        content = m.get("content")
+        if m.get("role") == "assistant":
+            for block in content if isinstance(content, list) else []:
+                if block.get("type") == "tool_use":
+                    tool_names[block.get("id", "")] = block.get("name", "tool")
+            continue
+        if isinstance(content, str):
+            replacement = await _inspect(request, agent_id, session_id, "user", content, findings)
+            if replacement is not None:
+                m["content"] = replacement
+            continue
+        for block in content or []:
+            if block.get("type") == "text":
+                replacement = await _inspect(request, agent_id, session_id, "user", block.get("text", ""), findings)
+                if replacement is not None:
+                    block["text"] = replacement
+            elif block.get("type") == "tool_result":
+                c = block.get("content")
+                text = _text(c) if isinstance(c, list) else ("" if c is None else str(c))
+                source = f"tool:{tool_names.get(block.get('tool_use_id', ''), 'tool')}"
+                replacement = await _inspect(request, agent_id, session_id, source, text, findings)
+                if replacement is not None:
+                    block["content"] = replacement
+
+    try:
+        up, client_key = _upstream(request, agent_id)
+        provider = engine.router.settings.providers.get(up.provider) if up.provider else None
+        if provider is not None and provider.type == "anthropic":   # native: every Messages feature passes through
+            body["model"] = up.model or body["model"]
+            stream = bool(body.pop("stream", False))
+            key = _key(engine, provider, client_key)
+            out = await get_adapter("anthropic").messages(provider, key, body, stream=stream)
+            if stream:
+                return StreamingResponse(_anthropic_stream(engine, out, agent_id, session_id, findings, provider.name,
+                                                           body["model"], key.alias), media_type="text/event-stream")
+            _record(engine, provider.name, body["model"], key.alias, out.get("usage") or {})
+            return await _anthropic_checked(engine, out, agent_id, session_id, findings)
+        # Any other upstream (or the gateway's own role): translate through the router's shape.
+        req = fmt.from_messages_request(body)
+        model = up.model or body["model"]
+        res = (await engine.router.call_upstream(up.provider, model, req, client_key) if up.provider
+               else await engine.router.chat(PROXY_ROLE, req))
+    except (AllProvidersFailed, ProviderError) as e:
+        return _anthropic_error(e)
+    msg = fmt.to_message(res.content, res.tool_calls, res.finish_reason, model if up.provider else body["model"],
+                         res.input_tokens, res.output_tokens)
+    checked = await _anthropic_checked(engine, msg, agent_id, session_id, findings)
+    if body.get("stream"):
+        return StreamingResponse(_anthropic_events(checked), media_type="text/event-stream")
+    return checked
+
+
+def _key(engine: Any, provider: Any, client_key: str | None) -> ApiKey:
+    if client_key:
+        registry.register(client_key)
+        return ApiKey(f"{provider.name}#client-{hashlib.sha256(client_key.encode()).hexdigest()[:8]}", client_key)
+    keys = engine.router.healthy_keys(provider)
+    if not keys:
+        raise ProviderError("auth_failed", f"no key configured on the gateway for upstream '{provider.name}'", 401)
+    return keys[0]
+
+
+def _record(engine: Any, provider: str, model: str, alias: str, usage: dict[str, Any]) -> None:
+    engine.router.store.record_usage(role=PROXY_ROLE, provider=provider, key_alias=alias, model=model, status="ok",
+                                     http_status=200, input_tokens=int(usage.get("input_tokens") or 0),
+                                     output_tokens=int(usage.get("output_tokens") or 0))
+
+
+async def _anthropic_checked(engine: Any, msg: dict[str, Any], agent_id: str, session_id: str,
+                             findings: list[dict[str, Any]]) -> dict[str, Any]:
+    """PRX-3 on a Messages response: blocked tool_use blocks removed (a notice text block added), pinned fields
+    rewritten in the released ones, stop_reason corrected when no tool call is left."""
+    content, notices = [], []
+    for block in msg.get("content") or []:
+        if block.get("type") != "tool_use":
+            content.append(block)
+            continue
+        final, notice = await _check(engine, block.get("name", ""), block.get("input") or {}, agent_id, session_id)
+        if notice:
+            notices.append(notice)
+        else:
+            content.append({**block, "input": final})
+    if notices:
+        content.append({"type": "text", "text": "\n".join(notices)})
+    out = {**msg, "content": content}
+    if msg.get("stop_reason") == "tool_use" and not any(b.get("type") == "tool_use" for b in content):
+        out["stop_reason"] = "end_turn"
+    out["x_security"] = {"session_id": session_id, "inbound": findings, "blocked_tool_calls": len(notices)}
+    return out
+
+
+def _event(kind: str, data: dict[str, Any]) -> str:
+    return f"event: {kind}\ndata: {json.dumps({'type': kind, **data})}\n\n"
+
+
+async def _anthropic_events(msg: dict[str, Any]):
+    """A checked Message as a Messages-API event stream (used when the upstream answered in one piece)."""
+    yield _event("message_start", {"message": {**{k: v for k, v in msg.items() if k not in ("content", "x_security")},
+                                               "content": [], "stop_reason": None}})
+    for i, block in enumerate(msg.get("content") or []):
+        if block.get("type") == "tool_use":
+            yield _event("content_block_start", {"index": i, "content_block": {**block, "input": {}}})
+            yield _event("content_block_delta", {"index": i, "delta": {"type": "input_json_delta",
+                                                                       "partial_json": json.dumps(block.get("input") or {})}})
+        else:
+            yield _event("content_block_start", {"index": i, "content_block": {**block, "text": ""}})
+            yield _event("content_block_delta", {"index": i, "delta": {"type": "text_delta", "text": block.get("text", "")}})
+        yield _event("content_block_stop", {"index": i})
+    yield _event("message_delta", {"delta": {"stop_reason": msg.get("stop_reason"), "stop_sequence": None},
+                                   "usage": {"output_tokens": (msg.get("usage") or {}).get("output_tokens", 0)}})
+    yield _event("message_stop", {})
+
+
+async def _anthropic_stream(engine: Any, events: Any, agent_id: str, session_id: str, findings: list[dict[str, Any]],
+                            provider: str, model: str, alias: str):
+    """PRX-6 for the native Messages stream: text, thinking and other blocks stream through (re-indexed);
+    tool_use blocks are buffered until the upstream message ends, checked, then emitted whole (allowed, pinned
+    fields rewritten) or replaced by a notice text block. A failed upstream never releases a buffered call."""
+    out_index, index_map = 0, {}
+    tools: dict[int, dict[str, Any]] = {}
+    stop_delta: dict[str, Any] | None = None
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    try:
+        async for event in events:
+            e = event.to_dict() if hasattr(event, "to_dict") else dict(event)
+            kind = e.get("type")
+            if kind == "message_start":
+                usage["input_tokens"] = int(((e.get("message") or {}).get("usage") or {}).get("input_tokens") or 0)
+                yield _event(kind, {k: v for k, v in e.items() if k != "type"})
+            elif kind == "content_block_start":
+                block = e.get("content_block") or {}
+                if block.get("type") == "tool_use":
+                    tools[e["index"]] = {**block, "json": ""}
+                else:
+                    index_map[e["index"]] = out_index
+                    yield _event(kind, {**e, "index": out_index})
+                    out_index += 1
+            elif kind == "content_block_delta":
+                if e.get("index") in tools:
+                    tools[e["index"]]["json"] += (e.get("delta") or {}).get("partial_json", "")
+                else:
+                    yield _event(kind, {**e, "index": index_map.get(e.get("index"), e.get("index"))})
+            elif kind == "content_block_stop":
+                if e.get("index") not in tools:
+                    yield _event(kind, {**e, "index": index_map.get(e.get("index"), e.get("index"))})
+            elif kind == "message_delta":
+                stop_delta = e
+                usage["output_tokens"] = int((e.get("usage") or {}).get("output_tokens") or 0)
+            elif kind == "message_stop":
+                break
+            else:   # ping and future event types pass through
+                yield _event(kind, {k: v for k, v in e.items() if k != "type"})
+    except Exception as exc:
+        yield _event("error", {"error": {"type": "api_error", "message": f"upstream stream failed ({type(exc).__name__})"}})
+        return
+    released, notices = 0, []
+    for i in sorted(tools):
+        t = tools[i]
+        try:
+            args = json.loads(t["json"] or "{}")
+        except json.JSONDecodeError:
+            args = {"_raw": t["json"]}
+        final, notice = await _check(engine, t.get("name", ""), args, agent_id, session_id)
+        if notice:
+            notices.append(notice)
+            continue
+        block = {"type": "tool_use", "id": t.get("id"), "name": t.get("name"), "input": {}}
+        yield _event("content_block_start", {"index": out_index, "content_block": block})
+        yield _event("content_block_delta", {"index": out_index, "delta": {"type": "input_json_delta",
+                                                                           "partial_json": json.dumps(final)}})
+        yield _event("content_block_stop", {"index": out_index})
+        out_index += 1
+        released += 1
+    if notices:
+        yield _event("content_block_start", {"index": out_index, "content_block": {"type": "text", "text": ""}})
+        yield _event("content_block_delta", {"index": out_index, "delta": {"type": "text_delta", "text": "\n".join(notices)}})
+        yield _event("content_block_stop", {"index": out_index})
+    delta = dict((stop_delta or {}).get("delta") or {"stop_reason": "end_turn"})
+    if delta.get("stop_reason") == "tool_use" and not released:
+        delta["stop_reason"] = "end_turn"
+    yield _event("message_delta", {"delta": delta, "usage": (stop_delta or {}).get("usage") or {},
+                                   "x_security": {"session_id": session_id, "inbound": findings,
+                                                  "blocked_tool_calls": len(notices)}})
+    yield _event("message_stop", {})
+    _record(engine, provider, model, alias, usage)

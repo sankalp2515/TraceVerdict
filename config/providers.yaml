@@ -75,6 +75,66 @@ providers:
     timeout_s: 45
     limits: { rpm: 60 }
 
+  # ---- Paid and self-hosted providers. Each becomes active as soon as its key is in the environment; none is used by
+  # a role in models.yaml until you add it there, so the free-tier defaults above are unchanged. Agents protected by
+  # the proxy can also name any of these as their own upstream (policy `upstream:`, docs/INTEGRATION.md).
+  openai:
+    type: openai_compatible
+    enabled: true
+    base_url: https://api.openai.com/v1
+    keys: { env_prefix: OPENAI_API_KEY, env_list: OPENAI_API_KEYS }
+    priority: 10
+    timeout_s: 60
+
+  anthropic:                       # native Messages API through the official SDK (extra: intentseal-core[anthropic])
+    type: anthropic
+    enabled: true
+    base_url: https://api.anthropic.com
+    keys: { env_prefix: ANTHROPIC_API_KEY, env_list: ANTHROPIC_API_KEYS }
+    priority: 11
+    timeout_s: 120
+
+  azure_openai:                    # set the base URL to your resource: https://<resource>.openai.azure.com/openai/v1
+    type: openai_compatible
+    enabled: false
+    base_url: https://YOUR-RESOURCE.openai.azure.com/openai/v1
+    keys: { env_prefix: AZURE_OPENAI_API_KEY }
+    auth_header: api-key
+    priority: 12
+    timeout_s: 60
+
+  deepseek:
+    type: openai_compatible
+    enabled: true
+    base_url: https://api.deepseek.com/v1
+    keys: { env_prefix: DEEPSEEK_API_KEY }
+    priority: 13
+    timeout_s: 60
+
+  xai:
+    type: openai_compatible
+    enabled: true
+    base_url: https://api.x.ai/v1
+    keys: { env_prefix: XAI_API_KEY }
+    priority: 14
+    timeout_s: 60
+
+  together:
+    type: openai_compatible
+    enabled: true
+    base_url: https://api.together.xyz/v1
+    keys: { env_prefix: TOGETHER_API_KEY }
+    priority: 15
+    timeout_s: 60
+
+  ollama:                          # local models: any OpenAI-compatible server (Ollama, vLLM, LM Studio, llama.cpp)
+    type: openai_compatible
+    enabled: false
+    base_url: http://localhost:11434/v1
+    no_auth: true
+    priority: 20
+    timeout_s: 120
+
   # Reserved slot (PRD §21). Paid; stays disabled until the free-only constraint is lifted.
   jev:
     type: jev

@@ -68,6 +68,19 @@ class TaintPolicy(BaseModel):
     flagged_to_high_risk: str = "escalate"              # escalate | block | record: flagged content into a high-risk tool
 
 
+class UpstreamPolicy(BaseModel):
+    """Where the LLM proxy forwards this agent's model calls (docs/INTEGRATION.md).
+
+    provider: a provider name from config/providers.yaml (openai, anthropic, gemini, groq, azure_openai, ollama, ...).
+              Unset: the gateway's own `proxy_upstream` role (free-tier models; demo and evaluation).
+    model:    override the model the client asks for (unset: forward the client's model).
+    key:      "gateway" - the gateway's configured key for that provider; "client" - the agent's own provider key,
+              sent in the X-Upstream-Key header and never stored."""
+    provider: str | None = None
+    model: str | None = None
+    key: str = "gateway"
+
+
 class AgentPolicy(BaseModel):
     agent: str
     org: str = "default"                                # organisation (multi-tenant gateway, API-12)
@@ -81,6 +94,7 @@ class AgentPolicy(BaseModel):
     budgets: Budgets = Field(default_factory=Budgets)
     memory: MemoryPolicy = Field(default_factory=MemoryPolicy)
     taint: TaintPolicy = Field(default_factory=TaintPolicy)
+    upstream: UpstreamPolicy = Field(default_factory=UpstreamPolicy)
     decision_model: str = "generative_free"
     version: str = "1"
 

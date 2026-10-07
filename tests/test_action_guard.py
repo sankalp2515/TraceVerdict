@@ -104,3 +104,39 @@ def test_violations_raise_session_risk(policy):
 
 def test_outbound_scan_ignores_ordinary_prose():
     assert scan_args({"body": "The meeting is at 3pm in the Pune office. Revenue was 4.2 million."}) == []
+
+
+@pytest.mark.parametrize("url", [
+    "https://evil.example#.fixtures.test/x",          # fragment posing as the host
+    "https://data@evil.example#.fixtures.test",        # user part + fragment
+    r"https://evil.example\.fixtures.test/",         # backslash: clients disagree on the host
+    "https://fixtures.test.evil.example/",
+    "https://fixtures.test@evil.example/",
+])
+def test_url_allow_list_uses_the_host_a_client_would_use(policy, url):
+    r = check_action("web_fetch", {"url": url}, policy, sess())
+    assert r.decision == Decision.BLOCK and r.policy_rule == "domain-not-allowed"
+
+
+@pytest.mark.parametrize("url", ["https://fixtures.test/a", "https://www.fixtures.test:443/b?c=1#d", "HTTPS://FIXTURES.TEST"])
+def test_url_allow_list_still_allows_approved_hosts(policy, url):
+    assert check_action("web_fetch", {"url": url}, policy, sess()).decision == Decision.ALLOW
+
+
+@pytest.mark.parametrize("to", [
+    "Bob <bob@evil.example>@example-corp.test",       # a mailer delivers to bob@evil.example
+    "y@example-corp.test@evil.example",
+    "@example-corp.test",
+    ["asha.rao@example-corp.test", "x@evil.example"],
+    "asha.rao@example-corp.test; x@evil.example",
+])
+def test_recipient_allow_list_parses_addresses_like_a_mailer(policy, to):
+    r = check_action("send_message", {"to": to, "subject": "", "body": ""}, policy, sess())
+    assert r.decision == Decision.BLOCK and r.policy_rule == "recipient-not-allowed"
+
+
+def test_recipient_display_names_are_fine(policy):
+    to = "Asha Rao <asha.rao@example-corp.test>, finance@example-corp.test"
+    r = check_action("send_message", {"to": to, "subject": "", "body": ""}, policy,
+                     sess(task="email asha.rao@example-corp.test and finance@example-corp.test"))
+    assert r.decision == Decision.ALLOW

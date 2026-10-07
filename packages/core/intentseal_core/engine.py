@@ -15,7 +15,7 @@ import re
 import time
 from collections import OrderedDict
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -28,7 +28,7 @@ from .llm.router import Router
 from .logger import DecisionLogger
 from .memory import AttackMemory, Match
 from .normalise import normalise
-from .policy import AgentPolicy, load_policy
+from .policy import AgentPolicy, load_policy, policy_exists
 from .secrets import registry
 from .session import Session, SessionStore
 from .store import Store
@@ -86,6 +86,7 @@ class Engine:
         self.recent_size = 500
         self.sessions = sessions or SessionStore()
         self.policy_loader = (lambda agent: load_policy(agent, policy_directory)) if policy_directory else policy_loader
+        self._policy_files = (policy_directory, policy_directory is not None or policy_loader is load_policy)
         self.decision_model = decision_model
         self.classifiers = None if classifiers is None else list(classifiers)
         self.tier0_timeout_s, self.tier1_timeout_s, self.tier2_timeout_s = (
@@ -103,6 +104,11 @@ class Engine:
         self.register_secrets(policy.canary_values())
         return policy
 
+    def has_policy(self, agent_id: str) -> bool:
+        """Is this agent configured? Policies come from files unless a custom loader was given."""
+        directory, from_files = self._policy_files
+        return policy_exists(agent_id, directory) if from_files else True
+
     def register_secrets(self, values: Iterable[str]) -> None:
         for value in values:
             if value and value not in self._secrets:
@@ -111,9 +117,10 @@ class Engine:
                 self.logger.add_secrets([value])
 
     def start_session(self, agent_id: str, user_ref: str | None = None, task: str = "",
-                      trusted: dict[str, Any] | None = None) -> Session:
+                      trusted: dict[str, Any] | None = None, session_id: str | None = None) -> Session:
         self._policy(agent_id)
-        session = self.sessions.create(agent_id, user_ref=user_ref, task=task, trusted=dict(trusted or {}))
+        session = self.sessions.create(agent_id, user_ref=user_ref, task=task, trusted=dict(trusted or {}),
+                                       session_id=session_id)
         self.logger.session(session.session_id, agent_id, session.user_ref, task)
         return session
 
@@ -379,21 +386,27 @@ class Engine:
             tier = 1
             score_key = self._key("scores-all", key)
             scored = self._get(score_key)
+            tier1_failed = False
             if scored is None:
                 try:
                     scored = await asyncio.wait_for(self._scores(scan.all_chunks), self.tier1_timeout_s * 4)
                     self._put(score_key, scored)
                 except Exception:
-                    degraded = True
+                    degraded = tier1_failed = True
                     scored = []
             low = policy.thresholds.escalate_band[0]
             if (policy.thresholds.judge_untrusted == "always" and source != "user"
                     and len(scan.doc.text.strip()) >= policy.thresholds.judge_min_chars):
                 low = 0.0   # policy: every untrusted document is assessed by the judge (scores still logged)
             hot_spans = {(f.span, f.origin) for f in scored if f.score >= low}
+            if tier1_failed:
+                # Without Tier 1 nothing can clear the content on the fast path: every chunk goes to the judge, and
+                # an unavailable judge then holds it (judge-unavailable-hold / budget-hold) instead of allowing it.
+                hot_spans = {((c[0], c[1]), c[2]) for c in scan.all_chunks}
             if hot_spans:
                 findings.extend(f.model_copy(deep=True) for f in scored if f.score >= low)
-                scan.chunks = [c for c in scan.all_chunks if ((c[0], c[1]), c[2]) in hot_spans]
+                # a copy: the scan object is cached and must keep its structural chunks only
+                scan = replace(scan, chunks=[c for c in scan.all_chunks if ((c[0], c[1]), c[2]) in hot_spans])
                 if source != "user":
                     session.flagged_untrusted = True
                 tier = 2

@@ -16,7 +16,6 @@ import time
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 SCOPES = {"public": 0, "project": 1, "admin": 2}
@@ -93,17 +92,29 @@ def require(scope: str):
     return Depends(dep)
 
 
-class BodySizeLimit(BaseHTTPMiddleware):
+class BodySizeLimit:
+    """Reject bodies over the limit without buffering them: a declared Content-Length is checked up front, and a
+    chunked body is counted as it streams in (413 as soon as it passes the limit). Runs before authentication."""
+
     def __init__(self, app, max_bytes: int | None = None) -> None:
-        super().__init__(app)
+        self.app = app
         self.max = max_bytes or int(os.environ.get("INTENTSEAL_MAX_BODY_BYTES") or 2 * 1024 * 1024)
 
-    async def dispatch(self, request: Request, call_next):
-        cl = request.headers.get("content-length")
-        if cl and cl.isdigit() and int(cl) > self.max:
-            return JSONResponse({"detail": "request body too large"}, status_code=413)
-        if request.method in ("POST", "PUT", "PATCH") and not cl:
-            body = await request.body()
-            if len(body) > self.max:
-                return JSONResponse({"detail": "request body too large"}, status_code=413)
-        return await call_next(request)
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        cl = dict(scope.get("headers") or []).get(b"content-length", b"").decode("latin-1")
+        if cl.isdigit() and int(cl) > self.max:
+            return await JSONResponse({"detail": "request body too large"}, status_code=413)(scope, receive, send)
+        seen = 0
+
+        async def limited_receive():
+            nonlocal seen
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > self.max:
+                    raise HTTPException(413, "request body too large")
+            return message
+
+        await self.app(scope, limited_receive, send)

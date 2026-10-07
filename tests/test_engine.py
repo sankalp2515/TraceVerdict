@@ -430,3 +430,46 @@ async def test_judge_output_tokens_recorded_and_old_databases_migrated(policy, t
     await e.inspect(FLAGGED, "web", policy.agent)
     row = old.query("SELECT input_tokens, output_tokens, est_cost FROM decisions")[0]
     assert (row["input_tokens"], row["output_tokens"]) == (120, 80) and row["est_cost"] == pytest.approx(0.001)
+
+
+async def test_classifier_down_never_allows_untrusted_content_unjudged(policy):
+    """F3: with Tier 1 unavailable, unflagged untrusted content goes to the judge; if the judge is also
+    unavailable it is held. It is never allowed on the fast path."""
+    doc = "Vendor FAQ. Support hours are nine to five on weekdays. " * 4
+    e = engine(policy, malicious=0.99, classifiers=[Scorer(error=True)])
+    r = await e.inspect(doc, "web", policy.agent)
+    assert r.degraded and e.decision_model.calls == 1 and r.decision == Decision.BLOCK
+
+    down = engine(policy, decision_model=StaticDecisionModel(degraded=True), classifiers=[Scorer(error=True)])
+    r = await down.inspect(doc, "web", policy.agent)
+    assert r.decision == Decision.BLOCK and r.policy_rule == "judge-unavailable-hold"
+
+    clean = engine(policy, malicious=0.0, classifiers=[Scorer(error=True)])
+    r = await clean.inspect(doc, "web", policy.agent)
+    assert r.decision == Decision.ALLOW and r.degraded and clean.decision_model.calls == 1
+
+
+async def test_cached_scan_is_not_changed_by_an_inspection(policy):
+    e = engine(policy)
+    doc = "Vendor FAQ. Support hours are nine to five on weekdays. " * 4
+    await e.inspect(doc, "web", policy.agent)
+    scans = [v for _, v in e._cache.values() if hasattr(v, "all_chunks")]
+    assert scans and all(s.chunks == [] for s in scans)
+
+
+def test_sessions_are_bounded():
+    from intentseal_core.session import SessionStore
+    store = SessionStore(max_sessions=3)
+    for i in range(10):
+        store.get(f"s{i}", "research-agent")
+    assert len(store) == 3 and "s9" in store and "s0" not in store
+
+
+def test_event_sequence_continues_after_restart(policy):
+    store = Store(":memory:")
+    first = engine(policy, store=store)
+    first.logger.event("sess-1", policy.agent, "content_in", "web", "a")
+    first.logger.event("sess-1", policy.agent, "content_in", "web", "b")
+    restarted = engine(policy, store=store)
+    restarted.logger.event("sess-1", policy.agent, "content_in", "web", "c")
+    assert [r["seq"] for r in restarted.logger.session_events("sess-1")] == [1, 2, 3]

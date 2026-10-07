@@ -79,6 +79,12 @@ def _percentile(values: list[float], q: float) -> float | None:
     return round(values[min(len(values) - 1, int(q * len(values)))], 1) if values else None
 
 
+def known_agent(request: Request, agent_id: str) -> None:
+    """An agent with no policy would run the default (monitor) policy, i.e. unprotected: refuse it instead (F4)."""
+    if not request.app.state.engine.has_policy(agent_id):
+        raise HTTPException(404, f"no policy for agent '{agent_id[:64]}'; add policies/<agent>.yaml (or PUT /v1/policies/<agent>)")
+
+
 def build_engine() -> Engine:
     router = Router()
     return Engine(router=router, store=router.store, tier0_timeout_s=float(os.environ.get("INTENTSEAL_EXTRACT_TIMEOUT_S") or "10"))
@@ -141,6 +147,7 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     # ---- API-1 inspect ------------------------------------------------------------------------
     @app.post("/v1/inspect", tags=["engine"])
     async def inspect(body: InspectRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
+        known_agent(request, body.agent_id)
         if body.content is None and body.content_b64 is None:
             raise HTTPException(422, "provide content or content_b64")
         try:
@@ -154,12 +161,14 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     # ---- API-2 action check -------------------------------------------------------------------
     @app.post("/v1/actions/check", tags=["engine"])
     async def check(body: ActionRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
+        known_agent(request, body.agent_id)
         r = await request.app.state.engine.check_action(body.tool, body.args, body.agent_id, session_id=body.session_id)
         return r.model_dump(mode="json")
 
     # ---- API-3 sessions -----------------------------------------------------------------------
     @app.post("/v1/sessions", tags=["sessions"])
     async def new_session(body: SessionRequest, request: Request, p: Principal = require("project")) -> dict[str, str]:
+        known_agent(request, body.agent_id)
         s = request.app.state.engine.start_session(body.agent_id, user_ref=body.user_ref, task=body.task, trusted=body.trusted)
         return {"session_id": s.session_id}
 
@@ -194,7 +203,8 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
 
     # ---- API-6 policy (read) ------------------------------------------------------------------
     @app.get("/v1/policies/{agent}", tags=["policy"])
-    async def policy(agent: str, p: Principal = require("public")) -> dict[str, Any]:
+    async def policy(agent: str, request: Request, p: Principal = require("public")) -> dict[str, Any]:
+        known_agent(request, agent)
         pol = load_policy(agent).model_dump(mode="json")
         pol["sensitive_data"]["canaries"] = [c if c == "from_env" else "[REDACTED]" for c in pol["sensitive_data"]["canaries"]]
         return pol

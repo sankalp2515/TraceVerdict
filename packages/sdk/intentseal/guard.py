@@ -23,7 +23,7 @@ from typing import Any, Callable, Iterator
 
 from intentseal_core.engine import Engine
 from intentseal_core.llm.router import Router
-from intentseal_core.policy import AgentPolicy, load_policy
+from intentseal_core.policy import AgentPolicy, load_policy, policy_exists
 from intentseal_core.session import Session
 from intentseal_core.types import ActionResult, Decision, InspectResult
 
@@ -50,6 +50,9 @@ class Guard:
             engine = RemoteEngine(remote or "http://gateway", api_key or "", client=http_client)
             policy = policy or engine.policy(agent_id)   # failure policy (SDK-5) uses the gateway's tool settings
             warm_up = False
+        if policy is None and remote is None and http_client is None and not policy_exists(agent_id):
+            log.warning("No policy file for agent '%s' (policies/%s.yaml): the default policy runs in monitor mode, "
+                        "so nothing is enforced. Add a policy or pass mode='enforce'.", agent_id, agent_id)
         self._policy = policy or load_policy(agent_id)
         if mode:
             self._policy.mode = mode

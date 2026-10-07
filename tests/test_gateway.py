@@ -172,8 +172,8 @@ def test_proxy_inspects_tool_results_before_forwarding(env):
 
 def test_proxy_stream_and_upstream_down(env):
     with make_client(env, FakeRouter(content="hello")) as c:
-        r = c.post("/proxy/v1/chat/completions", json={"messages": [{"role": "user", "content": "hi"}], "stream": True},
-                   headers=H(PROJECT))
+        r = c.post("/proxy/research-agent/v1/chat/completions",
+                   json={"messages": [{"role": "user", "content": "hi"}], "stream": True}, headers=H(PROJECT))
         assert r.status_code == 200 and "data: [DONE]" in r.text
 
     class Down(FakeRouter):
@@ -182,7 +182,8 @@ def test_proxy_stream_and_upstream_down(env):
             raise AllProvidersFailed(role, [])
 
     with make_client(env, Down()) as c:
-        r = c.post("/proxy/v1/chat/completions", json={"messages": [{"role": "user", "content": "hi"}]}, headers=H(PROJECT))
+        r = c.post("/proxy/v1/chat/completions", json={"messages": [{"role": "user", "content": "hi"}]},
+                   headers={**H(PROJECT), "X-Agent-Id": "research-agent"})
         assert r.status_code == 503
 
 
@@ -382,3 +383,31 @@ def test_policy_round_trip_keeps_redacted_canaries(env, monkeypatch):
         assert c.put("/v1/policies/demo-agent", json=got, headers=H(ADMIN)).status_code == 200
     saved = _yaml.safe_load((pdir / "demo-agent.yaml").read_text())
     assert saved["mode"] == "monitor" and saved["sensitive_data"]["canaries"] == ["from_env", "sk-literal-canary-0001"]
+
+
+def test_unknown_agent_is_refused_not_run_unprotected(env):
+    """F4: an agent with no policy file would run the default monitor policy (nothing enforced): 404 instead."""
+    with make_client(env, FakeRouter(content="hello")) as c:
+        body = {"messages": [{"role": "user", "content": "hi"}]}
+        assert c.post("/proxy/v1/chat/completions", json=body, headers=H(PROJECT)).status_code == 404   # default-agent
+        assert c.post("/proxy/reserch-agent/v1/chat/completions", json=body, headers=H(PROJECT)).status_code == 404
+        assert c.post("/v1/inspect", json={"content": "hi", "agent_id": "no-such-agent"}, headers=H(PROJECT)).status_code == 404
+        assert c.post("/v1/actions/check", json={"tool": "read_file", "args": {}, "agent_id": "no-such-agent"},
+                      headers=H(PROJECT)).status_code == 404
+        assert c.get("/v1/policies/no-such-agent", headers=H(PUBLIC)).status_code == 404
+        assert c.post("/proxy/research-agent/v1/chat/completions", json=["not", "a", "request"],
+                      headers=H(PROJECT)).status_code == 422
+
+
+def test_chunked_body_over_limit_is_rejected_while_streaming(env, monkeypatch):
+    monkeypatch.setenv("INTENTSEAL_MAX_BODY_BYTES", "2000")
+    sent = []
+
+    def body():   # no Content-Length: the limit must be enforced as chunks arrive
+        for _ in range(100):
+            sent.append(1)
+            yield b"x" * 1000
+
+    with make_client(env) as c:
+        r = c.post("/v1/inspect", content=body(), headers={**H(PROJECT), "Content-Type": "application/json"})
+        assert r.status_code == 413

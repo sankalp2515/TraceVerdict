@@ -64,17 +64,22 @@ async def agent_chat_completions(agent_id: str, request: Request, p: Principal =
 
 
 async def _complete(request: Request, agent_id: str) -> Any:
-    body = await request.json()
+    from .app import known_agent
+
+    known_agent(request, agent_id)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("messages", []), list)             or not all(isinstance(m, dict) for m in body.get("messages", [])):
+        return JSONResponse({"error": {"message": "body must be a chat completion request with a messages list",
+                                       "type": "invalid_request_error"}}, status_code=422)
     engine = request.app.state.engine
     messages: list[dict[str, Any]] = [dict(m) for m in body.get("messages", [])]
     session_id = request.headers.get("x-session-id") or _conversation_id(agent_id, messages)
-    if session_id not in getattr(engine.sessions, "_s", {}):
+    if session_id not in engine.sessions:
         first_user = next((_text(m.get("content")) for m in messages if m.get("role") == "user"), "")
-        s = engine.start_session(agent_id, task=first_user)
-        engine.sessions._s.pop(s.session_id, None)
-        s.session_id = session_id
-        engine.sessions._s[session_id] = s
-        engine.logger.session(session_id, agent_id, s.user_ref, first_user)
+        engine.start_session(agent_id, task=first_user, session_id=session_id)
     seen = _seen(request).setdefault(session_id, {})
     _seen(request).move_to_end(session_id)
     while len(_seen(request)) > _SEEN_MAX:

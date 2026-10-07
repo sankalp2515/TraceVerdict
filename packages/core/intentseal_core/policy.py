@@ -92,6 +92,11 @@ def policy_path(agent: str, directory: Path | None = None) -> Path:
     return (directory or Path(os.environ.get("INTENTSEAL_POLICY_DIR") or repo_root() / "policies")) / f"{agent}.yaml"
 
 
+def policy_exists(agent: str, directory: Path | None = None) -> bool:
+    """Raises ValueError for an invalid agent id (never a path outside the policy directory)."""
+    return policy_path(agent, directory).exists()
+
+
 def save_policy(policy: AgentPolicy, directory: Path | None = None) -> Path:
     path = policy_path(policy.agent, directory)
     path.parent.mkdir(parents=True, exist_ok=True)

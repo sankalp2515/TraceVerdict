@@ -16,6 +16,7 @@ from __future__ import annotations
 import fnmatch
 import time
 from dataclasses import dataclass, field
+from email.utils import getaddresses
 from typing import Any
 
 from .outbound import scan_args
@@ -34,6 +35,8 @@ class ActionCheck:
 
 def _recipient_ok(addr: str, allowed: list[str]) -> bool:
     a = addr.strip().lower()
+    if a.count("@") != 1 or not a.split("@")[0] or not a.split("@")[1]:
+        return False
     for rule in allowed:
         r = rule.lower()
         if (r.startswith("@") and a.endswith(r)) or a == r:
@@ -41,8 +44,27 @@ def _recipient_ok(addr: str, allowed: list[str]) -> bool:
     return False
 
 
+def recipients(value: Any) -> list[str]:
+    """Addresses a mailer would deliver to, parsed the way mail libraries parse them (display names, angle
+    brackets, comma/semicolon lists). A piece that does not parse to an address is kept as is, so it fails."""
+    raw = ", ".join(map(str, value)) if isinstance(value, (list, tuple)) else str(value)
+    out: list[str] = []
+    for piece in raw.replace(";", ",").split(","):
+        if not piece.strip():
+            continue
+        parsed = [a for _, a in getaddresses([piece])]
+        out += parsed if parsed and all(parsed) else [piece]
+    # getaddresses splits "Name <x@a> @b" into two entries; any leftover fragment must also pass.
+    for _, a in getaddresses([raw.replace(";", ",")]):
+        if a and a not in out:
+            out.append(a)
+    return out
+
+
 def _domain_ok(url: str, allowed: list[str]) -> bool:
     d = domain_of(url)
+    if not d:
+        return False
     return any(d == a.lower() or d.endswith("." + a.lower()) or fnmatch.fnmatch(d, a.lower()) for a in allowed)
 
 
@@ -85,9 +107,9 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
 
     # 4. recipients
     if tp.allowed_recipients and tp.recipient_arg in args:
-        bad = [r for r in str(args[tp.recipient_arg]).replace(";", ",").split(",")
-               if r.strip() and not _recipient_ok(r, tp.allowed_recipients)]
-        if bad:
+        parsed = recipients(args[tp.recipient_arg])
+        bad = [r for r in parsed if not _recipient_ok(r, tp.allowed_recipients)]
+        if bad or not parsed:
             checks.append(ActionCheck("recipient-not-allowed", Decision.BLOCK,
                                       f"recipient outside allowed list ({len(bad)} address(es))", ["Tool Abuse"]))
 

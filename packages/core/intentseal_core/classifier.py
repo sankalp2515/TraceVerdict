@@ -12,7 +12,8 @@ import json
 import logging
 import os
 import threading
-from functools import lru_cache
+import time
+from collections import OrderedDict
 from pathlib import Path
 
 from .config import repo_root
@@ -40,7 +41,7 @@ class LocalClassifier:
         self.pos = next(int(k) for k, v in cfg["id2label"].items() if "INJ" in v.upper())
         self.cls, self.sep = self.tok.token_to_id("[CLS]"), self.tok.token_to_id("[SEP]")
         self._lock = threading.Lock()
-        self._cache: dict[str, float] = {}
+        self._cache: OrderedDict[str, float] = OrderedDict()   # bounded: CACHE_MAX entries
 
     def score(self, text: str) -> float:
         """Max probability over windows of up to 256 tokens (shorter windows keep CPU latency low)."""
@@ -64,16 +65,37 @@ class LocalClassifier:
                 if start + window >= len(ids):
                     break
         self._cache[key] = best
+        while len(self._cache) > CACHE_MAX:
+            self._cache.popitem(last=False)
         return best
 
 
-@lru_cache(maxsize=1)
+CACHE_MAX = 20000
+RETRY_S = 60.0
+_loaded: LocalClassifier | None = None
+_failure: tuple[float, str] | None = None     # (time, error type) of the last failed load
+_load_lock = threading.Lock()
+
+
 def local_classifier() -> LocalClassifier | None:
-    try:
-        return LocalClassifier()
-    except Exception as e:  # missing model / runtime: engine runs degraded, never fails open silently
-        log.warning("Tier 1 local classifier unavailable: %s", type(e).__name__)
-        return None
+    """The process-wide local classifier. A failed load is retried after RETRY_S (never cached for the life of the
+    process); while it is unavailable the engine sends content to the judge or holds it (fail closed)."""
+    global _loaded, _failure
+    if _loaded is not None:
+        return _loaded
+    with _load_lock:
+        if _loaded is None and (_failure is None or time.monotonic() - _failure[0] >= RETRY_S):
+            try:
+                _loaded, _failure = LocalClassifier(), None
+            except Exception as e:  # missing model / runtime
+                _failure = (time.monotonic(), type(e).__name__)
+                log.warning("Tier 1 local classifier unavailable: %s", type(e).__name__)
+    return _loaded
+
+
+def tier1_status() -> dict[str, str | bool]:
+    """For readiness checks: loaded, or the last load error."""
+    return {"loaded": _loaded is not None, "error": _failure[1] if _failure and _loaded is None else ""}
 
 
 class RemoteGuard:
@@ -100,4 +122,6 @@ class RemoteGuard:
         except (AllProvidersFailed, ValueError):
             return None
         self._cache[key] = val
+        if len(self._cache) > CACHE_MAX:
+            self._cache.pop(next(iter(self._cache)))
         return val

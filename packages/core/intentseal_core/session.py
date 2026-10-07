@@ -8,11 +8,14 @@ untrusted content is a strong sign the action was steered by that content.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import time
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+", re.I)
@@ -27,18 +30,35 @@ def entities(text: str) -> set[str]:
         out.add(e.lower())
     for u in _URL.findall(text or ""):
         out.add(u.lower().rstrip(".,;"))
-        out.add(domain_of(u))
+        if d := domain_of(u):
+            out.add(d)
     for r in _RECORD_ID.findall(text or ""):
         out.add(r.upper())
     return out
 
 
+_HOST = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)*$")
+
+
 def domain_of(url_or_email: str) -> str:
+    """Host an HTTP client or mailer would actually use; "" when it is ambiguous.
+
+    Parsed with the standard library, so a fragment, query, port or user part can never pose as the host
+    (`https://evil.example#.allowed.test` is evil.example). Backslashes, whitespace and user parts are
+    rejected outright: clients disagree on them."""
     s = url_or_email.lower().strip()
     if "@" in s and "://" not in s:
-        return s.rsplit("@", 1)[-1]
-    s = re.sub(r"^[a-z]+://", "", s)
-    return s.split("/", 1)[0].split("?", 1)[0].split(":", 1)[0]
+        return s.rsplit("@", 1)[-1].strip(" >")
+    if "\\" in s or any(c.isspace() or ord(c) < 32 for c in s):
+        return ""
+    try:
+        parts = urlsplit(s if "://" in s else "//" + s)
+        host = parts.hostname or ""
+    except ValueError:
+        return ""
+    if "@" in parts.netloc or not _HOST.match(host):
+        return ""
+    return host
 
 
 @dataclass
@@ -83,19 +103,34 @@ class Session:
 
 
 class SessionStore:
-    """In-process session registry (the Gateway API persists sessions through the logger)."""
+    """In-process session registry (the Gateway API persists sessions through the logger).
 
-    def __init__(self) -> None:
-        self._s: dict[str, Session] = {}
+    Bounded: the least recently used sessions are dropped beyond `max_sessions` (INTENTSEAL_MAX_SESSIONS,
+    default 20000), so a stream of one-off session ids cannot grow memory without limit."""
+
+    def __init__(self, max_sessions: int | None = None) -> None:
+        self._s: OrderedDict[str, Session] = OrderedDict()
+        self.max_sessions = max_sessions or int(os.environ.get("INTENTSEAL_MAX_SESSIONS") or "20000")
+
+    def __contains__(self, session_id: object) -> bool:
+        return session_id in self._s
+
+    def __len__(self) -> int:
+        return len(self._s)
+
+    def _keep(self, s: Session) -> Session:
+        self._s[s.session_id] = s
+        self._s.move_to_end(s.session_id)
+        while len(self._s) > self.max_sessions:
+            self._s.popitem(last=False)
+        return s
 
     def create(self, agent_id: str, **kw: Any) -> Session:
-        s = Session(agent_id=agent_id, **kw)
-        self._s[s.session_id] = s
-        return s
+        if not kw.get("session_id"):
+            kw.pop("session_id", None)
+        return self._keep(Session(agent_id=agent_id, **kw))
 
     def get(self, session_id: str | None, agent_id: str) -> Session:
         if session_id and session_id in self._s:
-            return self._s[session_id]
-        s = Session(agent_id=agent_id, session_id=session_id or uuid.uuid4().hex[:16])
-        self._s[s.session_id] = s
-        return s
+            return self._keep(self._s[session_id])
+        return self._keep(Session(agent_id=agent_id, session_id=session_id or uuid.uuid4().hex[:16]))

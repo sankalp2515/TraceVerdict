@@ -93,8 +93,13 @@ class DecisionLogger:
 
     def event(self, session_id: str, agent_id: str, kind: str, source: str, content: str = "") -> str:
         eid = uuid.uuid4().hex[:20]
-        seq = self._seq.get(session_id, 0) + 1
-        self._seq[session_id] = seq
+        if session_id not in self._seq:   # continue a session logged before a restart (or evicted below)
+            row = self.store.query("SELECT COALESCE(MAX(seq), 0) AS n FROM events WHERE session_id = ?", (session_id,))
+            self._seq[session_id] = int(row[0]["n"])
+        seq = self._seq.pop(session_id) + 1
+        self._seq[session_id] = seq       # most recent last
+        while len(self._seq) > 20000:
+            del self._seq[next(iter(self._seq))]
         self.store.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)",
                            (eid, session_id, self._redact(agent_id), seq, kind, self._redact(source), _hash(content) if content else None,
                             self.scrub(content), time.time()))

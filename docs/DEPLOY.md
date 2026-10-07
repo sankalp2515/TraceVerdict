@@ -18,6 +18,8 @@ Settings named `ASG_*` (the names used until 7 Oct 2026) still work when the new
 | Variable | Required | Purpose |
 |---|---|---|
 | `GROQ_API_KEY`, `GEMINI_API_KEY`, `NVIDIA_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` (`_2`, `_3`… for spares) | at least one | Free-tier LLM providers for the judge, the proxy upstream and the demo agent. Without any, flagged content is held (fail closed) |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `AZURE_OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `TOGETHER_API_KEY` | no | Provider keys the gateway holds for agents whose policy says `upstream: {provider: …, key: gateway}`. Agents with `key: client` send their own key in `X-Upstream-Key` instead. Azure and local servers: set the base URL in `config/providers.yaml` and enable the entry |
+| `INTENTSEAL_PUBLIC_URL` | recommended | The gateway's public URL, used in the Console's connection snippets (default: the URL the request came in on) |
 | `INTENTSEAL_API_KEYS` | yes | `name:key:scope[:org[:agent\|agent]]`, comma separated. Scopes `project` (agents, CI, SIEM collectors) and `admin` (reviewers). Org `*` = all organisations. Use long random keys |
 | `INTENTSEAL_PUBLIC_KEY` | for the Console | Read-only key built into the Console |
 | `INTENTSEAL_PUBLIC_AGENTS` | recommended | Agents the public key can see, e.g. `research-agent,research-agent-monitor` (the demo agents). Without it the public key sees every agent of the default organisation |

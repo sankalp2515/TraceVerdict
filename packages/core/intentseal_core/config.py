@@ -13,7 +13,12 @@ from dotenv import load_dotenv
 from .secrets import ApiKey, load_keys
 
 
+DEFAULTS = Path(__file__).resolve().parent / "defaults"   # bundled config, policy templates, starter policy
+
+
 def repo_root() -> Path:
+    """Where IntentSeal keeps its configuration and data: INTENTSEAL_HOME, else the source checkout this package runs
+    from (development), else a per-user folder (~/.intentseal) for an installed package."""
     env = os.environ.get("INTENTSEAL_HOME")
     if env:
         return Path(env)
@@ -21,11 +26,18 @@ def repo_root() -> Path:
     for parent in here.parents:
         if (parent / "config" / "providers.yaml").exists():
             return parent
-    return Path.cwd()
+    return Path.home() / ".intentseal"
+
+
+def config_path(*parts: str) -> Path:
+    """A configuration file or folder: the home's own copy if there is one, else the copy bundled with the package."""
+    own = repo_root().joinpath("config", *parts)
+    return own if own.exists() else DEFAULTS.joinpath(*parts)
 
 
 def load_env() -> None:
     load_dotenv(repo_root() / ".env", override=False)
+    load_dotenv(Path.cwd() / ".env", override=False)   # an installed package: the project's own .env
     from . import adopt_legacy_env
 
     adopt_legacy_env()
@@ -99,7 +111,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 
 
 def load_providers(path: Path | None = None) -> dict[str, ProviderConfig]:
-    path = path or repo_root() / "config" / "providers.yaml"
+    path = path or config_path("providers.yaml")
     raw = _read_yaml(path)
     defaults = raw.get("defaults", {}) or {}
     out: dict[str, ProviderConfig] = {}
@@ -140,7 +152,7 @@ def load_providers(path: Path | None = None) -> dict[str, ProviderConfig]:
 
 
 def load_roles(path: Path | None = None) -> dict[str, RoleConfig]:
-    path = path or repo_root() / "config" / "models.yaml"
+    path = path or config_path("models.yaml")
     raw = _read_yaml(path)
     out: dict[str, RoleConfig] = {}
     for name, r in (raw.get("roles") or {}).items():

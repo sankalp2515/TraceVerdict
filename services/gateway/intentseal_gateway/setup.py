@@ -22,7 +22,7 @@ import yaml
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 
-from intentseal_core.config import repo_root
+from intentseal_core.config import config_path
 from intentseal_core.policy import AGENT_ID, AgentPolicy, UpstreamPolicy, list_policies, load_policy, save_policy
 
 from . import tenancy
@@ -33,7 +33,7 @@ router = APIRouter(tags=["setup"])
 
 def _templates() -> dict[str, dict[str, Any]]:
     out = {}
-    for f in sorted((repo_root() / "config" / "policy-templates").glob("*.yaml")):
+    for f in sorted(config_path("policy-templates").glob("*.yaml")):
         data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         out[f.stem] = data
     return out

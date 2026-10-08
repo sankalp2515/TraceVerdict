@@ -59,7 +59,7 @@ IntentSeal flagged; (c) both: S7 for the compromise, S2/S3 for detection on docu
 | E1 | ~~PRX-6 incremental streaming~~ ✅ 7 Oct (D-040) | P1 | ✅ |
 | E2 | ~~CORE-16 long documents~~ ✅ 7 Oct: judge windows, original-offset spans, input limits, `oversize-hold` (D-041) | P1 | ✅ |
 | E3 | ~~Rename code namespace~~ ✅ 7 Oct: `intentseal`, `intentseal_core`, `intentseal_gateway`, `intentseal_eval`, CLI `intentseal`, `INTENTSEAL_*` settings (D-038) | — | ✅ |
-| E4 | PyPI: ship default config + starter policy (enforce), per-user data dir, `[embedded]` extra, LICENSE, TestPyPI dry run; publish after A4 | — | M |
+| E4 | ~~PyPI packaging~~ ✅ 9 Oct (D-052): bundled config, `~/.intentseal`, `intentseal init`, `[embedded]`, LICENSE, `publish.yml`; local clean-install tests pass. **Left:** TestPyPI run (needs `publish.yml` on GitHub `main`), then PyPI | — | ✅ / S |
 | E5 | ~~API-12 SIEM export / multi-tenant / Postgres~~ ✅ 7 Oct (D-043, D-044) | P2 | ✅ |
 | E6 | EVAL-6 Jev comparison | P2 | L |
 | E7 | ~~CORE-17 taint tracking~~ ✅ 7 Oct: argument-to-origin tracing, flagged-content rule, replay (D-042) | P2 | ✅ |
@@ -72,7 +72,7 @@ IntentSeal flagged; (c) both: S7 for the compromise, S2/S3 for detection on docu
 | F2 | Hosting with persistent data: the free Spaces tier has no persistent disk; use a free hosted PostgreSQL (`INTENTSEAL_DATABASE_URL`) if decisions must survive restarts | Owner | S |
 | F3 | Rerun the final evaluation on the merged engine (D-047/D-048 change enforcement) after the free quotas reset: `sh eval/run_final.sh`, then summary + readme | Eng | M (waiting) |
 | F4 | Proxy: native AWS Bedrock and Vertex AI SDK formats (today: SDK or REST path); native Gemini `generateContent` | Eng | M |
-| F5 | E4 PyPI packaging (held by the owner): config and templates inside the package, `intentseal init`, per-user data dir, extras, LICENSE, TestPyPI | Eng + Owner | M |
+| F5 | ~~E4 PyPI packaging~~ ✅ see E4 | Eng + Owner | ✅ |
 
 ## G. Found by using the product on real input (8 Oct, `examples/assistant`)
 

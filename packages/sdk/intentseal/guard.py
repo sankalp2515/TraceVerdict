@@ -19,13 +19,14 @@ import functools
 import inspect
 import logging
 from contextlib import contextmanager
-from typing import Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
-from intentseal_core.engine import Engine
-from intentseal_core.llm.router import Router
-from intentseal_core.policy import AgentPolicy, load_policy, policy_exists
+from intentseal_core.policy import AgentPolicy, load_policy, policy_exists, policy_path
 from intentseal_core.session import Session
 from intentseal_core.types import ActionResult, Decision, InspectResult
+
+if TYPE_CHECKING:
+    from intentseal_core.engine import Engine
 
 log = logging.getLogger("intentseal.sdk")
 _current: contextvars.ContextVar[Session | None] = contextvars.ContextVar("intentseal_session", default=None)
@@ -50,9 +51,19 @@ class Guard:
             engine = RemoteEngine(remote or "http://gateway", api_key or "", client=http_client)
             policy = policy or engine.policy(agent_id)   # failure policy (SDK-5) uses the gateway's tool settings
             warm_up = False
+        if engine is None:
+            # Embedded mode runs the engine in-process; remote mode (above) needs only the light install.
+            try:
+                from intentseal_core.engine import Engine
+                from intentseal_core.llm.router import Router
+            except ImportError as e:
+                raise ImportError(
+                    f"Embedded mode needs the engine: pip install 'intentseal[embedded]' (missing: {e.name}). "
+                    "Or use a gateway: Guard(agent_id, remote='https://<gateway>', api_key=...).") from e
         if policy is None and remote is None and http_client is None and not policy_exists(agent_id):
-            log.warning("No policy file for agent '%s' (policies/%s.yaml): the default policy runs in monitor mode, "
-                        "so nothing is enforced. Add a policy or pass mode='enforce'.", agent_id, agent_id)
+            log.warning("No policy file for agent '%s' (%s): the default policy runs in monitor mode, so nothing is "
+                        "enforced. Create one with `intentseal init --agent %s`, or pass mode='enforce'.",
+                        agent_id, policy_path(agent_id), agent_id)
         self._policy = policy or load_policy(agent_id)
         if mode:
             self._policy.mode = mode

@@ -88,10 +88,14 @@ class RedactingFilter(logging.Filter):
 
 
 def install_log_redaction() -> None:
-    """Attach the redacting filter to every root handler (idempotent)."""
+    """Attach the redacting filter to every root handler (idempotent). A library must not configure the host app's
+    logging: when it has none, one WARNING handler (what Python would print anyway) is added, with redaction."""
     root = logging.getLogger()
     if not root.handlers:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        h = logging.StreamHandler()
+        h.setLevel(logging.WARNING)
+        h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        root.addHandler(h)
     for h in root.handlers:
         if not any(isinstance(f, RedactingFilter) for f in h.filters):
             h.addFilter(RedactingFilter())

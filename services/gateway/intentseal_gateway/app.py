@@ -88,6 +88,9 @@ def build_engine() -> Engine:
 
 
 def create_app(engine: Engine | None = None, reports_dir: Path | None = None) -> FastAPI:
+    if not logging.getLogger().handlers:   # the gateway is an application: INFO logs (access log), keys redacted
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.engine = engine or build_engine()

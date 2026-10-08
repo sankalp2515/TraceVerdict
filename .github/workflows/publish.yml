@@ -1,0 +1,96 @@
+# Publish intentseal-core and intentseal to TestPyPI or PyPI with trusted publishing (no tokens stored anywhere).
+# Run it by hand: Actions -> "Publish to PyPI" -> Run workflow (or: gh workflow run publish.yml -f target=testpypi).
+# Registered pending publishers (owner sankalp2515, repo intentseal, workflow publish.yml):
+#   PyPI      intentseal -> environment pypi        intentseal-core -> environment pypi-core
+#   TestPyPI  intentseal -> environment testpypi    intentseal-core -> environment testpypi-core
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish"
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+      version:
+        description: "Version override (blank = the version in pyproject.toml; e.g. 0.1.0rc1 for a TestPyPI trial)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Package data in sync with config/
+        run: python scripts/sync_package_data.py --check
+      - name: Set the version (both packages, and the SDK's pin on the engine)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'EOF'
+          import os, re, pathlib
+          v = os.environ["VERSION"].strip()
+          if not v:
+              raise SystemExit(0)
+          if not re.fullmatch(r"\d+\.\d+\.\d+((a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?", v):
+              raise SystemExit(f"not a release version: {v!r}")
+          for f in ("packages/core/pyproject.toml", "packages/sdk/pyproject.toml"):
+              p = pathlib.Path(f)
+              s = re.sub(r'(?m)^version = "[^"]+"', f'version = "{v}"', p.read_text())
+              s = re.sub(r'intentseal-core(\[[^\]]*\])?==[^"]+"', lambda m: f'intentseal-core{m.group(1) or ""}=={v}"', s)
+              p.write_text(s)
+          init = pathlib.Path("packages/core/intentseal_core/__init__.py")
+          init.write_text(re.sub(r'__version__ = "[^"]+"', f'__version__ = "{v}"', init.read_text()))
+          print("version", v)
+          EOF
+      - name: Build and check
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build packages/core -o dist/core
+          python -m build packages/sdk -o dist/sdk
+          python -m twine check --strict dist/core/* dist/sdk/*
+      - name: Smoke test the wheels in a clean environment
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/core/*.whl dist/sdk/*.whl
+          cd /tmp
+          /tmp/smoke/bin/python -c "import intentseal, intentseal.remote; from intentseal_core.config import config_path; assert config_path('providers.yaml').is_file()"
+          INTENTSEAL_HOME=/tmp/smoke-home /tmp/smoke/bin/intentseal init --agent smoke --template research-assistant
+      - uses: actions/upload-artifact@v4
+        with: { name: core, path: dist/core/ }
+      - uses: actions/upload-artifact@v4
+        with: { name: sdk, path: dist/sdk/ }
+
+  publish-core:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'pypi' && 'pypi-core' || 'testpypi-core' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: core, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.target == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
+
+  publish-sdk:
+    needs: publish-core      # the SDK pins this exact engine version, so the engine goes first
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'pypi' && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: sdk, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.target == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}

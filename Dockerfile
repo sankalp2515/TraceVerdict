@@ -18,7 +18,7 @@ COPY packages ./packages
 COPY agents ./agents
 COPY services ./services
 # Runtime dependencies only, at the exact versions of requirements.lock (a constraints file: nothing extra installed).
-RUN pip install -c requirements.lock "./packages/core[classifiers,ocr,postgres]" ./packages/sdk ./agents ./services/gateway openai
+RUN pip install -c requirements.lock "./packages/core[engine,classifiers,ocr,postgres]" ./packages/sdk ./agents ./services/gateway openai
 # Bake the Tier 1 classifier into the image so a cold start never runs without it.
 ENV HF_HOME=/opt/models/hf
 RUN python -c "from intentseal_core.classifier import LocalClassifier; LocalClassifier()"

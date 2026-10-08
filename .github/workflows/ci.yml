@@ -40,6 +40,8 @@ jobs:
           pip install --no-deps -e packages/core -e packages/sdk -e agents -e services/gateway -e eval
       - name: Lint (correctness rules)
         run: ruff check .
+      - name: Package data in sync (config/ -> packages, for PyPI builds)
+        run: python scripts/sync_package_data.py --check
       - name: Secret scan (no keys in the repo)
         run: python scripts/secret_scan.py --all
       - name: Fixtures are reproducible

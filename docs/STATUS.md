@@ -153,6 +153,8 @@ Groq + the local gateway, enforce mode:
   base64): 0 compromised, 11 flagged. 10 generated user-turn prompts: 6 blocked at the user message, none caused harm.
 - Allowed internal email ALLOW; external recipient BLOCK; unrequested send ESCALATE → approved once → next identical
   attempt escalated again.
+- RAG, SDK path: 6/6 poisoned knowledge-base articles (plain generated payloads) blocked at indexing, never indexed;
+  1 look-alike-letter article allowed at indexing (G5).
 - RAG through the proxy with `<context>` tags: benign context untouched, poisoned retrieved document blocked as `rag`.
 - Found and fixed: real web pages were all flagged (D-051), RAG/inline-file gaps in the proxy (D-050). Open: BACKLOG G3–G7.
 - These engine changes (D-050/D-051) are not in the B3 numbers; the pending rerun (F3) measures them.

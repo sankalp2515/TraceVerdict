@@ -62,4 +62,4 @@ where = ["."]
 include = ["intentseal_core*"]
 
 [tool.setuptools.package-data]
-intentseal_core = ["data/*.json", "defaults/*.yaml", "defaults/policy-templates/*.yaml"]
+intentseal_core = ["defaults/*.yaml", "defaults/policy-templates/*.yaml"]

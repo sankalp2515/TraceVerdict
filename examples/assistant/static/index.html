@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Assistant</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --panel: #ffffff; --ink: #1c2421; --muted: #5d6a65; --line: #dfe4e1;
+    --accent: #145c4a; --accent-ink: #ffffff; --user: #e8f1ed;
+    --ok: #1d6b3a; --ok-bg: #e3f3e8; --warn: #8a5a00; --warn-bg: #fdf1d8; --bad: #a3271f; --bad-bg: #fbe5e3;
+    --info: #285a8a; --info-bg: #e5eef8;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111614; --panel: #18201d; --ink: #e4ebe8; --muted: #9aa8a2; --line: #2a3531;
+      --accent: #4fb393; --accent-ink: #0d1412; --user: #1f2e29;
+      --ok: #7fd49c; --ok-bg: #173323; --warn: #f0c26a; --warn-bg: #3a2c12; --bad: #f19a92; --bad-bg: #3d1c19;
+      --info: #9cc3ec; --info-bg: #1a2a3b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  #chat { display: flex; flex-direction: column; height: calc(100vh - 100px); min-height: 480px; }
+  #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 92%; padding: 10px 14px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--user); }
+  .msg.bot { align-self: flex-start; border: 1px solid var(--line); }
+  .msg.err { border-color: var(--bad); color: var(--bad); }
+  .trace { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; font-size: 13px; white-space: normal; }
+  .trace summary { cursor: pointer; color: var(--muted); }
+  .step { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .step:last-child { border-bottom: 0; }
+  .step .what { overflow-wrap: anywhere; }
+  .step .why { color: var(--muted); font-size: 12px; }
+  .badge { display: inline-block; font: 600 11px/1 var(--mono); padding: 4px 6px; border-radius: 5px; text-align: center; }
+  .ALLOW { color: var(--ok); background: var(--ok-bg); }
+  .NEUTRALISE { color: var(--info); background: var(--info-bg); }
+  .ESCALATE { color: var(--warn); background: var(--warn-bg); }
+  .BLOCK, .UNAVAILABLE { color: var(--bad); background: var(--bad-bg); }
+  .proxy { color: var(--muted); background: var(--bg); }
+  .monitor-note { color: var(--warn); font-size: 12px; }
+  form#send { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); align-items: flex-end; }
+  textarea { flex: 1; min-height: 44px; max-height: 200px; resize: vertical; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  button, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 9px 14px; border-radius: 8px; font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:disabled { opacity: .6; cursor: wait; }
+  button:focus-visible, textarea:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  aside { display: flex; flex-direction: column; gap: 16px; }
+  aside section { padding: 14px; }
+  aside h2 { font-size: 14px; margin: 0 0 8px; }
+  dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 13px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12px; }
+  ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  li { margin: 3px 0; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .alert { border: 1px solid var(--bad); background: var(--bad-bg); color: var(--bad); padding: 10px 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; }
+  a { color: var(--accent); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  label.check { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .mail { border-top: 1px solid var(--line); padding: 6px 0; font-size: 13px; }
+  .mail b { font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Test Assistant</h1>
+    <div class="sub">Your own files, web pages, email and knowledge base, protected by IntentSeal</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="new" type="button">New conversation</button>
+</header>
+<main>
+  <div id="chat" class="panel">
+    <div id="log" aria-live="polite"></div>
+    <form id="send">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label class="btn" for="file" style="text-align:center">Attach file</label>
+        <input id="file" type="file" hidden>
+        <label class="check"><input id="tokb" type="checkbox"> to knowledge base</label>
+      </div>
+      <textarea id="input" placeholder="Ask anything, e.g. “Summarise uploads/report.pdf”, “What is our refund policy?”, “Read my inbox”, “Fetch https://example.com”" aria-label="Message"></textarea>
+      <button class="primary" id="go" type="submit">Send</button>
+    </form>
+  </div>
+  <aside>
+    <section class="panel" id="conn"><h2>Connection</h2><p class="muted">Loading…</p></section>
+    <section class="panel"><h2>Knowledge base</h2><div id="kb" class="muted">…</div>
+      <div class="row" style="margin-top:8px"><button id="reindex" type="button">Re-index kb/</button></div></section>
+    <section class="panel"><h2>Outbox <span class="muted">(emails the assistant sent)</span></h2><div id="outbox" class="muted">…</div></section>
+  </aside>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+let conversation = null, status = null;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function badge(d) {
+  const cls = d === "via proxy" ? "proxy" : esc(d);
+  return `<span class="badge ${cls}">${esc(d === "via proxy" ? "PROXY" : d)}</span>`;
+}
+
+function traceHtml(trace, session) {
+  if (!trace?.length) return "";
+  const flagged = trace.filter((t) => !["ALLOW", "via proxy"].includes(t.decision)).length;
+  const rows = trace.map((t) => {
+    const what = t.kind === "action"
+      ? `<b>${esc(t.tool)}</b> <span class="muted">${esc(JSON.stringify(t.args ?? {}))}</span>`
+      : `read <b>${esc(t.source)}</b> · ${esc(t.item ?? "")}`;
+    const monitored = t.enforced && t.enforced !== t.decision ? `<div class="monitor-note">monitor mode: recorded, not enforced</div>` : "";
+    const why = t.decision !== "ALLOW" && (t.rule || t.reason)
+      ? `<div class="why">${esc(t.rule ?? "")}${t.labels?.length ? " · " + esc(t.labels.join(", ")) : ""}${t.reason ? " — " + esc(t.reason) : ""}</div>` : "";
+    const pinned = t.pinned ? `<div class="why">pinned: ${esc(JSON.stringify(t.pinned))}</div>` : "";
+    return `<div class="step"><div>${badge(t.decision)}</div><div class="what">${what}${why}${pinned}${monitored}</div></div>`;
+  }).join("");
+  const link = status?.console && session ? ` · <a href="${esc(status.console)}/#/replay?session=${encodeURIComponent(session)}" target="_blank" rel="noopener">replay in Console</a>` : "";
+  return `<details class="trace" ${flagged ? "open" : ""}><summary>What IntentSeal checked: ${trace.length} step(s), ${flagged} flagged${link}</summary>${rows}</details>`;
+}
+
+function add(role, html, extra = "") {
+  const div = document.createElement("div");
+  div.className = `msg ${role} ${extra}`;
+  div.innerHTML = html;
+  $("#log").appendChild(div);
+  $("#log").scrollTop = $("#log").scrollHeight;
+  return div;
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`);
+  return data;
+}
+
+function renderKb(kb) {
+  if (!kb) { $("#kb").innerHTML = "Not indexed."; return; }
+  const q = (kb.quarantined || []).map((f) => `<li>${badge(f.decision)} ${esc(f.file)}<div class="why muted">${esc(f.rule ?? "")} ${esc(f.reason ?? "")}</div></li>`).join("");
+  const ok = (kb.indexed || []).map((f) => `<li>${badge(f.decision === "not checked (proxy mode)" ? "via proxy" : f.decision)} ${esc(f.file)}</li>`).join("");
+  $("#kb").innerHTML = `<div>${kb.files} file(s), ${kb.chunks} passage(s) indexed${kb.quarantined?.length ? `, <b>${kb.quarantined.length} kept out</b>` : ""}</div>`
+    + (q ? `<p class="muted" style="margin:8px 0 2px">Kept out of the index:</p><ul>${q}</ul>` : "")
+    + (ok ? `<details><summary class="muted">Indexed files</summary><ul>${ok}</ul></details>` : "");
+}
+
+async function loadStatus() {
+  try {
+    status = await api("/api/status");
+    const p = status.policy || {};
+    const mode = p.mode ? `<span class="badge ${p.mode === "enforce" ? "ALLOW" : "ESCALATE"}">${esc(p.mode.toUpperCase())}</span>` : "";
+    let warn = "";
+    if (status.error) warn = `<div class="alert">${esc(status.error)}\n\nCheck INTENTSEAL_URL / INTENTSEAL_KEY, and that agent “${esc(status.agent)}” is registered (Console → Set up). Then press Reconnect.</div>`;
+    else if (p.status && p.status !== 200) warn = `<div class="alert">The gateway has no policy for “${esc(status.agent)}” (HTTP ${p.status}). Register it in Console → Set up.</div>`;
+    $("#conn").innerHTML = `<h2>Connection</h2>${warn}<dl>
+      <dt>Gateway</dt><dd>${esc(status.gateway)}</dd>
+      <dt>Agent</dt><dd>${esc(status.agent)} ${mode}</dd>
+      <dt>Connected by</dt><dd>${esc(status.connect === "proxy" ? "LLM proxy (no SDK)" : "IntentSeal SDK")}</dd>
+      <dt>Model</dt><dd>${esc(status.provider)} · ${esc(status.model)}</dd>
+      <dt>Signed in as</dt><dd>${esc(status.user_email)}</dd>
+      <dt>Workspace</dt><dd>${esc(status.workspace)}</dd></dl>
+      ${p.mode === "monitor" ? `<p class="monitor-note">Monitor mode: everything is checked and recorded, nothing is blocked. Switch to enforce on the Console Policy page.</p>` : ""}
+      <div class="row" style="margin-top:8px"><a href="${esc(status.console)}/#/decisions" target="_blank" rel="noopener">Console decisions</a><button id="reconnect" type="button">Reconnect</button></div>`;
+    $("#reconnect").onclick = async () => { await api("/api/restart", {}); loadStatus(); };
+    renderKb(status.kb);
+  } catch (e) { $("#conn").innerHTML = `<h2>Connection</h2><div class="alert">${esc(e.message)}</div>`; }
+}
+
+async function loadOutbox() {
+  try {
+    const mails = await api("/api/outbox");
+    $("#outbox").innerHTML = mails.length ? mails.slice(0, 8).map((m) => `<div class="mail"><b>To:</b> ${esc(m.to)}<br><b>Subject:</b> ${esc(m.subject)}<div class="muted">${esc(String(m.body).slice(0, 160))}</div></div>`).join("") : "Nothing sent yet.";
+  } catch { $("#outbox").textContent = "Unavailable."; }
+}
+
+$("#send").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("#input").value.trim();
+  if (!text) return;
+  $("#input").value = "";
+  add("user", esc(text));
+  const pending = add("bot", "<span class='muted'>Working… (each file, page and action is checked first)</span>");
+  $("#go").disabled = true;
+  try {
+    const r = await api("/api/chat", { message: text, conversation_id: conversation });
+    conversation = r.conversation_id;
+    pending.innerHTML = (r.error ? `<span>${esc(r.error)}</span>` : esc(r.answer || "(no answer)")) + traceHtml(r.trace, r.session_id);
+    if (r.error) pending.classList.add("err");
+  } catch (err) { pending.textContent = err.message; pending.classList.add("err"); }
+  $("#go").disabled = false;
+  loadOutbox();
+};
+$("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#send").requestSubmit(); } });
+$("#new").onclick = () => { conversation = null; $("#log").innerHTML = ""; add("bot", "New conversation. IntentSeal starts a fresh session for it.", ""); };
+$("#reindex").onclick = async () => { $("#kb").textContent = "Indexing (each file is checked)…"; try { renderKb(await api("/api/kb/reindex", {})); } catch (e) { $("#kb").textContent = e.message; } };
+$("#file").onchange = async () => {
+  const f = $("#file").files[0];
+  if (!f) return;
+  const data = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = bad; r.readAsDataURL(f); });
+  const toKb = $("#tokb").checked;
+  try {
+    const r = await api("/api/upload", { name: f.name, data_b64: data, to_knowledge_base: toKb });
+    if (toKb) { renderKb(r.kb); add("bot", `Added <b>${esc(r.path)}</b> to the knowledge base (checked before indexing — see the panel on the right).`); }
+    else { $("#input").value = ($("#input").value + ` ${r.path}`).trim(); $("#input").focus(); add("bot", `Uploaded <b>${esc(r.path)}</b>. Ask me about it.`); }
+  } catch (e) { add("bot", esc(e.message), "err"); }
+  $("#file").value = "";
+};
+add("bot", "Hi! I can read your files (PDF, Word, Markdown, HTML, email, JSON, code, images), web pages and APIs, your inbox and the knowledge base, write notes and send email. Every message, file and action passes through IntentSeal first; open “What IntentSeal checked” under each answer.");
+loadStatus(); loadOutbox();
+</script>
+</body>
+</html>

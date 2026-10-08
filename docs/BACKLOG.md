@@ -73,3 +73,15 @@ IntentSeal flagged; (c) both: S7 for the compromise, S2/S3 for detection on docu
 | F3 | Rerun the final evaluation on the merged engine (D-047/D-048 change enforcement) after the free quotas reset: `sh eval/run_final.sh`, then summary + readme | Eng | M (waiting) |
 | F4 | Proxy: native AWS Bedrock and Vertex AI SDK formats (today: SDK or REST path); native Gemini `generateContent` | Eng | M |
 | F5 | E4 PyPI packaging (held by the owner): config and templates inside the package, `intentseal init`, per-user data dir, extras, LICENSE, TestPyPI | Eng + Owner | M |
+
+## G. Found by using the product on real input (8 Oct, `examples/assistant`)
+
+| # | Item | Who | Size |
+|---|---|---|---|
+| G1 | ~~Real web pages all flagged as hidden-text attacks; second page held; structural flag shielded the visible text of long pages~~ ✅ D-051 (9/13 real sites now allowed with session risk 0, was 2/13) | Eng | ✅ |
+| G2 | ~~RAG context in system/user messages bypassed the proxy or counted as the user's words; inline images not OCR-inspected~~ ✅ D-050 | Eng | ✅ |
+| G3 | Long real pages (≈150 KB+) take 15–55 s and can be held on the free-tier judge (window cap, rate limits). Options: paid judge tier, per-agent `judge_max_windows`, judge main-article text only, or `judge_untrusted: classifier` for read-only agents | Owner (cost) / Eng | M |
+| G4 | After a poisoned document raises session risk, later **user** messages in that conversation are held (`session-risk-escalate`). Session risk from third-party content should gate actions and further third-party content, not the user's own words; user-turn risk (multi-step) should come from user turns | Eng (engine; needs rerun) | S |
+| G5 | One generated look-alike-letter knowledge-base payload (open another customer's record) judged benign at indexing time (no task context then) | Eng (judge prompt / ingestion context) | S |
+| G6 | No output-side check: a secret the model repeats in its **answer** text is not scanned (tool arguments are). Add the outbound/canary scan to final answers (proxy responses, SDK helper) | Eng | S |
+| G7 | promptfoo `redteam eval` needs a verified email; generated tests run as plain evals meanwhile (`to_plain_eval.py`) | Owner | S |

@@ -1,7 +1,7 @@
 # Status
 
 Updated: **Tue 7 Oct 2026, evening (Day 3 of 7)** · Deadline **Sat 11 Oct 2026, 11:59 PM IST** · Product name: **IntentSeal** · tagline “Keep AI agents inside the user’s intent” (D-032)
-Tests: **223 passing** offline (`.venv/Scripts/python -m pytest -q`; storage contract tests also on PostgreSQL when
+Tests: **228 passing** offline (`.venv/Scripts/python -m pytest -q`; storage contract tests also on PostgreSQL when
 `INTENTSEAL_TEST_DATABASE_URL` is set, as in CI) · lint clean (`ruff check .`) · secret scan clean (`python scripts/secret_scan.py --all`).
 
 ## 1. Headline numbers
@@ -140,6 +140,22 @@ S9 runs the unmodified OpenAI-SDK agent through the gateway's own proxy (OFF = m
 
 DEF-025…031 come from the 7 Oct production-readiness audit (D-039). Open from before: DEF-013 (Groq rejects some
 malformed tool calls), DEF-015 (Console visual quality → owner).
+
+## 4b. Real-input testing (8 Oct evening)
+
+`examples/assistant`: a real tool-calling assistant (SDK remote mode, or proxy) over real files, web pages, APIs, email
+files, OCR and a knowledge base, registered through the onboarding API from the new `rag-assistant` template. Live on
+Groq + the local gateway, enforce mode:
+- All 11 input sources work on ordinary tasks; every step checked and shown under the answer.
+- Test pack (11 generated payloads in PDF, hidden-text PDF, DOCX, hidden-run DOCX, HTML, hidden-div HTML, email,
+  Markdown, PNG, JSON API, code): **11/11 blocked** (one needed a retry after a judge rate-limit hold).
+- 12 fresh promptfoo attacks generated for this assistant (hijacking, prompt extraction, excessive agency; plain and
+  base64): 0 compromised, 11 flagged. 10 generated user-turn prompts: 6 blocked at the user message, none caused harm.
+- Allowed internal email ALLOW; external recipient BLOCK; unrequested send ESCALATE → approved once → next identical
+  attempt escalated again.
+- RAG through the proxy with `<context>` tags: benign context untouched, poisoned retrieved document blocked as `rag`.
+- Found and fixed: real web pages were all flagged (D-051), RAG/inline-file gaps in the proxy (D-050). Open: BACKLOG G3–G7.
+- These engine changes (D-050/D-051) are not in the B3 numbers; the pending rerun (F3) measures them.
 
 ## 5. What is left
 

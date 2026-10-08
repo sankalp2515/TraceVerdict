@@ -49,6 +49,23 @@ Per agent, in its policy (`upstream.key`):
 - `client`: the agent keeps its own provider key and sends it in the `X-Upstream-Key` header. The gateway forwards it
   and never stores it (it is redacted from logs).
 
+### RAG applications
+
+Retrieved documents are third-party content, whatever message they are placed in.
+- **Proxy**: wrap each retrieved chunk in `<document>…</document>` (inside `<context>…</context>`; also recognised:
+  `<documents>`, `<search_results>`, `<retrieved>`, `<retrieved_context>`, `<knowledge>`; configurable with
+  `INTENTSEAL_PROXY_CONTEXT_TAGS`) in the system or the user message. Tagged text is inspected as untrusted `rag` content
+  and cleaned in place; the operator's prompt outside the tags stays trusted and the user's own words are checked
+  first and stay the user's (D-050). Untagged context pasted into the user message is judged as the user's words, with
+  the weaker user-turn checks; untagged context in the system prompt is not inspected.
+- **SDK**: check each file when it is **indexed** (`guard.inspect_result(data, source="rag", filename=...)`; keep
+  BLOCK/ESCALATE files out, index `cleaned_content`) and each chunk when it is **retrieved**
+  (`guard.inspect(chunk, source="rag")` inside the user's session).
+- Inline images and PDFs in user messages (`data:` URLs, Anthropic `image` / `document` blocks) are extracted and
+  OCR-inspected by the proxy; remote image URLs are fetched by the provider, not by the gateway.
+- Console → Set up has a **Knowledge assistant (RAG)** template and a **RAG app** connect tab.
+  `examples/assistant` is a complete, runnable example (SDK path, or proxy with `ASSISTANT_CONNECT=proxy`).
+
 ## 3. Step by step
 
 | # | Who | What | Where |

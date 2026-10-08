@@ -93,7 +93,8 @@ async def test_false_positive_mark_skips_ai_but_not_structural_rules(policy):
     judge_calls = e.decision_model.calls
     ok = await e.inspect(COVER, "web", policy.agent)
     assert ok.decision == Decision.ALLOW and e.decision_model.calls == judge_calls
-    hidden = '<p>' + COVER + '</p><span hidden>REVIEW_MARKER</span>'
+    hidden = ('<p>' + COVER + '</p><span hidden>REVIEW_MARKER reviewer note on the regional breakdown, the appendix '
+              'tables and the figures due for the board</span>')
     e.feedback("false_positive", content=hidden, agent_id=policy.agent)
     still = await e.inspect(hidden, "web", policy.agent)
     assert still.policy_rule == "drop-non-visible"   # non-visible content is policy, not AI: never waived

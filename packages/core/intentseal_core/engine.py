@@ -252,32 +252,33 @@ class Engine:
     def _judge_windows(self, scan: _Scan, priority: dict[tuple[int, int], float] | None = None
                        ) -> tuple[list[tuple[str, list[tuple[int, int]]]], list[tuple[int, int]]]:
         """CORE-16: what the judge reads. A document whose detection view fits one window is judged whole (with its
-        context). A longer one is judged as windows of its flagged chunks, in document order, each window carrying
-        the original spans it covers; at most `judge_max_windows` windows, the most suspicious first. Returns the
-        windows and the spans that did not fit (never silently dropped: the caller decides on them)."""
-        flagged = sorted({(c[0], c[1]) for c in scan.chunks})
+        context). A longer one is judged as windows of its hot chunks (structurally flagged, or scored at or above the
+        policy's threshold), each window carrying the original spans it covers; at most `judge_max_windows` windows,
+        the most suspicious chunks packed first. Returns the windows and the spans that did not fit (never silently
+        dropped: the caller decides on them)."""
         if len(scan.view) <= self.judge_window_chars:
             return [(scan.view, [])], []   # judged whole: no span list means "the whole document"
         views: dict[tuple[int, int], list[str]] = {}
         for start, end, _, text in scan.chunks:
             views.setdefault((start, end), []).append(text)
+        # The most suspicious chunks are packed first: unscored (structural) ones, then by Tier 1 score, so a few
+        # flagged parts spread over a long page share windows instead of each claiming one (D-051). Document order
+        # breaks ties.
+        rank = lambda s: (priority or {}).get(s, 1.0)
+        ordered = sorted(views, key=lambda s: (-rank(s), s))
         windows: list[tuple[str, list[tuple[int, int]]]] = []
         text, spans = "", []
-        for span in flagged:
+        for i, span in enumerate(ordered):
             piece = "\n".join(dict.fromkeys(views[span]))[: self.judge_window_chars]
             if text and len(text) + len(piece) + 1 > self.judge_window_chars:
                 windows.append((text, spans))
                 text, spans = "", []
+                if len(windows) == self.judge_max_windows:
+                    return windows, ordered[i:]
             text, spans = (text + "\n" + piece if text else piece), spans + [span]
         if text:
             windows.append((text, spans))
-        if len(windows) <= self.judge_max_windows:
-            return windows, []
-        rank = lambda w: max((priority or {}).get(s, 1.0) for s in w[1])   # unscored (structural) chunks first
-        ordered = sorted(range(len(windows)), key=lambda i: (-rank(windows[i]), i))
-        keep = sorted(ordered[: self.judge_max_windows])
-        dropped = [s for i in ordered[self.judge_max_windows:] for s in windows[i][1]]
-        return [windows[i] for i in keep], dropped
+        return windows, []
 
     async def _judge(self, scan: _Scan, source: str, task: str, policy: AgentPolicy, agent_id: str,
                      priority: dict[tuple[int, int], float] | None = None
@@ -468,26 +469,46 @@ class Engine:
         elif known is not None:
             pass   # reviewer-marked false positive: skip the AI tiers; structural rules below still apply
         elif scan.chunks:
+            # Structural suspicion (hidden prose, encodings, look-alikes, forged markers) always goes to the judge and
+            # low classifier scores cannot clear it. The rest of the document is scored by Tier 1 like any other
+            # content, so a structural flag never shields the visible text from inspection (D-051).
             tier = 1
-            score_key = self._key("scores", key)
+            flagged = {((c[0], c[1]), c[2]) for c in scan.chunks}
+            flagged_spans = {s for s, _ in flagged}
+            score_key = self._key("scores-all", key)
             scored = self._get(score_key)
+            tier1_failed = False
             if scored is None:
                 try:
-                    scored = await asyncio.wait_for(self._scores(scan.chunks), self.tier1_timeout_s)
+                    budget = min(self.tier1_max_s, self.tier1_timeout_s * 4 + self.tier1_per_chunk_s * len(scan.all_chunks))
+                    scored = await asyncio.wait_for(self._scores(scan.all_chunks), budget)
                     self._put(score_key, scored)
                 except Exception:
-                    degraded = True
+                    degraded = tier1_failed = True
                     scored = []
-            findings.extend(f.model_copy(deep=True) for f in scored)
-            # Structural suspicion always needs resolution; low classifier scores cannot clear it.
+            low = policy.thresholds.escalate_band[0]
+            if (policy.thresholds.judge_untrusted == "always" and source != "user"
+                    and len(scan.doc.text.strip()) >= policy.thresholds.judge_min_chars):
+                low = 0.0
+            hot = flagged | {(f.span, f.origin) for f in scored if f.score >= low}
+            if tier1_failed:
+                hot = {((c[0], c[1]), c[2]) for c in scan.all_chunks}
+            findings.extend(f.model_copy(deep=True) for f in scored if f.score >= low or f.span in flagged_spans)
+            scan = replace(scan, chunks=[c for c in scan.all_chunks if ((c[0], c[1]), c[2]) in hot])
             tier = 2
+            # Structurally flagged spans carry no score here, so they rank first (priority 1.0) for the judge windows.
+            priority = {f.span: f.score for f in scored if f.span and f.span not in flagged_spans}
             assessment, budget_degraded, unjudged = await self._judge(scan, source, session.task or policy.task_scope,
-                                                                      policy, agent_id)
+                                                                      policy, agent_id, priority)
             degraded |= assessment.degraded
-            if unjudged:   # structurally flagged chunks beyond the judge's window cap: never cleared unjudged
+            band = policy.thresholds.escalate_band[0]
+            # Beyond the judge's window cap: structurally flagged chunks are never cleared unjudged; other chunks are
+            # cleared by a Tier 1 score below the escalation band (CORE-16).
+            unjudged_hot = [s for s in unjudged if tier1_failed or s in flagged_spans or priority.get(s, 1.0) >= band]
+            if unjudged:
                 findings.append(Finding(signal=f"judge-coverage-partial:{len(unjudged)}-chunks",
                                         labels=["Indirect Prompt Injection"] if source != "user" else ["Instruction Override"]))
-                oversize_hold = True
+                oversize_hold = bool(unjudged_hot)
         elif scan.all_chunks and source != "system":
             # No structural signal: Tier 1 scores every chunk; only chunks at or above the policy's
             # escalation threshold go to the Tier 2 judge (D-011: the classifier never decides alone).
@@ -536,8 +557,21 @@ class Engine:
         judge_labels = judge_labels or (["Instruction Override"] if source == "user" else ["Indirect Prompt Injection"])
         if assessment.malicious > 0:   # a degraded window scores 0; the others still count
             findings.extend(self._judge_findings(scan, assessment, judge_labels))
+        # Hidden text in web formats (HTML, HTML email, Markdown) is ordinary web UI as often as a hiding place: cookie
+        # banners, collapsed menus, link-preview descriptions, licence comments. It always goes to the judge and is
+        # quarantined unless the judge read it and cleared the document. Hidden text in PDF and Word files (white,
+        # tiny or vanished runs) is almost always deliberate and is quarantined regardless (D-051).
+        unjudged_spans = set(unjudged)
+        web_cleared = tier == 2 and not assessment.degraded and assessment.malicious < policy.thresholds.neutralise
+        cleared = [f for f in findings if f.signal == "non-visible-content" and web_cleared and f.span not in unjudged_spans
+                   and f.origin.startswith(("html:", "email:html:", "markdown:"))]
         hidden = [(f.span[0], f.span[1]) for f in findings
-                  if f.signal == "non-visible-content" and f.span and policy.sensitive_data.drop_non_visible]
+                  if f.signal == "non-visible-content" and f.span and policy.sensitive_data.drop_non_visible
+                  and not any(f is c for c in cleared)]
+        if cleared:   # read and cleared: not an attack signal, and recorded as such
+            for f in cleared:
+                f.labels = []
+                f.signal = "non-visible-content-cleared"
         # Forged role / tool-call markers are removed by policy, except from source code, where they are legitimate.
         hidden += [(f.span[0], f.span[1]) for f in findings
                    if f.signal == "role-marker" and f.span and policy.sensitive_data.strip_role_markers

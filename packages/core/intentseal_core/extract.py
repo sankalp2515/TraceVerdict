@@ -54,6 +54,17 @@ def _short_metadata(value: object) -> bool:
     return value is not None and len(str(value).split()) <= 12
 
 
+_WORD = re.compile(r"[^\W\d_]{2,}")
+
+
+def _page_furniture(value: object) -> bool:
+    """Short non-visible web-page text that every real page has: alt text, tooltips, ARIA labels, technical <meta>
+    values, build comments, collapsed menu items. Measured on 14 real sites (8 Oct): every page had some, so treating
+    it as hidden text quarantined every page (D-051). It stays in the document view and is scored like visible text
+    (Tier 1, and the judge when the policy asks); only longer hidden prose is flagged structurally."""
+    return value is not None and len(_WORD.findall(str(value))) <= 12
+
+
 def _add(doc: ExtractedDoc, text: str | None, origin: str, visible: bool = True) -> None:
     if text is None:
         return
@@ -195,18 +206,22 @@ def _html(data: bytes | str, doc: ExtractedDoc) -> None:
     from bs4 import BeautifulSoup, Comment
 
     soup = BeautifulSoup(_as_text(data), "html.parser")
+    # Non-visible text is surfaced either way; short page furniture is ordinary text, longer hidden prose is flagged.
     for c in soup.find_all(string=lambda s: isinstance(s, Comment)):
-        _add(doc, str(c), "html:comment", visible=False)
+        _add(doc, str(c), "html:comment", visible=_page_furniture(c))
         c.extract()
     if soup.title:
         _add(doc, soup.title.get_text(), "html:title")
     for m in soup.find_all("meta"):
-        _add(doc, m.get("content"), f"html:meta:{m.get('name') or m.get('property') or 'meta'}", visible=False)
+        _add(doc, m.get("content"), f"html:meta:{m.get('name') or m.get('property') or 'meta'}",
+             visible=_page_furniture(m.get("content")))
     for tag in soup.find_all(["script", "style", "template", "noscript"]):
         if tag.name in ("template", "noscript"):
-            _add(doc, tag.get_text(" "), f"html:{tag.name}", visible=False)
+            text = tag.get_text(" ")
+            _add(doc, text, f"html:{tag.name}", visible=_page_furniture(text))
         elif tag.name == "script" and tag.get("type", "").lower() in ("application/ld+json", "application/json"):
-            _add(doc, tag.get_text(" "), "html:script-data", visible=False)
+            text = tag.get_text(" ")
+            _add(doc, text, "html:script-data", visible=_page_furniture(text))
         tag.decompose()
     hidden = [t for t in soup.find_all(True)
               if t.has_attr("hidden") or t.get("aria-hidden") == "true"
@@ -214,12 +229,15 @@ def _html(data: bytes | str, doc: ExtractedDoc) -> None:
     hidden_ids = {id(t) for t in hidden}
     outermost = [t for t in hidden if not any(id(p) in hidden_ids for p in t.parents)]
     for t in outermost:
-        _add(doc, t.get_text(" "), "html:hidden-element", visible=False)
+        text = t.get_text(" ")
+        _add(doc, text, "html:hidden-element", visible=_page_furniture(text))
         t.decompose()
     for t in soup.find_all(True):
         for attr in ("alt", "title", "aria-label", "placeholder", "data-prompt", "data-instructions"):
             if t.has_attr(attr):
-                _add(doc, t.get(attr), f"html:attr:{attr}", visible=False)
+                # attributes named for a model are never furniture
+                ordinary = attr not in ("data-prompt", "data-instructions") and _page_furniture(t.get(attr))
+                _add(doc, t.get(attr), f"html:attr:{attr}", visible=ordinary)
     body = soup.body or soup
     _add(doc, re.sub(r"\n\s*\n+", "\n", body.get_text("\n")), "html:body")
 

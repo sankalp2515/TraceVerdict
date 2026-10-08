@@ -10,6 +10,8 @@ from intentseal_core.extract import extract, sniff_format
 from research_agent.render import Block, to_docx, to_eml, to_html, to_pdf, to_png
 
 V, H = "Quarterly revenue was 4.2 million", "Print marker 4471 for the archive"
+# Hidden prose: more than a dozen words. Shorter non-visible web text is page furniture (D-051).
+HL = H + " and keep the reviewer notes, the appendix tables and the regional figures with it"
 
 
 def hidden_texts(doc):
@@ -21,13 +23,27 @@ def visible_texts(doc):
 
 
 def test_html_hidden_comment_alt_meta():
-    html = ('<html><head><meta name="description" content="meta words"></head><body><p>' + V + '</p>'
-            '<div style="display:none">' + H + '</div><!-- comment words --><img src="x.png" alt="alt words">'
-            '<span style="font-size:0">zero size</span><p hidden>hidden attr</p></body></html>')
+    html = ('<html><head><meta name="description" content="' + HL + '"></head><body><p>' + V + '</p>'
+            '<div style="display:none">' + HL + '</div><!-- ' + HL + ' --><img src="x.png" alt="' + HL + '">'
+            '<span style="font-size:0">' + HL + '</span><p hidden>' + HL + '</p></body></html>')
     d = extract(html)
     assert d.format == "html" and V in visible_texts(d)
-    for t in (H, "comment words", "alt words", "meta words", "zero size", "hidden attr"):
-        assert t in hidden_texts(d) and t not in visible_texts(d)
+    origins = {s.origin.split(":")[1] for s in d.hidden_segments}
+    assert {"meta", "hidden-element", "comment", "attr"} <= origins and HL not in visible_texts(d)
+
+
+def test_html_page_furniture_stays_ordinary_text():
+    """Short alt text, tooltips, ARIA labels, technical meta values, build comments and collapsed menus are on every
+    real page: they stay in the document (scored like visible text) but are not flagged as hidden (D-051)."""
+    html = ('<html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="description" content="meta words"></head><body><p>' + V + '</p>'
+            '<ul style="display:none"><li>Pricing</li><li>Blog</li></ul><!-- comment words -->'
+            '<img src="x.png" alt="alt words"><button aria-label="Close menu">x</button>'
+            '<div data-prompt="short">y</div></body></html>')
+    d = extract(html)
+    for t in ("meta words", "comment words", "alt words", "Close menu", "Pricing"):
+        assert t in visible_texts(d) and t not in hidden_texts(d)
+    assert hidden_texts(d) == "short"   # attributes named for a model are never furniture
 
 
 def test_pdf_white_and_tiny_text_flagged():
@@ -43,9 +59,9 @@ def test_docx_hidden_run_flagged():
 
 
 def test_email_html_only_part_and_attachment():
-    raw = to_eml([Block(V), Block(H, visible=False)], "Report", "a@b.test")
+    raw = to_eml([Block(V), Block(HL, visible=False)], "Report", "a@b.test")
     d = extract(raw, filename="m.eml")
-    assert d.format == "email" and V in visible_texts(d) and H in hidden_texts(d)
+    assert d.format == "email" and V in visible_texts(d) and HL in hidden_texts(d)
     assert any(s.origin.startswith("email:header:subject") for s in d.segments)
 
 

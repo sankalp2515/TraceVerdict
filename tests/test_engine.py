@@ -15,7 +15,9 @@ from intentseal_core.store import Store
 from intentseal_core.types import ATTACK_TYPES, Decision
 
 MARKER = "REVIEW_MARKER"
-FLAGGED = '<p>Quarterly report ready.</p><span hidden>' + MARKER + '</span>'
+# Hidden prose (more than a dozen words): flagged structurally. Shorter hidden text is page furniture (D-051).
+HIDDEN_NOTE = MARKER + " reviewer note on the regional breakdown, the appendix tables and the figures due for the board"
+FLAGGED = '<p>Quarterly report ready.</p><span hidden>' + HIDDEN_NOTE + '</span>'
 
 
 class Scorer:
@@ -61,17 +63,31 @@ async def test_single_entry_for_all_channels(policy, source):
     assert r.decision == Decision.ALLOW and e.logger.decisions()[0]["source"] == source
 
 
-async def test_hidden_content_quarantined_despite_benign_judge(policy):
+async def test_hidden_web_text_is_judged_and_cleared_by_a_benign_judge(policy):
+    """D-051: hidden text in web formats is ordinary web UI as often as a hiding place; it always goes to the judge
+    and stays unless the judge flags the document. Not an attack signal once cleared."""
     e = engine(policy)
     r = await e.inspect(FLAGGED, "web", policy.agent)
+    assert r.decision == Decision.ALLOW and r.tier == 2 and e.decision_model.calls == 1
+    assert MARKER in r.cleaned_content and r.session_risk == 0.0
+    assert any(f.signal == "non-visible-content-cleared" and not f.labels for f in r.findings)
+    assert all(set(f.labels) <= set(ATTACK_TYPES) for f in r.findings)
+
+
+async def test_hidden_document_text_quarantined_despite_benign_judge(policy):
+    """White, tiny or vanished text in PDF and Word files is almost always deliberate: quarantined regardless."""
+    from research_agent.render import Block, to_docx
+    e = engine(policy)
+    r = await e.inspect(to_docx([Block("Quarterly report ready."), Block(HIDDEN_NOTE, visible=False)]), "docx",
+                        policy.agent, filename="r.docx")
     assert r.decision == Decision.NEUTRALISE and r.policy_rule == "drop-non-visible"
     assert MARKER not in r.cleaned_content and "Quarterly report ready." in r.cleaned_content
     assert "[QUARANTINED]" in r.cleaned_content and "UNTRUSTED-" in r.cleaned_content
     assert r.tier == 2 and e.decision_model.calls == 1
-    assert all(f.labels and set(f.labels) <= set(ATTACK_TYPES) for f in r.findings)
+    assert all(f.labels and set(f.labels) <= set(ATTACK_TYPES) for f in r.findings if f.signal != "classifier")
     event = e.logger.session_events(e.logger.decisions()[0]["session_id"])[0]
     hidden = next(f for f in event["findings"] if f["signal"] == "non-visible-content")
-    assert hidden["span_start"] == 0 and hidden["span_end"] == len(MARKER)
+    assert hidden["span_end"] - hidden["span_start"] == len(HIDDEN_NOTE)
 
 
 async def test_classifier_is_advice_not_a_decider(policy):
@@ -142,7 +158,8 @@ async def test_session_accumulation_decay_and_cached_scan(policy):
     assert any(r.policy_rule == "session-risk-escalate" for r in decisions)
     assert decisions[-1].policy_rule == "session-risk-block"
     assert s.risk == pytest.approx(1.6) and s.turns == 7
-    assert e.decision_model.calls == 1 and len(e.classifiers[0].calls) == 1
+    # every chunk (the visible one too, D-051) is scored once; the cached scan and scores serve the repeats
+    assert e.decision_model.calls == 1 and len(e.classifiers[0].calls) == 2
     await e.inspect("Ordinary report.", "web", policy.agent, s.session_id)
     assert s.risk == pytest.approx(1.4)
 
@@ -201,7 +218,8 @@ async def test_classifier_timeout_is_bounded(policy):
             await asyncio.sleep(1)
     e = engine(policy, classifiers=[SlowScorer()], tier1_timeout_s=0.01)
     r = await e.inspect(FLAGGED, "web", policy.agent)
-    assert r.degraded and r.policy_rule == "drop-non-visible"
+    # Tier 1 timed out: every chunk went to the judge, which read the hidden text too and cleared it (D-051)
+    assert r.degraded and r.decision == Decision.ALLOW and e.decision_model.calls == 1
 
 
 async def test_extraction_warning_and_timeout_are_held(policy, monkeypatch):
@@ -660,3 +678,67 @@ async def test_role_markers_in_source_code_are_not_stripped(policy):
     code = 'TEMPLATE = "<|im_start|>{role}\\n{content}<|im_end|>"\nprint(TEMPLATE)\n'
     r = await e.inspect(code, "tool:read_file", policy.agent, filename="chat.py")
     assert r.decision == Decision.ALLOW and "<|im_start|>" in r.cleaned_content
+
+
+# ---- real web pages (D-051) -------------------------------------------------------------------------------
+
+def _real_page(body: str, furniture: int = 40) -> str:
+    """The shape of a real page: viewport meta, a description, icons with alt text, ARIA labels, build comments, a
+    collapsed menu, JSON-LD; nothing hidden that is longer than a short label."""
+    items = "".join(f'<li><a href="/p{i}" title="Section {i}" aria-label="Open section {i}"><img src="i{i}.svg" '
+                    f'alt="icon {i}"></a><!-- item {i} --></li>' for i in range(furniture))
+    return ('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="description" content="Docs and guides for the product.">'
+            '<script type="application/ld+json">{"@type": "WebSite", "name": "Docs"}</script></head><body>'
+            '<nav><ul style="display:none">' + "<li>Pricing</li><li>Blog</li>" + '</ul><ul>' + items + '</ul></nav>'
+            '<main>' + body + '</main></body></html>')
+
+
+async def test_real_page_furniture_is_not_hidden_text(policy):
+    """Alt text, tooltips, ARIA labels, technical meta values, build comments and short menus are on every real page:
+    they stay readable and are not an attack signal, so a session can read many pages without escalating."""
+    e = engine(policy, classifiers=[Scorer()])
+    s = e.start_session(policy.agent, task="Compare these pages")
+    for i in range(4):
+        r = await e.inspect(_real_page(f"<p>Release notes {i}: faster start-up and a new export button.</p>"), "web",
+                            policy.agent, s.session_id)
+        assert r.decision == Decision.ALLOW and r.policy_rule == "allow", r.policy_rule
+    assert s.risk == 0.0
+
+
+async def test_hidden_web_prose_is_quarantined_unless_the_judge_clears_it(policy):
+    page = _real_page("<p>Release notes.</p><div style='display:none'>" + HIDDEN_NOTE + "</div>")
+    r = await engine(policy, malicious=0.65).inspect(page, "web", policy.agent)          # judge unsure: not cleared
+    assert r.decision == Decision.NEUTRALISE and r.policy_rule == "drop-non-visible" and MARKER not in r.cleaned_content
+    budget = load_policy("research-agent")
+    budget.budgets.daily_tokens_tier2 = 0
+    held = await engine(budget).inspect(page, "web", budget.agent)                       # judge not available
+    assert held.decision != Decision.ALLOW and MARKER not in held.cleaned_content
+
+
+async def test_attributes_named_for_a_model_always_go_to_the_judge(policy):
+    e = engine(policy, malicious=0.65)
+    r = await e.inspect('<p>Hello</p><div data-instructions="summarise briefly">x</div>', "web", policy.agent)
+    assert e.decision_model.calls == 1 and r.policy_rule == "drop-non-visible"
+
+
+async def test_structural_flag_does_not_shield_the_visible_text_of_a_long_page(policy):
+    """Before D-051 a page with any structurally flagged part sent only those parts to Tier 1 and the judge: on a long
+    page the visible body was never scored. Now every chunk is scored and hot visible chunks are judged too."""
+    policy.thresholds.judge_untrusted = "classifier"
+    filler = "".join(f"<p>Paragraph {i} about the product roadmap and the release schedule for the next quarter.</p>"
+                     for i in range(120))
+    page = ("<html><body>" + filler + "<p>" + MARKER + " visible text the classifier scores high.</p>"
+            + filler + "<div style='display:none'>" + HIDDEN_NOTE.replace(MARKER, "plain") + "</div></body></html>")
+    judged: list[str] = []
+
+    class Recorder(StaticDecisionModel):
+        async def assess(self, content, source, task=""):
+            judged.append(content)
+            return await super().assess(content, source, task)
+
+    e = engine(policy, decision_model=Recorder(0.0))
+    r = await e.inspect(page, "web", policy.agent)
+    assert r.decision == Decision.ALLOW
+    assert any(MARKER in text for text in judged), "the hot visible chunk must reach the judge"
+    assert any("reviewer note" in text for text in judged)   # and the hidden prose too (then cleared: benign judge)

@@ -19,8 +19,12 @@ Provider errors are returned with the provider's own status code, so client retr
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
+import os
+import re
 import time
 import uuid
 from collections import OrderedDict
@@ -43,6 +47,13 @@ _SEEN_MAX = 2000   # sessions whose per-message decisions are kept in memory
 # Request fields the proxy itself handles; everything else is forwarded to the agent's own upstream unchanged.
 _OPENAI_HANDLED = {"model", "messages", "tools", "tool_choice", "temperature", "max_tokens", "stream", "stream_options", "n"}
 _STATUS = {"rate_limited": 429, "auth_failed": 401, "not_found": 404, "bad_request": 400, "timeout": 504}
+# RAG apps put retrieved documents into the system or user message. Text inside these tags is third-party content:
+# it is inspected as untrusted (source "rag") on its own, never trusted as the operator's or the user's words (D-050).
+_CONTEXT_TAGS = [t.strip() for t in (os.environ.get("INTENTSEAL_PROXY_CONTEXT_TAGS") or
+                 "document,documents,context,search_results,retrieved,retrieved_context,knowledge").split(",") if t.strip()]
+_CONTEXT = re.compile(r"<(%s)\b[^>]*>(.*?)</\1\s*>" % "|".join(map(re.escape, _CONTEXT_TAGS)), re.S | re.I)
+_DATA_URL = re.compile(r"^data:([\w.+-]+/[\w.+-]+)?(?:;[^,;]*)*;base64,(.*)$", re.S)
+_EXT = {"image/png": "upload.png", "image/jpeg": "upload.jpg", "image/jpg": "upload.jpg", "application/pdf": "upload.pdf"}
 
 
 def _text(content: Any) -> str:
@@ -73,14 +84,17 @@ def _session(request: Request, agent_id: str, opening: list[Any], first_user: st
 
 
 async def _inspect(request: Request, agent_id: str, session_id: str, source: str, text: str,
-                   findings: list[dict[str, Any]]) -> str | None:
-    """PRX-2: the text the model may see instead of `text`, or None when it is allowed unchanged."""
-    if not text:
+                   findings: list[dict[str, Any]], data: bytes | None = None, filename: str | None = None) -> str | None:
+    """PRX-2: the text the model may see instead of `text` (or of the file `data`), or None when it is allowed
+    unchanged. Files (images, PDFs) are extracted by the engine (OCR for images); a file that is not allowed is
+    replaced by its cleaned text or a notice."""
+    if not text and not data:
         return None
     seen = _seen(request, session_id)
-    key = hashlib.sha256(f"{source}\n{text}".encode()).hexdigest()
+    key = hashlib.sha256(source.encode() + b"\n" + (data if data is not None else text.encode())).hexdigest()
     if key not in seen:
-        r = await request.app.state.engine.inspect(text, source, agent_id, session_id=session_id)
+        r = await request.app.state.engine.inspect(data if data is not None else text, source, agent_id,
+                                                   session_id=session_id, filename=filename)
         if r.enforced == Decision.ALLOW:
             seen[key] = (text, None)
         else:
@@ -93,6 +107,84 @@ async def _inspect(request: Request, agent_id: str, session_id: str, source: str
         return None
     findings.append(finding)
     return replacement
+
+
+def _without_context(text: str) -> str:
+    """The message text with retrieved-document spans removed: what the user (or operator) actually wrote."""
+    return _CONTEXT.sub(" ", text or "")
+
+
+async def _inspect_text(request: Request, agent_id: str, session_id: str, source: str | None, text: str,
+                        findings: list[dict[str, Any]]) -> str | None:
+    """One system or user message text. Retrieved-document spans (`<context>…</context>`, `<document>…`) are
+    inspected as untrusted "rag" content and cleaned in place; the rest is inspected as `source` ("user"), or left
+    alone when `source` is None (the operator's system prompt). Returns the new text, or None when unchanged.
+    If the user's own words are not allowed, the whole message is replaced."""
+    if not text:
+        return None
+    spans = list(_CONTEXT.finditer(text))
+    if source is not None:
+        # The user's own words first: risk from a poisoned retrieved document must not hold the user's question.
+        own = _without_context(text) if spans else text
+        if own.strip():
+            rep = await _inspect(request, agent_id, session_id, source, own, findings)
+            if rep is not None:
+                return rep
+    out, pos, changed = [], 0, False
+    for m in spans:
+        rep = await _inspect(request, agent_id, session_id, "rag", m.group(2), findings)
+        out += [text[pos:m.start(2)], m.group(2) if rep is None else rep]
+        changed |= rep is not None
+        pos = m.end(2)
+    out.append(text[pos:])
+    return "".join(out) if changed else None
+
+
+async def _inspect_openai_message(request: Request, agent_id: str, session_id: str, m: dict[str, Any],
+                                  source: str | None, findings: list[dict[str, Any]]) -> None:
+    """A system/developer (source None) or user message: text parts as in `_inspect_text`, inline images and PDFs
+    (`data:` URLs) through the engine's extraction and OCR as untrusted content. Rewrites `m` in place."""
+    content = m.get("content")
+    if isinstance(content, str):
+        rep = await _inspect_text(request, agent_id, session_id, source, content, findings)
+        if rep is not None:
+            m["content"] = rep
+        return
+    if not isinstance(content, list):
+        return
+    parts: list[Any] = []
+    for part in content:
+        kind = part.get("type") if isinstance(part, dict) else None
+        if kind == "text":
+            rep = await _inspect_text(request, agent_id, session_id, source, part.get("text", ""), findings)
+            parts.append(part if rep is None else {**part, "text": rep})
+            continue
+        url = ((part.get("image_url") or {}).get("url") if kind == "image_url" else
+               (part.get("file") or {}).get("file_data") if kind == "file" else None)
+        f = _file_bytes(url=url) if isinstance(url, str) else None
+        if f is None:
+            parts.append(part)
+            continue
+        file_source = "image" if kind == "image_url" else "document"
+        rep = await _inspect(request, agent_id, session_id, file_source, "", findings, data=f[0], filename=f[1])
+        parts.append(part if rep is None else {"type": "text", "text": rep})
+    m["content"] = parts
+
+
+def _file_bytes(source: dict[str, Any] | None = None, url: str | None = None) -> tuple[bytes, str] | None:
+    """Inline file content (an OpenAI `data:` URL or an Anthropic base64 source) as (bytes, filename hint)."""
+    try:
+        if url is not None:
+            m = _DATA_URL.match(url.strip())
+            if not m:
+                return None   # remote URLs are fetched by the provider, not by the gateway
+            return base64.b64decode(re.sub(r"\s+", "", m.group(2)), validate=True), _EXT.get((m.group(1) or "").lower(), "upload.bin")
+        if source and source.get("type") == "base64" and source.get("data"):
+            return (base64.b64decode(re.sub(r"\s+", "", str(source["data"])), validate=True),
+                    _EXT.get(str(source.get("media_type", "")).lower(), "upload.bin"))
+    except (binascii.Error, ValueError):
+        return None   # not valid base64: the provider rejects it too, so nothing readable reaches the model
+    return None
 
 
 async def _check(engine: Any, name: str, args: Any, agent_id: str, session_id: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -166,8 +258,10 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
                                        "type": "invalid_request_error"}}, status_code=422)
     engine = request.app.state.engine
     messages: list[dict[str, Any]] = [dict(m) for m in body.get("messages", [])]
-    opening = [(m.get("role"), _text(m.get("content"))) for m in messages if m.get("role") in ("system", "user")][:2]
-    first_user = next((_text(m.get("content")) for m in messages if m.get("role") == "user"), "")
+    # Retrieved documents are not part of the conversation's identity or of the user's task (D-050).
+    opening = [(m.get("role"), _without_context(_text(m.get("content"))))
+               for m in messages if m.get("role") in ("system", "user")][:2]
+    first_user = next((_without_context(_text(m.get("content"))) for m in messages if m.get("role") == "user"), "")
     session_id = _session(request, agent_id, opening, first_user)
 
     call_names: dict[str, str] = {}
@@ -175,12 +269,14 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
     for m in messages:
         for tc in m.get("tool_calls") or []:
             call_names[tc.get("id", "")] = (tc.get("function") or {}).get("name", "tool")
-        if m.get("role") not in ("user", "tool"):
-            continue
-        source = "user" if m["role"] == "user" else f"tool:{call_names.get(m.get('tool_call_id', ''), 'tool')}"
-        replacement = await _inspect(request, agent_id, session_id, source, _text(m.get("content")), findings)
-        if replacement is not None:
-            m["content"] = replacement
+        role = m.get("role")
+        if role == "tool":
+            source = f"tool:{call_names.get(m.get('tool_call_id', ''), 'tool')}"
+            replacement = await _inspect(request, agent_id, session_id, source, _text(m.get("content")), findings)
+            if replacement is not None:
+                m["content"] = replacement
+        elif role in ("user", "system", "developer"):
+            await _inspect_openai_message(request, agent_id, session_id, m, "user" if role == "user" else None, findings)
 
     try:
         up, client_key = _upstream(request, agent_id)
@@ -312,13 +408,24 @@ async def anthropic_messages(agent_id: str, request: Request, p: Principal = req
                             status_code=400)
     engine = request.app.state.engine
     body = json.loads(json.dumps(body))   # private copy: inspection rewrites content in place
-    first_user = next((_text(m["content"]) if isinstance(m.get("content"), list) else str(m.get("content") or "")
+    first_user = next((_without_context(_text(m["content"]) if isinstance(m.get("content"), list) else str(m.get("content") or ""))
                        for m in body["messages"] if m.get("role") == "user"), "")
     system = body.get("system")
-    opening = [_text(system) if isinstance(system, list) else system, first_user]
+    opening = [_without_context(_text(system) if isinstance(system, list) else str(system or "")), first_user]
     session_id = _session(request, agent_id, opening, first_user)
 
     findings: list[dict[str, Any]] = []
+    # The operator's system prompt is trusted; retrieved documents placed in it are not (D-050).
+    if isinstance(system, str):
+        rep = await _inspect_text(request, agent_id, session_id, None, system, findings)
+        if rep is not None:
+            body["system"] = rep
+    elif isinstance(system, list):
+        for block in system:
+            if isinstance(block, dict) and block.get("type") == "text":
+                rep = await _inspect_text(request, agent_id, session_id, None, block.get("text", ""), findings)
+                if rep is not None:
+                    block["text"] = rep
     tool_names: dict[str, str] = {}
     for m in body["messages"]:
         content = m.get("content")
@@ -328,22 +435,38 @@ async def anthropic_messages(agent_id: str, request: Request, p: Principal = req
                     tool_names[block.get("id", "")] = block.get("name", "tool")
             continue
         if isinstance(content, str):
-            replacement = await _inspect(request, agent_id, session_id, "user", content, findings)
+            replacement = await _inspect_text(request, agent_id, session_id, "user", content, findings)
             if replacement is not None:
                 m["content"] = replacement
             continue
+        blocks = []
         for block in content or []:
-            if block.get("type") == "text":
-                replacement = await _inspect(request, agent_id, session_id, "user", block.get("text", ""), findings)
+            kind = block.get("type") if isinstance(block, dict) else None
+            if kind == "text":
+                replacement = await _inspect_text(request, agent_id, session_id, "user", block.get("text", ""), findings)
                 if replacement is not None:
                     block["text"] = replacement
-            elif block.get("type") == "tool_result":
+            elif kind == "tool_result":
                 c = block.get("content")
                 text = _text(c) if isinstance(c, list) else ("" if c is None else str(c))
                 source = f"tool:{tool_names.get(block.get('tool_use_id', ''), 'tool')}"
                 replacement = await _inspect(request, agent_id, session_id, source, text, findings)
                 if replacement is not None:
                     block["content"] = replacement
+            elif kind in ("document", "image"):
+                # Documents (citations, PDFs) and images reach the model as content: inspect what it would read.
+                src = block.get("source") or {}
+                f = _file_bytes(source=src)
+                text = (str(src.get("data") or "") if src.get("type") == "text" else
+                        _text(src.get("content")) if src.get("type") == "content" else "")
+                if f is not None or text:
+                    file_source = "image" if kind == "image" else "document"
+                    replacement = await _inspect(request, agent_id, session_id, file_source, text, findings,
+                                                 data=f[0] if f else None, filename=f[1] if f else None)
+                    if replacement is not None:
+                        block = {"type": "text", "text": replacement}
+            blocks.append(block)
+        m["content"] = blocks
 
     try:
         up, client_key = _upstream(request, agent_id)

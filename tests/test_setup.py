@@ -42,7 +42,8 @@ def H(key: str) -> dict[str, str]:
 
 def test_templates_and_agent_list(client):
     t = {x["id"]: x for x in client.get("/v1/setup/templates", headers=H(PUBLIC)).json()}
-    assert {"blank", "research-assistant", "customer-support", "coding-agent"} <= set(t)
+    assert {"blank", "research-assistant", "customer-support", "coding-agent", "rag-assistant"} <= set(t)
+    assert t["rag-assistant"]["tools"]["search_knowledge"] == "low" and t["rag-assistant"]["tools"]["send_message"] == "high"
     assert t["customer-support"]["tools"]["issue_refund"] == "high" and t["blank"]["mode"] == "monitor"
     agents = client.get("/v1/agents", headers=H(PUBLIC)).json()
     assert [a["agent"] for a in agents] == ["research-agent"] and agents[0]["tools"]["send_message"] == "high"
@@ -65,7 +66,8 @@ def test_create_connect_and_self_test(client):
     assert "https://gw.example.test/proxy/support-bot/v1" in ids["openai-python"]["code"]
     assert "X-Upstream-Key" in ids["openai-python"]["code"]                       # key: client
     assert "/proxy/support-bot/anthropic" in ids["anthropic-python"]["code"]
-    assert {"openai-env", "openai-node", "sdk-python", "rest"} <= set(ids)
+    assert {"openai-env", "openai-node", "sdk-python", "rag", "rest"} <= set(ids)
+    assert "<context>" in ids["rag"]["code"] and 'source="rag"' in ids["rag"]["code"]
     assert client.get("/v1/agents/nobody/connect", headers=H(PUBLIC)).status_code == 404
 
     st = client.post("/v1/agents/support-bot/self-test", headers=H(PROJECT)).json()

@@ -1,4 +1,4 @@
-"""Per-agent policy (PRD §9), loaded from policies/<agent>.yaml."""
+"""Per-agent policy, loaded from policies/<agent>.yaml."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Thresholds(BaseModel):
     escalate_band: tuple[float, float] = (0.5, 0.85)
     # Untrusted third-party content (not user turns) goes to the Tier 2 judge when:
     #   "classifier" - Tier 1 scores it at or above escalate_band[0] (fast path for everything else), or
-    #   "always"     - always (for agents with high-risk tools; Tier 1 alone misses paraphrased injections, DEF-017)
+    #   "always"     - always (for agents with high-risk tools; Tier 1 alone misses paraphrased injections)
     judge_untrusted: str = "classifier"
     judge_min_chars: int = 40                           # shorter tool output (e.g. "sent") stays on the fast path
 

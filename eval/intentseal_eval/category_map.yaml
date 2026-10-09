@@ -1,4 +1,4 @@
-# Map generator test labels (promptfoo plugin / strategy, garak probe) to the 9 hackathon categories.
+# Map generator test labels (promptfoo plugin / strategy, garak probe) to the nine attack types.
 # A test gets the union of its plugin's and strategy's categories, plus any channel rule.
 plugins:
   indirect-prompt-injection: [Indirect Prompt Injection]

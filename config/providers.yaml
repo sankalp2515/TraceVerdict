@@ -135,7 +135,7 @@ providers:
     priority: 20
     timeout_s: 120
 
-  # Reserved slot (PRD §21). Paid; stays disabled until the free-only constraint is lifted.
+  # Optional external decision model (a paid service); disabled by default.
   jev:
     type: jev
     enabled: false

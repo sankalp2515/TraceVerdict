@@ -5,7 +5,7 @@
 #
 # price_per_mtok: approximate public list price (USD per million tokens), used ONLY to convert
 # free-tier usage into an "equivalent cost" figure for the cost panel / overhead metric (CC7).
-# We pay nothing; re-check these before publishing any cost number.
+# Re-check list prices before publishing any cost figure.
 
 roles:
   # The reference research agent's model (needs reliable tool calling).
@@ -28,7 +28,7 @@ roles:
       - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
       - { provider: gemini,     model: gemini-3.1-flash-lite }
 
-  # Headline evaluation and demo video: a single model, no fallback, so numbers are attributable.
+  # Headline evaluation: a single model, no fallback, so numbers are attributable.
   # Waits out Groq cooldowns rather than switching model (Groq free tier: 8K tokens/min, 200K/day).
   agent_headline:
     cache: false

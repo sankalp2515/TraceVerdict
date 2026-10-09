@@ -1,6 +1,6 @@
 """CORE-3 decoding: extra detection views for text hidden by common encodings (standard library only).
 
-Acceptance (PRD CORE-3): encoded-instruction cases decode *before scoring*. Each decoder returns the decoded
+Requirement (CORE-3): encoded-instruction cases decode *before scoring*. Each decoder returns the decoded
 text as an additional view for Tier 1/Tier 2; the content given to the agent is never changed here.
 
   base64 / base64url  runs of >= 24 base64 characters that decode to mostly printable UTF-8 text

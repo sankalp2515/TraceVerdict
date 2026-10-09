@@ -1,11 +1,11 @@
-"""Trainability (PRD §7.2, EVAL-4, CON-8): a memory of reviewer-confirmed attacks and false positives.
+"""Trainability (EVAL-4, CON-8): a memory of reviewer-confirmed attacks and false positives.
 
 Confirmed attacks (adversary-loop misses, reviewer "confirm attack") are matched on later content so a known
 attack, or the same attack embedded in a larger document, is caught by rules at Tier 0, without a judge call.
 Reviewer "false positive" marks let the exact same content pass the AI tiers next time; structural policy
 rules (non-visible content) and the action guard still apply, so a mark can never wave through an action.
 
-Privacy (PRD §10): only fingerprints are stored, never content. A fingerprint is the set of hashed word
+Privacy: only fingerprints are stored, never content. A fingerprint is the set of hashed word
 5-shingles of the normalised ASCII view (keyed BLAKE2b, 64-bit), plus a SHA-256 of the whole view for exact
 false-positive marks. Matching is containment: |stored ∩ new| / |stored|, so an attack quoted inside a long,
 otherwise benign document still matches.

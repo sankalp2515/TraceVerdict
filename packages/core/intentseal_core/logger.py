@@ -1,4 +1,4 @@
-"""CORE-10 Decision logger: every decision, with evidence, in the event store (PRD §10).
+"""CORE-10 Decision logger: every decision, with evidence, in the event store.
 
 Privacy: content is stored as a hash plus a short redacted preview (or hash only when
 INTENTSEAL_STORE_PREVIEWS=0, e.g. public demo); user references are hashed; secrets, canaries and keys are

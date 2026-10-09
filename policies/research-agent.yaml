@@ -1,4 +1,4 @@
-# Policy for the reference research agent (PRD §9).
+# Policy for the reference research agent.
 agent: research-agent
 version: "1"
 mode: enforce            # monitor | enforce

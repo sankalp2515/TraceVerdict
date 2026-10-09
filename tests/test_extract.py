@@ -107,7 +107,7 @@ def test_sniff_and_failure_fallback():
 
 
 def test_bare_email_body_is_text_not_an_empty_message():
-    # DEF-016: a plain body sent with source="email" used to parse as an RFC 822 message with no body -> empty view
+    # regression: a plain body sent with source="email" used to parse as an RFC 822 message with no body -> empty view
     body = "Hi team, the offsite moved to Thursday. Agenda attached later."
     doc = extract(body, source="email")
     assert doc.format == "text" and body in doc.text

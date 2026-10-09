@@ -400,7 +400,7 @@ async def test_unflagged_low_score_skips_judge(policy):
 
 
 async def test_judge_untrusted_always_assesses_low_scoring_documents(policy):
-    # DEF-017: Tier 1 scores paraphrased injections near 0, so high-risk agents send every untrusted document
+    # regression: Tier 1 scores paraphrased injections near 0, so high-risk agents send every untrusted document
     # to the judge; user turns and very short tool output keep the classifier gate (fast path).
     policy.thresholds.judge_untrusted = "always"
     e = engine(policy, malicious=0.95, classifiers=[Scorer(0.0)])

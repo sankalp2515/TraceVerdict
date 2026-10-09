@@ -114,7 +114,7 @@ def test_feedback_needs_recent_event_or_content(policy):
 
 
 async def test_sdk_email_source_text_is_inspected_not_passed_unseen(policy):
-    # DEF-016 regression through the SDK path: ALLOW returns the original text, so it must have been inspected.
+    # regression through the SDK path: ALLOW returns the original text, so it must have been inspected.
     from intentseal import Guard
 
     e = make(policy, malicious=0.95, score=0.95)

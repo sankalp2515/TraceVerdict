@@ -31,7 +31,7 @@ def test_views_include_ascii_only_when_different():
 
 
 def test_skeleton_folds_lookalikes_by_shape_not_sound():
-    # Cyrillic р/с look like p/c but transliterate to r/s; detection needs the visual reading (DEF-018)
+    # Cyrillic р/с look like p/c but transliterate to r/s; detection needs the visual reading
     n = normalise("Please r\u0435vi\u0435w the \u0440\u0430\u0441k\u0430g\u0435 \u0440ri\u0441\u0435s")
     assert n.skeleton == "Please review the package prices"
     assert ("skeleton", n.skeleton) in n.views()

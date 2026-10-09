@@ -242,14 +242,14 @@ class OpenAICompatibleAdapter:
 
 
 class JevAdapter:
-    """Reserved slot for the TypeSafe Jev decision model (PRD §21). Not a chat model.
+    """Slot for the optional TypeSafe Jev decision model. Not a chat model.
 
     It is wired into the DecisionModel interface (CORE-13), not the chat router. Kept here so
     `type: jev` in providers.yaml resolves; any call fails clearly while the provider is disabled.
     """
 
     async def chat(self, *args: Any, **kwargs: Any) -> AdapterResponse:
-        raise ProviderError("bad_request", "jev is a decision model, not a chat model (PRD §21)")
+        raise ProviderError("bad_request", "jev is a decision model, not a chat model")
 
     async def list_models(self, *args: Any, **kwargs: Any) -> list[str]:
         return []

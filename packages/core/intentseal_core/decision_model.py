@@ -2,7 +2,7 @@
 
 Typed question in, typed answer out. The judge never gets tools and only ever sees content as quoted
 data. Its output is advice: the policy engine makes the decision (rules decide, AI advises).
-Adapters: `generative_free` (free LLMs via the router), `jev` (reserved, disabled, PRD §21),
+Adapters: `generative_free` (free LLMs via the router), `jev` (optional external model, disabled by default),
 `static` (tests).
 """
 
@@ -110,12 +110,12 @@ class GenerativeJudge:
 
 
 class JevDecisionModel:
-    """Reserved slot (PRD §21): 9 attack-type Nouls + severity Score per chunk. Disabled (free-only)."""
+    """Optional external decision model (TypeSafe Jev): nine attack-type scores per chunk. Disabled by default."""
 
     name = "jev"
 
     async def assess(self, content: str, source: str, task: str = "") -> Assessment:
-        return Assessment(0.0, degraded=True, error="jev decision model is disabled (PRD §21)")
+        return Assessment(0.0, degraded=True, error="the jev decision model is disabled")
 
 
 class StaticDecisionModel:

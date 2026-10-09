@@ -1,6 +1,6 @@
 # Corpus v0 manifest. Text is downloaded at build time (data/corpus/, git-ignored); this file records
 # exactly which sources, splits, sample sizes and label mappings make up the corpus, so it is reproducible.
-# Type names are the 9 hackathon categories. Channel names are the 11 PDF input sources.
+# Type names are the nine attack types. Channel names are the eleven input sources.
 version: v0
 seed: 2026
 

@@ -17,7 +17,7 @@ function Claim({ s }: { s: Summary }) {
   const c = s.claim;
   return (
     <Card>
-      <CardTitle meta={c.rule}>Grid position by the PRD §15 rule</CardTitle>
+      <CardTitle meta={c.rule}>Coverage claim (recall ≥ 85% with FPR ≤ 5%)</CardTitle>
       <div className="mb-7 flex flex-wrap items-end gap-10">
         <Stat value={`${c.F} / ${c.D}`} label="Function / depth, applied mechanically" tone={c.F === "none" ? "var(--block)" : undefined} />
         <Stat value={`${c.types_meeting} of 9`} label="Attack types at recall ≥ 85% with FPR ≤ 5%" />

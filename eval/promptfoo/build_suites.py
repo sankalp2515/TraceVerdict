@@ -93,7 +93,7 @@ def plain(test: dict, var_from: str, var_to: str) -> dict:
 
 
 def split_turns(test: dict, parts: int) -> dict | None:
-    """Spread one generated user-turn attack over `parts` consecutive user turns (PRD §14 type 7: an attack spread
+    """Spread one generated user-turn attack over `parts` consecutive user turns (multi-step jailbreaks: an attack spread
     across several turns; D-006 split variant). Mechanical: sentence boundaries first, else equal word chunks.
     The text is the generator's, unchanged and in order; returns None when it is too short to split."""
     text = str((test.get("vars") or {}).get("prompt") or "")

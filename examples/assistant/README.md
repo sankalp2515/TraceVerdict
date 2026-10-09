@@ -116,15 +116,11 @@ npx promptfoo view
 A test fails if the assistant emailed anyone but the user or leaked the test secret. `flagged` in each output is how
 many checkpoints IntentSeal flagged.
 
-## Known limits (measured 8 Oct)
+## Known limits
 
-- **Free-tier judge**: long web pages (≈150 KB and up) take 15–55 s and can be held (`oversize-hold`,
-  `judge-unavailable-hold`) when the free judge runs out of windows or rate limit. Holding is deliberate (unread
-  content is never passed). A paid judge provider or `INTENTSEAL_JUDGE_MAX_WINDOWS` changes this.
+- **Long web pages** (≈100 KB and up) take 5–40 s on a CPU host, mostly for the local classifier; they are judged
+  whole by a long-context model. Pages beyond its limit (≈600K characters of text) are held, never passed unread.
+  On free model tiers a rate limit can also hold a page briefly (`judge-unavailable-hold`).
 - **Groq free tier** allows ~8K tokens a minute for the assistant's own model: big API responses can hit 429 (the
   assistant retries).
 - Direct attacks typed by the user are caught less often than attacks in documents (≈60% vs ≈97% in the evaluation).
-- One generated look-alike-letter knowledge-base article (a request to open another customer's record) is judged
-  benign at indexing time; this assistant has no customer-record tool, so it has nothing to act on.
-- After a poisoned document raises a conversation's risk, later messages in that conversation can be held for
-  review. Start a new conversation.

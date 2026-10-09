@@ -6,9 +6,9 @@ decision logger. Model/provider configuration stays in the existing YAML loaders
 all decision thresholds come from `AgentPolicy`.
 
 Inspection rules run in this order; the first match wins. Requirement IDs link to
-[PRD §8.1](11-PRD-complete.md#81-core-engine-core).
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
-| `policy_rule` | When it fires | Effect | PRD IDs |
+| `policy_rule` | When it fires | Effect | IDs |
 |---|---|---|---|
 | `extraction-failed` | Extraction warns, fails or exceeds its time budget | BLOCK; record degraded inspection | CORE-1, CORE-10, CORE-12 |
 | `content-risk-block` | Judge risk or mandatory hidden-content quarantine risk reaches `thresholds.block` | BLOCK | CORE-5, CORE-7 |
@@ -24,7 +24,7 @@ Action decisions delegate unchanged to `action_guard.check_action`; all are logg
 The guard chooses the most restrictive observation (BLOCK before ESCALATE before
 ALLOW), retaining its first rule when severity ties.
 
-| `policy_rule` | When it fires | Effect | PRD IDs |
+| `policy_rule` | When it fires | Effect | IDs |
 |---|---|---|---|
 | `tool-not-allowed` | Unknown tool with `unknown_tools: block` | BLOCK | CORE-9 |
 | `pinned-field-override` | Proposed pinned value differs from trusted session context | Rewrite and ALLOW unless another rule holds the action | CORE-9 |
@@ -83,7 +83,7 @@ event loop with instructions to await the async method.
 Tests inject `StaticDecisionModel` and fake scorers, using neutral marker text and
 benign documents. They require no model downloads or network access.
 
-## Additions on 6 Oct (D-023 … D-027)
+## Decoding, judge coverage and memory (D-023 … D-027)
 
 | Stage / rule | Where | Behaviour |
 |---|---|---|
@@ -93,5 +93,5 @@ benign documents. They require no model downloads or network access.
 | `known-attack-match` | `memory.py` | content containing ≥ `memory.match_threshold` of a confirmed attack fingerprint → BLOCK at Tier 0, no AI call |
 | False-positive mark | `memory.py` | exact content, per agent: skips Tier 1/2; structural rules (`drop-non-visible`) and the action guard still apply |
 | `human-approved` | `Engine.check_action` | an approved ESCALATE for the same session + tool + arguments allows the call once; never overrides BLOCK |
-| Raw-text fallback | `extract.py` | a structured parse that yields nothing for non-empty text input falls back to the raw text (DEF-016) |
+| Raw-text fallback | `extract.py` | a structured parse that yields nothing for non-empty text input falls back to the raw text |
 | `INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS` | `policy.load_policy` | operational override of the daily Tier 2 cap (`none` lifts it); used by evaluation runs and recorded in the summary |

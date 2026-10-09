@@ -1,0 +1,20 @@
+name: False alarm or missed attack
+description: IntentSeal blocked something legitimate, or allowed something it should have caught
+labels: [detection]
+body:
+  - type: dropdown
+    id: kind
+    attributes: { label: Kind, options: [False alarm (legitimate content or action was flagged), Missed attack (an attack was allowed)] }
+    validations: { required: true }
+  - type: dropdown
+    id: source
+    attributes:
+      label: Input type
+      options: [User message, Web page, PDF, Word document, Email, Markdown, HTML file, API response, OCR text, Source code, Image, Retrieved document (RAG), Tool call]
+  - type: textarea
+    id: decision
+    attributes: { label: Decision shown, description: "Decision, rule and labels from the Console or the SDK result." }
+    validations: { required: true }
+  - type: textarea
+    id: example
+    attributes: { label: Minimal example, description: "Only content you are allowed to share. For a bypass of the action guard, use SECURITY.md instead." }

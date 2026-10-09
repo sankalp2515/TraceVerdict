@@ -13,7 +13,7 @@ that browser tab's session storage (D-037).
 ## 1. Settings
 
 All configuration is environment variables; no secret is ever written into the image or the repository.
-Settings named `ASG_*` (the names used until 7 Oct 2026) still work when the new `INTENTSEAL_*` name is unset (D-038).
+Older settings named `ASG_*` still work when the `INTENTSEAL_*` name is unset.
 
 | Variable | Required | Purpose |
 |---|---|---|
@@ -31,7 +31,7 @@ Settings named `ASG_*` (the names used until 7 Oct 2026) still work when the new
 | `INTENTSEAL_TRUSTED_PROXIES` | behind a proxy | Addresses whose `X-Forwarded-For` is trusted (per-client rate limits). `*` on Hugging Face Spaces / Render, where the platform proxy is the only way in |
 | `INTENTSEAL_RATE_LIMIT_PER_MIN` / `INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN` | no | Per key (default 120) / per public client (default 20) |
 | `INTENTSEAL_DEMO_RUNS_PER_HOUR` | no | Global cap on live demo runs (default 60), protects the free LLM quota |
-| `INTENTSEAL_DEMO_AGENT_ROLE` | no | `agent` (default) or `agent_eval` (the model on which S7 reproducibly compromises the unprotected agent; see BACKLOG C5) |
+| `INTENTSEAL_DEMO_AGENT_ROLE` | no | `agent` (default) or `agent_eval` (the evaluation agent model) |
 | `INTENTSEAL_SIEM_SINKS` | no | Push decisions to `jsonl:/data/siem/decisions.jsonl`, `webhook:https://…`, `syslog:udp://host:514` (see `intentseal_core/siem.py`) |
 | `INTENTSEAL_MAX_BODY_BYTES`, `INTENTSEAL_MAX_TEXT_CHARS`, `INTENTSEAL_JUDGE_MAX_WINDOWS`, `INTENTSEAL_TIER1_PER_CHUNK_S`, `INTENTSEAL_TIER1_MAX_S` | no | Input and long-document limits (CORE-16; defaults 2 MB, 1,000,000 characters, 8 judge windows, 0.75 s per chunk, 30 s) |
 | `PORT` | no | Listen port (default 8000) |

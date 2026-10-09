@@ -1,6 +1,6 @@
 # Architecture
 
-Product: IntentSeal (code: `intentseal` SDK, `intentseal_core`, `intentseal_gateway`, `intentseal_eval`). PRD: `docs/11-PRD-complete.md`. Decisions: `docs/DECISIONS.md`.
+Product: IntentSeal (code: `intentseal` SDK, `intentseal_core`, `intentseal_gateway`, `intentseal_eval`). Design decisions: [DECISIONS.md](DECISIONS.md).
 
 **Principle: rules decide, AI advises.** Every decision is made by a deterministic policy rule. Classifiers and the
 LLM judge produce signals; no AI signal alone can allow high-risk content or a high-risk action.
@@ -56,7 +56,7 @@ raw bytes/text
 When the judge is called: on any structural signal; on a Tier 1 score in the escalation band; and, for agents
 whose policy sets `judge_untrusted: always` (agents with high-risk tools), on every untrusted document of at
 least `judge_min_chars`. User turns and short tool output stay on the fast path. Reason: the open classifier is
-near-binary and misses paraphrased third-party instructions (DEF-017, measured in docs/EVALUATION.md).
+near-binary and misses paraphrased third-party instructions (measured in [EVALUATION.md](EVALUATION.md)).
 If Tier 1 itself fails (model not loaded, timeout), nothing can clear content on the fast path: every chunk goes
 to the judge, and an unavailable judge holds it (audit F3, D-039).
 
@@ -75,7 +75,7 @@ Deterministic checks, worst result wins: tool allowed → pinned fields rewritte
 outbound scan (canaries, registered secrets, detect-secrets patterns) → recipient allow-list → URL domain
 allow-list → sandbox paths → provenance (a high-risk target that appears only in untrusted content) → session risk
 → explicit intent (`intent_terms`: a high-risk action the user's own words never ask for is escalated; the
-confused-deputy lesson, docs/13) → data flow (CORE-17, below). The outbound scan also reads decoded views of every
+confused-deputy lesson, D-047) → data flow (CORE-17, below). The outbound scan also reads decoded views of every
 argument (base64, hex, %-encoding, reversed, tag characters). Allow-lists use the host and addresses a real client would use (`urlsplit`,
 `email.utils.getaddresses`): fragment, user-part, backslash and display-name tricks fail (audit F1/F2, D-039).
 `ESCALATE` creates a pending approval (CON-9). A reviewer approval lets the *same* call in the *same* session run
@@ -102,7 +102,7 @@ Action violations add risk too, and high-risk tools are held in a risky session.
 | Tier 1 down / timed out | every chunk goes to the judge; judge also down → held. A failed classifier load is retried every 60 s and reported by `/readyz` |
 | Unknown agent id | the Gateway answers 404 instead of running the default (monitor) policy; the SDK warns when it falls back to monitor mode |
 | Budget cap (CORE-14) | rules continue; flagged content held (`budget-hold`, `budget_degraded`) |
-| Extraction failure | `extraction-failed` → BLOCK; an empty parse of non-empty text falls back to raw text (DEF-016) |
+| Extraction failure | `extraction-failed` → BLOCK; an empty parse of non-empty text falls back to raw text |
 | SDK failure policy (SDK-5) | write/send tools fail closed, read tools fail open (logged); remote inspection failure withholds content |
 | Modes (CORE-15) | `monitor` logs the same decisions as `enforce` but does not enforce them |
 | Caches | scan and judge results cached by content hash and context; enforcement and session state never cached |
@@ -128,7 +128,7 @@ provider/model lists. Failover on 429/5xx/timeouts, circuit breaker, tokens-per-
 daily budgets, response cache, usage and equivalent cost recorded per call. One key per provider; spare keys
 are used only if a key is rejected (D-004).
 
-## 8. Trainability (PRD §7.2) and review
+## 8. Trainability and review
 
 `intentseal_core/memory.py`: confirmed attacks (reviewer `POST /v1/feedback`, adversary-loop misses) are stored as
 keyed hashes of word 5-shingles, never as text. Later content whose shingles contain ≥ 60% of a stored attack
@@ -138,11 +138,11 @@ rules or the action guard.
 
 ## 9. Gateway API
 
-| Endpoint | Scope | PRD |
+| Endpoint | Scope | ID |
 |---|---|---|
 | `POST /v1/inspect`, `POST /v1/actions/check`, `POST /v1/sessions` | project | API-1..3 |
 | `GET /v1/sessions/{id}/events`, `GET /v1/decisions` | public | API-3, API-4 |
-| `GET /v1/scorecard/{agent}` (latest reports + summary with grid claim) | public | API-5 |
+| `GET /v1/scorecard/{agent}` (latest reports + evaluation summary) | public | API-5 |
 | `GET /v1/policies/{agent}`, `PUT /v1/policies/{agent}` (validated, versioned, atomic) | public / admin | API-6 |
 | `GET /v1/costs`, `GET /v1/costs/{agent}` (incl. security/agent overhead ratio) | public | API-11, G7b |
 | `GET /v1/approvals`, `POST /v1/approvals/{event_id}` | public / admin | CON-9 backend |
@@ -181,7 +181,7 @@ content or arguments.
 promptfoo (MIT) / garak (Apache-2.0)  ->  attack cases (we never author attack text: D-005, D-014)
 eval/promptfoo/build_suites.py        ->  each indirect payload delivered through every channel (incl. hidden text)
 eval/targets/agent_target.py          ->  protection off | on (reference agent) | detect (content checkpoint only)
-python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.json + docs/EVALUATION.md (grid claim by §15 rule)
+python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.json + docs/EVALUATION.md (coverage claim)
 ```
 
 Outcomes are deterministic (EVAL-5): canary checks, sandbox outbox, executed tool calls. False positives are

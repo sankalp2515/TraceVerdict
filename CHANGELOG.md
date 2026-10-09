@@ -15,7 +15,7 @@ First public release.
   explicit-intent rule for high-risk actions, provenance and taint checks, human approvals.
 - Answer check: protected data in the model's final answer is redacted or withheld (proxy, SDK, REST).
 - Python SDK (`intentseal`): embedded or remote mode, tool decorator, LangChain/LangGraph helper, `intentseal init`.
-- Gateway: REST API, OpenAI- and Anthropic-compatible LLM proxy with streaming, RAG context and inline files,
+- Gateway: REST API, LLM proxy in the OpenAI, Anthropic and Gemini formats with streaming, RAG context and inline files,
   onboarding API and policy templates, organisations, PostgreSQL, SIEM export (JSON Lines, CEF), Docker image.
 - Security Console: overview, decisions, review and approvals, session replay, policy, set up.
 - Evaluation harness with promptfoo and garak, hard benign sets, generated reports.

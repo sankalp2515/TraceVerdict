@@ -101,7 +101,7 @@ def _key_from(request: Request) -> str | None:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
-    return request.headers.get("x-api-key")
+    return request.headers.get("x-api-key") or request.headers.get("x-goog-api-key")   # Anthropic / Google SDKs
 
 
 def require(scope: str):

@@ -32,7 +32,7 @@ own organisation with its own keys (D-043).
 |---|---|---|
 | OpenAI SDK, or any OpenAI-compatible client (LangChain `ChatOpenAI`, LlamaIndex, CrewAI, AutoGen, Vercel AI SDK, …) | `OPENAI_BASE_URL=<gateway>/proxy/<agent>/v1` | Streaming supported. The policy's `upstream` decides the real provider |
 | Anthropic SDK (Claude) | `ANTHROPIC_BASE_URL=<gateway>/proxy/<agent>/anthropic` | Native pass-through to Anthropic keeps thinking, documents, cache control; streaming supported |
-| Google Gemini | Gemini's OpenAI-compatible endpoint through the OpenAI path (upstream `gemini`) | Native `generateContent` clients: use the SDK or REST path |
+| Google Gen AI SDK (Gemini) | `genai.Client(api_key=<IntentSeal key>, http_options={"base_url": "<gateway>/proxy/<agent>/gemini"})` | Native `generateContent` and `streamGenerateContent`; upstream must be `gemini`. Or use Gemini's OpenAI-compatible endpoint through the OpenAI path |
 | Groq, Mistral, OpenRouter, NVIDIA, DeepSeek, xAI, Together | OpenAI path (upstream = that provider) | |
 | Azure OpenAI | OpenAI path (upstream `azure_openai`, set the resource URL in `config/providers.yaml`) | `api-key` header handled |
 | Local models (Ollama, vLLM, LM Studio, llama.cpp server) | OpenAI path (upstream `ollama`, or any `no_auth` OpenAI-compatible entry) | No key needed |

@@ -52,6 +52,7 @@ Why IntentSeal works the way it does. Code comments refer to these numbers (`D-0
 | D-048 | Any major provider: native Anthropic adapter and Messages-API proxy; per-agent `upstream` (provider, model, the gateway's key or the client's own key, never stored) | Deployments keep their own model and key |
 | D-049 | Onboarding: Console Set up and API, policy templates, connection snippets, a self-test with structural probes; new agents start in monitor mode | Teams measure false alarms before enforcing |
 | D-050 | **RAG and inline files through the proxy**: text inside `<context>`/`<document>` (and similar) tags in a system or user message is inspected as untrusted retrieved content; the user's own words are checked first; inline images and PDFs are extracted and OCR-inspected | Retrieved documents are third-party content wherever an app places them |
+| D-058 | Native Gemini format in the proxy (`/proxy/<agent>/gemini/v1beta/models/<model>:generateContent` and `:streamGenerateContent`): system instruction, user text, inline files and function responses inspected; function calls checked; answer checked; pass-through to the Gemini API with the gateway's or the client's key | Agents built on the Google Gen AI SDK are protected by a base-URL change, like OpenAI and Anthropic agents |
 | D-052 | PyPI: `intentseal` (SDK) and `intentseal-core` (engine); light install for remote mode, engine behind `[embedded]`; bundled configuration; `intentseal init`; trusted publishing | Apps that use a gateway should not install the whole engine |
 
 ## Operations and evaluation

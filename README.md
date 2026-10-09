@@ -146,7 +146,7 @@ Per-type and per-channel numbers, false alarms and method: [docs/EVALUATION.md](
 |---|---|---|
 | OpenAI, Azure OpenAI | ✅ | ✅ |
 | Anthropic (Claude) | ✅ native Messages API (thinking, documents, cache control pass through) | ✅ |
-| Google Gemini | ✅ OpenAI-compatible endpoint | ✅ |
+| Google Gemini | ✅ native Gemini API (Google Gen AI SDK), or the OpenAI-compatible endpoint | ✅ |
 | Groq, Mistral, OpenRouter, NVIDIA NIM, DeepSeek, xAI, Together | ✅ | ✅ |
 | Local models: Ollama, vLLM, LM Studio, llama.cpp | ✅ no key needed | ✅ |
 | AWS Bedrock, Vertex AI native SDKs | use the SDK or REST API | via an OpenAI-compatible endpoint |

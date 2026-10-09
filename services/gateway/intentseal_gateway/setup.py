@@ -142,6 +142,13 @@ async def connect(agent: str, request: Request, p: Principal = require("public")
          "code": (f'import os\nimport anthropic\n\nclient = anthropic.Anthropic(base_url="{gw}/proxy/{agent}/anthropic",\n'
                   f'                             api_key=os.environ["INTENTSEAL_KEY"]{upstream_header_py})\n'
                   f'# or, with no code change: ANTHROPIC_BASE_URL={gw}/proxy/{agent}/anthropic')},
+        {"id": "gemini-python", "title": "Google Gen AI SDK (Gemini)",
+         "when": "The agent uses the Gemini API natively (needs the agent's upstream provider to be gemini)",
+         "language": "python",
+         "code": (f'import os\nfrom google import genai\n\nclient = genai.Client(api_key=os.environ["INTENTSEAL_KEY"],\n'
+                  f'                      http_options={{"base_url": "{gw}/proxy/{agent}/gemini"'
+                  + (', "headers": {"X-Upstream-Key": os.environ["GEMINI_API_KEY"]}' if byok else "") + '})\n'
+                  'reply = client.models.generate_content(model="gemini-3.1-flash-lite", contents=prompt)')},
         {"id": "sdk-python", "title": "IntentSeal SDK (deepest protection, any model)",
          "when": "Python agents whose tools you can wrap; works whatever LLM provider the agent uses", "language": "python",
          "code": (f'from intentseal import Guard\n\nguard = Guard("{agent}", remote="{gw}", api_key=os.environ["INTENTSEAL_KEY"])\n'

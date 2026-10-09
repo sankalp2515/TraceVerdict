@@ -49,6 +49,18 @@ roles:
       - { provider: gemini,     model: gemini-3.1-flash-lite }
       - { provider: openrouter, model: "nvidia/nemotron-3-super-120b-a12b:free" }
 
+  # Long documents (more than two judge windows, e.g. real web pages): one whole-document assessment by a
+  # long-context model instead of many windows of the judge above. Measured 8 Oct: 30K characters in 2.8 s,
+  # 300K characters (109K tokens) in 7.1 s on Nemotron 3 Ultra. If both fail, the windows run as before.
+  judge_long:
+    cache: true
+    max_queue_s: 5
+    cache_ttl_s: 604800
+    defaults: { temperature: 0, max_tokens: 1000 }
+    models:
+      - { provider: nvidia, model: nvidia/nemotron-3-ultra-550b-a55b }
+      - { provider: gemini, model: gemini-3.1-flash-lite }
+
   # Tier-1 hosted classifier (Prompt Guard 2). Returns a probability; never decides alone (D-011).
   tier1_remote:
     cache: true

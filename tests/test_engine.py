@@ -792,3 +792,30 @@ async def test_answer_check_redacts_withholds_and_respects_monitor_mode(policy):
     policy.mode = "monitor"
     m = await e.check_output("The key is sk-canary-answer-0001.", policy.agent)
     assert m.decision == Decision.NEUTRALISE and m.enforced == Decision.ALLOW and "sk-canary" in m.cleaned_content
+
+
+async def test_long_documents_are_judged_whole_by_the_long_context_model(policy):
+    """G3: a document needing more than two judge windows gets one whole-document assessment; if the long-context
+    model is unavailable, the windows run as before."""
+    from intentseal_core.decision_model import Assessment
+
+    class Recorder(StaticDecisionModel):
+        def __init__(self, malicious, degraded=False):
+            super().__init__(malicious)
+            self.texts, self.degraded = [], degraded
+
+        async def assess(self, content, source, task=""):
+            self.texts.append(content)
+            if self.degraded:
+                return Assessment(0.0, degraded=True)
+            return await super().assess(content, source, task)
+
+    page = "".join(f"<p>Paragraph {i} about the roadmap and the release schedule for next quarter.</p>" for i in range(400))
+    small, long = Recorder(0.0), Recorder(0.0)
+    e = engine(policy, decision_model=small, long_decision_model=long)
+    r = await e.inspect(page, "web", policy.agent)
+    assert r.decision == Decision.ALLOW and len(long.texts) == 1 and not small.texts
+    small2, down = Recorder(0.0), Recorder(0.0, degraded=True)
+    e2 = engine(policy, decision_model=small2, long_decision_model=down)
+    r2 = await e2.inspect(page, "web", policy.agent)
+    assert len(down.texts) == 1 and small2.texts and r2.decision in (Decision.ALLOW, Decision.BLOCK)

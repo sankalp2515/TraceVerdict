@@ -67,7 +67,7 @@ class Engine:
                  decision_model: DecisionModel | None = None, classifiers: Iterable[Any] | None = None,
                  router: Router | None = None, store: Store | None = None,
                  logger: DecisionLogger | None = None, sessions: SessionStore | None = None,
-                 memory: AttackMemory | None = None,
+                 memory: AttackMemory | None = None, long_decision_model: DecisionModel | None = None,
                  policy_directory: Path | None = None, tier0_timeout_s: float = 2.0,
                  tier1_timeout_s: float = 1.0, tier2_timeout_s: float = 15.0,
                  segment_chars: int = 1000, encoded_min_chars: int = 48,
@@ -93,6 +93,11 @@ class Engine:
         self._policy_files = (policy_directory, policy_directory is not None or policy_loader is load_policy)
         self.logger.org_of = self._org_of
         self.decision_model = decision_model
+        # Documents the judge windows cannot cover are assessed whole by a long-context model (role `judge_long`)
+        self.long_decision_model = long_decision_model
+        self.long_judge_chars = int(os.environ.get("INTENTSEAL_LONG_JUDGE_MAX_CHARS") or 600_000)
+        self.long_judge_timeout_s = float(os.environ.get("INTENTSEAL_LONG_JUDGE_TIMEOUT_S") or 90)
+        self.long_judge_min_windows = int(os.environ.get("INTENTSEAL_LONG_JUDGE_MIN_WINDOWS") or 3)
         self.classifiers = None if classifiers is None else list(classifiers)
         self.tier0_timeout_s, self.tier1_timeout_s, self.tier2_timeout_s = (
             tier0_timeout_s, tier1_timeout_s, tier2_timeout_s)
@@ -288,6 +293,22 @@ class Engine:
         if any window could not be assessed), whether the daily budget stopped it, and the spans left unjudged."""
         windows, unjudged = self._judge_windows(scan, priority)
         cap = policy.budgets.daily_tokens_tier2
+        many = bool(unjudged) or len(windows) >= self.long_judge_min_windows
+        long_model = self._long_decision_model(policy) if many and len(scan.view) <= self.long_judge_chars else None
+        if long_model is not None:
+            # A long document: one whole-document assessment by a long-context model (one call instead of many
+            # windows; measured 3-7 s for 30K-300K characters). If it is unavailable, the windows below run and
+            # whatever they cannot cover is held (CORE-16).
+            key = self._key("judge-long", scan.view, source, task, agent_id, policy.model_dump())
+            cached = self._get(key)
+            if cached is None and cap is not None and self._tokens_today(agent_id) >= cap:
+                return Assessment(0, degraded=True), True, unjudged
+            whole = (Assessment(**{**cached.__dict__, "input_tokens": 0, "output_tokens": 0, "est_cost": 0.0})
+                     if cached is not None else
+                     await self._assess(long_model, key, scan.view, source, task, timeout=self.long_judge_timeout_s))
+            if not whole.degraded:
+                whole.spans = []   # judged whole: evidence is searched in the whole document
+                return whole, False, []
         results: list[Assessment | None] = []
         pending: list[tuple[int, str, str]] = []
         for i, (text, _) in enumerate(windows):
@@ -338,9 +359,20 @@ class Engine:
                 self._models[policy.decision_model] = model
         return model
 
-    async def _assess(self, model: DecisionModel, key: str, text: str, source: str, task: str) -> Assessment:
+    def _long_decision_model(self, policy: AgentPolicy) -> DecisionModel | None:
+        if self.long_decision_model is not None or self.decision_model is not None:
+            return self.long_decision_model   # injected models (tests, custom decision models): only if given
+        if policy.decision_model != "generative_free" or self.router is None or "judge_long" not in self.router.settings.roles:
+            return None
+        if "judge_long" not in self._models:
+            from .decision_model import GenerativeJudge
+            self._models["judge_long"] = GenerativeJudge(self.router, role="judge_long", max_chars=self.long_judge_chars)
+        return self._models["judge_long"]
+
+    async def _assess(self, model: DecisionModel, key: str, text: str, source: str, task: str,
+                      timeout: float | None = None) -> Assessment:
         try:
-            assessment = await asyncio.wait_for(model.assess(text, source, task), self.tier2_timeout_s)
+            assessment = await asyncio.wait_for(model.assess(text, source, task), timeout or self.tier2_timeout_s)
             _probability(assessment.malicious)
             for value in assessment.categories.values():
                 _probability(value)

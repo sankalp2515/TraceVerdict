@@ -2,7 +2,7 @@
 
 All notable changes to IntentSeal. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.1.0] - 2026-10-10
+## [0.1.0] - 2026-10-09
 
 First public release.
 

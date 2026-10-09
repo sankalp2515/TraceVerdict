@@ -70,7 +70,8 @@ class Session:
     user_ref: str | None = None            # stored hashed
     task: str = ""
     trusted: dict[str, Any] = field(default_factory=dict)   # e.g. {"customer_id": "C-1042"}
-    risk: float = 0.0
+    risk: float = 0.0                      # all risk: gates actions and further third-party content
+    user_risk: float = 0.0                 # risk from the user's own turns only: gates the user's messages (multi-step)
     turns: int = 0
     labels: set[str] = field(default_factory=set)
     trusted_entities: set[str] = field(default_factory=set)
@@ -107,9 +108,12 @@ class Session:
     def new_turn(self, decay: float) -> None:
         self.turns += 1
         self.risk = max(0.0, self.risk - decay)
+        self.user_risk = max(0.0, self.user_risk - decay)
 
-    def add_risk(self, amount: float, labels: list[str] | None = None) -> None:
+    def add_risk(self, amount: float, labels: list[str] | None = None, user: bool = False) -> None:
         self.risk += max(0.0, amount)
+        if user:
+            self.user_risk += max(0.0, amount)
         self.labels |= set(labels or [])
 
 

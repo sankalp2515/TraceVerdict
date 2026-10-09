@@ -459,7 +459,15 @@ class Assistant:
                                        for c in calls]
             conv.messages.append(entry)
             if not calls:
-                return Turn(msg.content or "", trace, conv.gateway_session or "")
+                answer = msg.content or ""
+                if self.guard is not None and answer:   # protected data in the answer never reaches the user
+                    checked = await self.guard.acheck_output(answer, session_id=conv.gateway_session)
+                    if checked != answer:
+                        trace.append({"kind": "content", "source": "answer", "item": "the assistant's answer",
+                                      "decision": "BLOCK" if "withheld" in checked else "NEUTRALISE",
+                                      "rule": "answer-protected-data", "labels": ["Secret Extraction"]})
+                        answer = checked
+                return Turn(answer, trace, conv.gateway_session or "")
             for c in calls:
                 try:
                     args = json.loads(c.function.arguments or "{}")

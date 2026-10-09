@@ -55,6 +55,7 @@ class SensitiveData(BaseModel):
     canaries: list[str] = Field(default_factory=list)   # literal values; "from_env" reads INTENTSEAL_CANARIES
     drop_non_visible: bool = True                       # untrusted docs: the model sees what a human sees
     strip_role_markers: bool = True                     # remove forged role/tool-call markers (not from source code)
+    drop_lookalike_text: bool = True                    # quarantine text written largely in look-alike letters
 
 
 class MemoryPolicy(BaseModel):

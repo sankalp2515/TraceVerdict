@@ -30,6 +30,7 @@ from .llm.router import Router
 from .logger import DecisionLogger
 from .memory import AttackMemory, Match
 from .normalise import normalise
+from .outbound import scan_args
 from .policy import AgentPolicy, load_policy, policy_exists
 from .secrets import registry
 from .session import Session, SessionStore
@@ -576,11 +577,18 @@ class Engine:
         hidden += [(f.span[0], f.span[1]) for f in findings
                    if f.signal == "role-marker" and f.span and policy.sensitive_data.strip_role_markers
                    and scan.doc.format != "code"]
+        # Text written largely in look-alike letters (mixed-script words) is obfuscation, whatever the judge says.
+        lookalike = [(f.span[0], f.span[1]) for f in findings
+                     if f.signal == "lookalike_obfuscation" and f.span and policy.sensitive_data.drop_lookalike_text]
+        hidden += [s for s in lookalike if s not in hidden]
         risk = max(assessment.malicious,
                    policy.thresholds.neutralise if hidden else 0.0,
                    policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
         labels = sorted({label for f in findings for label in f.labels})
-        session.add_risk(risk, labels)
+        session.add_risk(risk, labels, user=source == "user")
+        # A poisoned document raises the session's risk for actions and further documents, but the user's own words are
+        # held only for risk the user's own turns built up (multi-step attacks).
+        gate = session.user_risk if source == "user" else session.risk
         if too_large:
             decision, rule, reason = (Decision.BLOCK, "content-too-large",
                                       f"Content exceeds the inspection limit ({self.max_text_chars} characters)")
@@ -591,7 +599,7 @@ class Engine:
                                       f"Matches a confirmed attack in memory (similarity {known.score:.2f})")
         elif risk >= policy.thresholds.block:
             decision, rule, reason = Decision.BLOCK, "content-risk-block", "Content risk reached the policy block threshold"
-        elif session.risk >= policy.session.block_at:
+        elif gate >= policy.session.block_at:
             decision, rule, reason = Decision.BLOCK, "session-risk-block", "Accumulated session risk reached the block threshold"
         elif assessment.degraded and scan.chunks:
             decision, rule, reason = (Decision.BLOCK, "budget-hold" if budget_degraded else "judge-unavailable-hold",
@@ -599,13 +607,19 @@ class Engine:
         elif oversize_hold:
             decision, rule, reason = (Decision.BLOCK, "oversize-hold",
                                       "Flagged parts of a long document exceed what the judge can assess; held")
-        elif session.risk >= policy.session.escalate_at:
+        elif gate >= policy.session.escalate_at:
             decision, rule, reason = Decision.ESCALATE, "session-risk-escalate", "Accumulated session risk requires review"
         elif hidden:
-            only_markers = all(f.signal != "non-visible-content" for f in findings if f.span in hidden)
-            decision, rule, reason = ((Decision.NEUTRALISE, "strip-role-markers", "Forged role/tool-call markers removed by policy")
-                                      if only_markers else
-                                      (Decision.NEUTRALISE, "drop-non-visible", "Non-visible content quarantined by policy"))
+            kinds = {f.signal for f in findings if f.span in hidden
+                     and f.signal in ("non-visible-content", "role-marker", "lookalike_obfuscation")}
+            if "non-visible-content" in kinds:
+                decision, rule, reason = Decision.NEUTRALISE, "drop-non-visible", "Non-visible content quarantined by policy"
+            elif "lookalike_obfuscation" in kinds:
+                decision, rule, reason = (Decision.NEUTRALISE, "drop-lookalike-text",
+                                          "Text written in look-alike letters quarantined by policy")
+            else:
+                decision, rule, reason = (Decision.NEUTRALISE, "strip-role-markers",
+                                          "Forged role/tool-call markers removed by policy")
         elif risk >= policy.thresholds.neutralise:
             decision, rule, reason = Decision.NEUTRALISE, "judge-neutralise", "Assessed spans reached the policy neutralise threshold"
         else:
@@ -655,6 +669,46 @@ class Engine:
             result.event_id = self.logger.action(session.session_id, agent_id, tool, args, result, session.risk)
             self.store.execute("UPDATE sessions SET risk = ? WHERE id = ?", (session.risk, session.session_id))
             return result
+
+    def output_hits(self, text: str, agent_id: str) -> bool:
+        """Does an answer contain protected data (canaries, registered secrets, known secret formats; plain or
+        encoded)? Fast and unlogged: for streamed answers, checked as they are sent."""
+        return bool(text) and bool(scan_args({"answer": text}, self._policy(agent_id).canary_values(), self._secrets))
+
+    async def check_output(self, text: str, agent_id: str, session_id: str | None = None) -> InspectResult:
+        """The model's final answer, before the user (or anyone the answer reaches) sees it: protected values are
+        redacted, and an answer with protected data that cannot be redacted (encoded, or a recognised secret format)
+        is withheld. Only answers with findings are logged (source "answer")."""
+        t0 = time.perf_counter()
+        policy = self._policy(agent_id)
+        canaries = policy.canary_values()
+        hits = scan_args({"answer": text or ""}, canaries, self._secrets)
+        if not hits:
+            return InspectResult(decision=Decision.ALLOW, enforced=Decision.ALLOW, cleaned_content=text or "",
+                                 policy_rule="allow", reason="no protected data in the answer",
+                                 latency_ms=round((time.perf_counter() - t0) * 1000, 2))
+        cleaned = text
+        for value in sorted({*canaries, *self._secrets}, key=len, reverse=True):
+            if value:
+                cleaned = cleaned.replace(value, "[REDACTED]")
+        rest = scan_args({"answer": cleaned}, canaries, self._secrets)
+        decision = Decision.BLOCK if rest else Decision.NEUTRALISE
+        if rest:
+            cleaned = "[The answer was withheld by the security policy: it contained protected data]"
+        kinds = sorted({h.kind for h in hits})
+        async with self._agent_locks.setdefault(agent_id, asyncio.Lock()):
+            session = self._session(agent_id, session_id)
+            labels = ["Credential Theft", "Secret Extraction"]
+            session.add_risk(policy.thresholds.block if rest else policy.thresholds.neutralise, labels)
+            enforced = decision if policy.mode == "enforce" else Decision.ALLOW
+            result = InspectResult(
+                decision=decision, enforced=enforced, cleaned_content=cleaned if enforced != Decision.ALLOW else text,
+                findings=[Finding(signal="outbound-secret:" + k, labels=labels) for k in kinds], labels=labels,
+                risk=1.0, session_risk=session.risk, policy_rule="answer-protected-data",
+                reason=f"the answer contains protected data ({', '.join(kinds)})",
+                latency_ms=round((time.perf_counter() - t0) * 1000, 2))
+            result.event_id = self.logger.inspection(session.session_id, agent_id, "answer", cleaned, result, None, 0, 0.0, 0)
+        return result
 
     def inspect_sync(self, *args: Any, **kwargs: Any) -> InspectResult:
         return _sync(lambda: self.inspect(*args, **kwargs))

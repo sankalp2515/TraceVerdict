@@ -306,6 +306,8 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
 
     kept, notices = await _check_tool_calls(engine, res.tool_calls, agent_id, session_id)
     content = res.content or ""
+    if content:   # protected data in the answer is redacted, or the answer withheld
+        content = (await engine.check_output(content, agent_id, session_id=session_id)).cleaned_content
     if notices:
         content = (content + "\n\n" if content else "") + "\n".join(notices)
     message: dict[str, Any] = {"role": "assistant", "content": content}
@@ -319,6 +321,52 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
                   "total_tokens": res.input_tokens + res.output_tokens},
         "x_security": {**security, "blocked_tool_calls": len(notices)},
     }
+
+
+class _AnswerGuard:
+    """The model's answer on its way out: protected data (canaries, registered secrets, secret formats, also encoded)
+    must not reach the client. Streamed text is held back (twice the longest protected value, at least 96 characters) and scanned before it is released, so a
+    protected value is caught before it is fully sent; the final answer is checked (and logged) by the engine."""
+
+    def __init__(self, engine: Any, agent_id: str, session_id: str) -> None:
+        self.engine, self.agent_id, self.session_id = engine, agent_id, session_id
+        policy = engine.policy_loader(agent_id)
+        self.enforce = policy.mode == "enforce"
+        # enough to hold a whole protected value in its longest form (hex doubles it) before any of it is sent
+        longest = max((len(v) for v in [*policy.canary_values(), *getattr(engine, "_secrets", [])]), default=0)
+        self.HOLD = max(96, 2 * longest + 8)
+        self.full, self.pending, self.withheld = "", "", False
+
+    def feed(self, text: str) -> str:
+        """Text that is safe to send now."""
+        if self.withheld:
+            return ""
+        self.full += text
+        self.pending += text
+        if len(self.pending) <= self.HOLD:
+            return ""
+        return self._release(keep=self.HOLD)
+
+    def flush(self) -> str:
+        """End of a text block: everything still held, if it is clean."""
+        return "" if self.withheld else self._release(keep=0)
+
+    def _release(self, keep: int) -> str:
+        if self.enforce and self.engine.output_hits(self.full, self.agent_id):
+            self.withheld, self.pending = True, ""
+            return ""
+        cut = len(self.pending) - keep
+        out, self.pending = self.pending[:cut], self.pending[cut:]
+        return out
+
+    async def finish(self) -> str | None:
+        """Check (and log) the whole answer; the notice to append when part of it was withheld."""
+        if not self.full:
+            return None
+        r = await self.engine.check_output(self.full, self.agent_id, session_id=self.session_id)
+        if self.withheld or r.enforced != Decision.ALLOW:
+            return "[Part of this answer was withheld by the security policy: it contained protected data]"
+        return None
 
 
 def _sse(obj: Any) -> str:
@@ -339,6 +387,7 @@ async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, se
 
     calls: dict[int, dict[str, Any]] = {}
     finish, started = None, False
+    answer = _AnswerGuard(engine, agent_id, session_id)
     try:
         async for c in upstream.chunks():
             for choice in c.get("choices") or []:
@@ -351,17 +400,26 @@ async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, se
                     slot["function"]["name"] += fn.get("name") or ""
                     slot["function"]["arguments"] += fn.get("arguments") or ""
                 if delta.get("content"):
-                    yield chunk({**({} if started else {"role": "assistant"}), "content": delta["content"]})
-                    started = True
+                    out = answer.feed(delta["content"])
+                    if out:
+                        yield chunk({**({} if started else {"role": "assistant"}), "content": out})
+                        started = True
                 finish = choice.get("finish_reason") or finish
     except Exception as e:   # upstream failed mid-stream: say so; buffered tool calls are dropped, never released
         yield _sse({"error": {"message": "upstream stream failed", "type": "upstream_error", "detail": type(e).__name__}})
         yield "data: [DONE]\n\n"
         return
+    rest = answer.flush()
+    if rest:
+        yield chunk({**({} if started else {"role": "assistant"}), "content": rest})
+        started = True
+    withheld = await answer.finish()
     ordered = [calls[i] for i in sorted(calls)]
     for tc in ordered:
         tc["id"] = tc["id"] or f"call_{uuid.uuid4().hex[:12]}"
     kept, notices = await _check_tool_calls(engine, ordered, agent_id, session_id)
+    blocked = len(notices)
+    notices = ([withheld] if withheld else []) + notices
     if notices:
         text = ("\n\n" if started else "") + "\n".join(notices)
         yield chunk({**({} if started else {"role": "assistant"}), "content": text})
@@ -370,7 +428,7 @@ async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, se
         yield chunk({**({} if started else {"role": "assistant"}),
                      "tool_calls": [{**tc, "index": i} for i, tc in enumerate(kept)]})
     final = "tool_calls" if kept else ("stop" if finish in (None, "tool_calls") else finish)
-    yield chunk({}, final, x_security={**security, "blocked_tool_calls": len(notices)})
+    yield chunk({}, final, x_security={**security, "blocked_tool_calls": blocked, "answer_withheld": bool(withheld)})
     if include_usage:
         h = upstream.handle
         yield _sse({"id": cid, "object": "chat.completion.chunk", "created": created, "model": model, "choices": [],
@@ -518,6 +576,10 @@ async def _anthropic_checked(engine: Any, msg: dict[str, Any], agent_id: str, se
     rewritten in the released ones, stop_reason corrected when no tool call is left."""
     content, notices = [], []
     for block in msg.get("content") or []:
+        if block.get("type") == "text" and block.get("text"):   # protected data in the answer: redacted or withheld
+            r = await engine.check_output(block["text"], agent_id, session_id=session_id)
+            content.append({**block, "text": r.cleaned_content})
+            continue
         if block.get("type") != "tool_use":
             content.append(block)
             continue
@@ -566,6 +628,7 @@ async def _anthropic_stream(engine: Any, events: Any, agent_id: str, session_id:
     tools: dict[int, dict[str, Any]] = {}
     stop_delta: dict[str, Any] | None = None
     usage = {"input_tokens": 0, "output_tokens": 0}
+    answer = _AnswerGuard(engine, agent_id, session_id)
     try:
         async for event in events:
             e = event.to_dict() if hasattr(event, "to_dict") else dict(event)
@@ -582,13 +645,23 @@ async def _anthropic_stream(engine: Any, events: Any, agent_id: str, session_id:
                     yield _event(kind, {**e, "index": out_index})
                     out_index += 1
             elif kind == "content_block_delta":
+                d = e.get("delta") or {}
                 if e.get("index") in tools:
-                    tools[e["index"]]["json"] += (e.get("delta") or {}).get("partial_json", "")
+                    tools[e["index"]]["json"] += d.get("partial_json", "")
+                elif d.get("type") == "text_delta":
+                    out = answer.feed(d.get("text", ""))
+                    if out:
+                        yield _event(kind, {**e, "index": index_map.get(e.get("index"), e.get("index")),
+                                            "delta": {**d, "text": out}})
                 else:
                     yield _event(kind, {**e, "index": index_map.get(e.get("index"), e.get("index"))})
             elif kind == "content_block_stop":
                 if e.get("index") not in tools:
-                    yield _event(kind, {**e, "index": index_map.get(e.get("index"), e.get("index"))})
+                    idx = index_map.get(e.get("index"), e.get("index"))
+                    rest = answer.flush()
+                    if rest:
+                        yield _event("content_block_delta", {"index": idx, "delta": {"type": "text_delta", "text": rest}})
+                    yield _event(kind, {**e, "index": idx})
             elif kind == "message_delta":
                 stop_delta = e
                 usage["output_tokens"] = int((e.get("usage") or {}).get("output_tokens") or 0)
@@ -600,6 +673,9 @@ async def _anthropic_stream(engine: Any, events: Any, agent_id: str, session_id:
         yield _event("error", {"error": {"type": "api_error", "message": f"upstream stream failed ({type(exc).__name__})"}})
         return
     released, notices = 0, []
+    withheld = await answer.finish()
+    if withheld:
+        notices.append(withheld)
     for i in sorted(tools):
         t = tools[i]
         try:

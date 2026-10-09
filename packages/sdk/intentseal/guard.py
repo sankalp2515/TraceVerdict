@@ -141,6 +141,20 @@ class Guard:
                        session_id: str | None = None) -> InspectResult:
         return _run(self.ainspect_result(content, source, filename, session_id))
 
+    # ---- the model's answer -------------------------------------------------------------------
+    async def acheck_output(self, text: str, session_id: str | None = None) -> str:
+        """What the user may see of the model's final answer: protected values (canaries, registered secrets, known
+        secret formats, also encoded) are redacted, or the answer is withheld when they cannot be."""
+        try:
+            r = await self.engine.check_output(text, self.agent_id, session_id=self._sid(session_id))
+        except Exception as e:   # the check is unavailable: the answer is not known to be safe
+            log.warning("answer check failed (%s); answer withheld", type(e).__name__)
+            return "[The answer was withheld: the security check is unavailable]"
+        return r.cleaned_content
+
+    def check_output(self, text: str, session_id: str | None = None) -> str:
+        return _run(self.acheck_output(text, session_id))
+
     # ---- actions (SDK-3, SDK-5) --------------------------------------------------------------
     async def acheck(self, tool: str, args: dict[str, Any], session_id: str | None = None) -> ActionResult:
         try:

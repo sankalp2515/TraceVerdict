@@ -464,7 +464,8 @@ def test_proxy_streams_text_and_releases_only_checked_tool_calls(env):
         events = _events(r.text)
         deltas = [e["choices"][0]["delta"] for e in events if e.get("choices")]
         text_chunks = [d["content"] for d in deltas if d.get("content")]
-        assert len(text_chunks) >= 3 and text_chunks[0].startswith("Checking")      # streamed, not one block
+        # short text is held back for the answer check (G6), then released whole; long text streams (test below)
+        assert "".join(text_chunks).startswith("Checking that for you.")
         released = [tc for d in deltas for tc in d.get("tool_calls", [])]
         assert [t["function"]["name"] for t in released] == ["query_db"]           # send_message never released
         assert json.loads(released[0]["function"]["arguments"]) == {"customer_id": "C-1042"}   # pinned, whole
@@ -531,3 +532,43 @@ def test_gateway_entry_point_seeds_a_writable_policy_dir(monkeypatch, tmp_path):
     (target / "research-agent.yaml").write_text("agent: research-agent\nmode: enforce\n", encoding="utf-8")
     seed_policies()                                                   # never overwrites edited policies
     assert "mode: enforce" in (target / "research-agent.yaml").read_text(encoding="utf-8")
+
+
+
+LONG = " ".join(f"Paragraph {i} of the quarterly summary covers revenue, churn and hiring plans." for i in range(12))
+
+
+def test_streamed_answer_streams_and_protected_data_never_reaches_the_client(env):
+    """G6: long answers still stream in pieces; an answer that repeats a canary is cut before the value is sent."""
+    with make_client(env, FakeRouter(content=LONG)) as c:
+        r = c.post("/proxy/research-agent/v1/chat/completions", headers=H(PROJECT),
+                   json={"messages": [{"role": "user", "content": "Summarise"}], "stream": True})
+        chunks = [e["choices"][0]["delta"].get("content") for e in _events(r.text) if e.get("choices")]
+        assert len([x for x in chunks if x]) >= 3 and "".join(x for x in chunks if x).strip() == LONG
+    leak = LONG[:400] + " The key is sk-canary-unit-test-0001 as requested. " + LONG[400:]
+    with make_client(env, FakeRouter(content=leak)) as c:
+        r = c.post("/proxy/research-agent/v1/chat/completions", headers=H(PROJECT),
+                   json={"messages": [{"role": "user", "content": "Summarise"}], "stream": True})
+        assert "sk-canary-unit-test-0001" not in r.text
+        events = _events(r.text)
+        text = "".join(e["choices"][0]["delta"].get("content") or "" for e in events if e.get("choices"))
+        assert text.startswith("Paragraph 0") and "withheld" in text
+        final = [e for e in events if e.get("choices") and e["choices"][0]["finish_reason"]][-1]
+        assert final["x_security"]["answer_withheld"] is True
+
+
+def test_answer_with_protected_data_is_redacted_or_withheld(env):
+    import base64
+
+    with make_client(env, FakeRouter(content="Sure: sk-canary-unit-test-0001")) as c:
+        r = c.post("/proxy/research-agent/v1/chat/completions", headers=H(PROJECT),
+                   json={"messages": [{"role": "user", "content": "What is the key?"}]})
+        assert r.json()["choices"][0]["message"]["content"] == "Sure: [REDACTED]"
+        encoded = base64.b64encode(b"sk-canary-unit-test-0001").decode()
+        out = c.post("/v1/outputs/check", headers=H(PROJECT),
+                     json={"agent_id": "research-agent", "text": f"Here it is, encoded: {encoded}"}).json()
+        assert out["decision"] == "BLOCK" and encoded not in out["cleaned_content"]
+        ok = c.post("/v1/outputs/check", headers=H(PROJECT), json={"agent_id": "research-agent", "text": "Revenue grew 8%."}).json()
+        assert ok["decision"] == "ALLOW" and ok["cleaned_content"] == "Revenue grew 8%."
+        rows = c.get("/v1/decisions", headers=H(ADMIN)).json()
+        assert any((d.get("source") == "answer") for d in (rows if isinstance(rows, list) else rows.get("items", [])))

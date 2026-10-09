@@ -70,12 +70,19 @@ def normalise(text: str) -> Normalised:
     if folded != fixed:
         changes["ascii_folded"] = sum(a != b for a, b in zip(folded, fixed)) or 1
 
-    for word in {w for w in fixed.split() if len(w) >= 3}:
+    words = {w for w in fixed.split() if len(w) >= 3}
+    for word in words:
         if confusables.is_mixed_script(word):
             flags.add("mixed_script")
             if confusables.is_dangerous(word):
                 flags.add("confusable_characters")
             break
+    if "confusable_characters" in flags:
+        # Text written largely in look-alike letters is obfuscation: real multilingual text keeps each word in one script.
+        lettered = [w for w in fixed.split() if sum(c.isalpha() for c in w) >= 3]
+        dangerous = sum(1 for w in lettered if confusables.is_mixed_script(w) and confusables.is_dangerous(w))
+        if dangerous >= 3 and dangerous >= 0.25 * len(lettered):
+            flags.add("lookalike_obfuscation")
 
     skeleton = latin_skeleton(fixed) if flags & {"mixed_script", "confusable_characters"} else None
     return Normalised(original=text, text=fixed, ascii_view=folded, changes=changes, flags=flags, skeleton=skeleton)

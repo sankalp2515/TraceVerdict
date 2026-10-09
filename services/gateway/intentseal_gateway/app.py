@@ -41,6 +41,12 @@ class InspectRequest(BaseModel):
     session_id: str | None = None
 
 
+class OutputRequest(BaseModel):
+    text: str
+    agent_id: str
+    session_id: str | None = None
+
+
 class ActionRequest(BaseModel):
     tool: str
     args: dict[str, Any] = Field(default_factory=dict)
@@ -183,6 +189,13 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     async def check(body: ActionRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
         require_agent(request, p, body.agent_id)
         r = await request.app.state.engine.check_action(body.tool, body.args, body.agent_id, session_id=body.session_id)
+        return r.model_dump(mode="json")
+
+    # ---- the model's answer: protected data never reaches the reader -----------------------------
+    @app.post("/v1/outputs/check", tags=["engine"])
+    async def check_output(body: OutputRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
+        require_agent(request, p, body.agent_id)
+        r = await request.app.state.engine.check_output(body.text, body.agent_id, session_id=body.session_id)
         return r.model_dump(mode="json")
 
     # ---- API-3 sessions -----------------------------------------------------------------------

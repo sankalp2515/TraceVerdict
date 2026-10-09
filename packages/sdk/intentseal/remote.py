@@ -65,5 +65,9 @@ class RemoteEngine:
         body = {"tool": tool, "args": args, "agent_id": agent_id, "session_id": session_id}
         return ActionResult.model_validate(await asyncio.to_thread(self._post, "/v1/actions/check", body))
 
+    async def check_output(self, text: str, agent_id: str, session_id: str | None = None) -> InspectResult:
+        body = {"agent_id": agent_id, "session_id": session_id, "text": text}
+        return InspectResult.model_validate(await asyncio.to_thread(self._post, "/v1/outputs/check", body))
+
     def close(self) -> None:
         self.http.close()

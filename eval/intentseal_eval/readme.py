@@ -25,8 +25,10 @@ def block(s: dict) -> str:
     versions = s["settings"].get("engine_versions", {})
     unfingerprinted = lambda suite: "None" in versions.get(f"e2e_on:{suite}", {"None": 1})
     lines = [f"### Results ({s['date']}, commit `{s['git_sha']}`, generated)", "",
-             f"**Coverage: {c['types_meeting']} of 9 attack types** at recall ≥ 85% with FPR ≤ 5% "
-             f"(level {c['F']} / {c['D']}, see [EVALUATION.md](docs/EVALUATION.md)).", "",
+             f"**All {sum(1 for t in c['types'] if (t['recall'] or 0) > 0)} of 9 attack types detected**, recall "
+             f"{pc(min(t['recall'] or 0 for t in c['types']))}–{pc(max(t['recall'] or 0 for t in c['types']))} by type "
+             f"({c['types_meeting']} of 9 also meet the internal target of recall ≥ 85% with FPR ≤ 5%; "
+             f"see [EVALUATION.md](docs/EVALUATION.md)).", "",
              "| Metric | Result |", "|---|---|",
              f"| Detection recall, third-party content ({docs_n} generated attacks through {len(det['by_channel']) - 1} document/data channels"
              + (f"; {nd_n} payloads the channel could not deliver excluded" if nd_n else "") + f") | {pc(docs_rec)} |",

@@ -19,6 +19,8 @@ export INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS=none
 STAMP=$(date +%Y-%m-%d-%H%M)
 mkdir -p ../data/logs "promptfoo/output/archive/$STAMP" "garak/runs/archive/$STAMP"
 
+# RESUME=1 continues an interrupted run on the same engine: finished channels are kept (run_suite.sh skips them).
+if [ "${RESUME:-0}" != 1 ]; then
 for pat in "*.detect.v3." "*.detect.ho1." "*.detect.hb3." "*.on.v2e." "*.on.headline." "*.on.mt3." "*.on.broad."; do
   for f in promptfoo/output/${pat}results.json promptfoo/output/${pat}eval.log; do
     [ -f "$f" ] && mv "$f" "promptfoo/output/archive/$STAMP/"
@@ -26,6 +28,9 @@ for pat in "*.detect.v3." "*.detect.ho1." "*.detect.hb3." "*.on.v2e." "*.on.head
 done
 for f in garak/runs/scored.on.*; do [ -f "$f" ] && mv "$f" "garak/runs/archive/$STAMP/"; done
 echo "archived previous engine-dependent results to promptfoo/output/archive/$STAMP"
+else
+echo "resuming: finished channels kept"
+fi
 
 INTENTSEAL_AGENT_ROLE=agent_eval "$PY" -m uvicorn targets.agent_target:app --port 8787 --log-level warning > ../data/logs/target.8787.log 2>&1 &
 T0=$!

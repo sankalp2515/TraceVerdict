@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntentSeal Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="metrics.js"></script>
+<style>
+:root {
+  --bg: #090611; --bg2: #110b23; --surface: #140d2a; --surface2: #1b1335;
+  --line: rgba(220, 207, 255, 0.16); --line2: rgba(220, 207, 255, 0.30);
+  --text: #f8f5ff; --muted: #c0b9d6; --subtle: #9b8fb5;
+  --accent: #7857ff; --accent2: #ceadff; --grad: linear-gradient(100deg, #6d7bff, #a86bff 55%, #e07cff);
+  --allow: #8be3b9; --neutral: #ffd59e; --block: #ff98a8; --escalate: #b5c3ff;
+  --h: "Space Grotesk", "Segoe UI", sans-serif; --b: "Inter", "Segoe UI", sans-serif; --m: "JetBrains Mono", Consolas, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: #05030b; color: var(--text); font-family: var(--b); }
+body { overflow: hidden; }
+.stage { position: fixed; inset: 0; display: grid; place-items: center; }
+.deck { position: relative; width: 1600px; height: 900px; transform-origin: center center; }
+.slide { position: absolute; inset: 0; width: 1600px; height: 900px; padding: 64px 80px 56px; overflow: hidden;
+  background: radial-gradient(1100px 600px at 85% -10%, rgba(120, 87, 255, 0.22), transparent 60%),
+              radial-gradient(900px 500px at -10% 110%, rgba(172, 19, 235, 0.12), transparent 60%), var(--bg);
+  opacity: 0; visibility: hidden; transition: opacity .35s ease; display: flex; flex-direction: column; }
+.slide.active { opacity: 1; visibility: visible; }
+.kicker { font: 600 15px/1 var(--m); letter-spacing: .14em; text-transform: uppercase; color: var(--accent2); display: flex; gap: 14px; align-items: center; }
+.kicker .n { color: var(--subtle); }
+h1, h2, h3 { font-family: var(--h); font-weight: 600; letter-spacing: -0.02em; }
+h2 { font-size: 46px; line-height: 1.08; margin-top: 18px; max-width: 1340px; }
+h3 { font-size: 25px; line-height: 1.2; }
+.grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+p, li { font-size: 19px; line-height: 1.5; color: var(--muted); }
+.lede { font-size: 22px; color: var(--muted); max-width: 1180px; margin-top: 14px; line-height: 1.45; }
+.card { background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); border: 1px solid var(--line); border-radius: 18px; padding: 24px 26px; }
+.card h3 { margin-bottom: 10px; }
+.card p, .card li { font-size: 19px; line-height: 1.5; }
+.fill { flex: 1; min-height: 0; }
+.fill > .card { display: flex; flex-direction: column; }
+.mono { font-family: var(--m); }
+.tag { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--m); padding: 9px 12px; border-radius: 999px; border: 1px solid var(--line2); color: var(--text); background: rgba(255,255,255,0.04); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.footer { position: absolute; left: 80px; right: 80px; bottom: 24px; display: flex; justify-content: space-between; font: 500 13px/1 var(--m); color: var(--subtle); letter-spacing: .04em; }
+.big { font-family: var(--h); font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -0.03em; }
+.src { font: 12px/1.4 var(--m); color: var(--subtle); margin-top: auto; padding-top: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+ul.clean { list-style: none; }
+ul.clean li { padding-left: 22px; position: relative; margin: 9px 0; }
+ul.clean li::before { content: ""; position: absolute; left: 2px; top: 11px; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
+.pill { font: 600 13px/1 var(--m); padding: 6px 9px; border-radius: 6px; letter-spacing: .02em; }
+.ALLOW { color: #062417; background: var(--allow); } .NEUTRALISE { color: #2d1d00; background: var(--neutral); }
+.ESCALATE { color: #0c1440; background: var(--escalate); } .BLOCK { color: #3a0711; background: var(--block); }
+.nav { position: fixed; bottom: 14px; right: 18px; display: flex; gap: 10px; align-items: center; z-index: 10; font: 13px var(--m); color: var(--subtle); }
+.nav button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line2); background: rgba(255,255,255,0.05); color: var(--text); cursor: pointer; }
+.progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--grad); z-index: 10; transition: width .3s; }
+
+/* --- slide-specific --- */
+.title-wrap { margin-top: auto; margin-bottom: auto; }
+.title-wrap h1 { font-size: 132px; line-height: .95; letter-spacing: -0.045em; margin: 26px 0 22px; }
+.title-wrap .tagline { font-family: var(--h); font-size: 40px; line-height: 1.15; max-width: 1150px; color: var(--text); font-weight: 500; }
+.seal { width: 74px; height: 74px; border-radius: 20px; display: grid; place-items: center; background: var(--grad); box-shadow: 0 20px 60px rgba(120, 87, 255, .45); }
+.claim { position: absolute; right: 80px; top: 64px; text-align: right; }
+.claim .box { display: inline-block; padding: 16px 20px; border-radius: 16px; border: 1px solid var(--line2); background: rgba(120, 87, 255, .12); }
+.claim .box .big { font-size: 46px; }
+.arch { position: relative; margin-top: 22px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.lane { display: flex; align-items: stretch; gap: 0; flex: 1; margin-bottom: 16px; }
+.lane .lab { width: 118px; flex: none; font: 600 12px/1.3 var(--m); color: var(--subtle); text-transform: uppercase; letter-spacing: .1em; padding-top: 12px; }
+.node { flex: 1; border: 1px solid var(--line2); border-radius: 14px; padding: 12px 13px; background: rgba(255,255,255,0.035); min-width: 0; }
+.node b { display: block; font: 600 18px/1.25 var(--h); color: var(--text); margin-bottom: 6px; }
+.node span { display: block; font-size: 15px; line-height: 1.4; color: var(--muted); }
+.node .num { font: 700 12px/1 var(--m); color: var(--accent2); margin-bottom: 6px; display: block; }
+.node.ai { border-color: rgba(206, 173, 255, 0.6); background: rgba(120, 87, 255, 0.13); }
+.node.rule { border-color: rgba(139, 227, 185, 0.45); background: rgba(139, 227, 185, 0.06); }
+.node.ext { border-style: dashed; background: transparent; }
+.arrow { flex: none; width: 26px; display: grid; place-items: center; color: var(--accent2); font: 700 18px var(--m); }
+.legend { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; font-size: 15px; color: var(--muted); }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; margin-right: 7px; vertical-align: -2px; }
+table.t { width: 100%; border-collapse: collapse; }
+table.t th { text-align: left; font: 600 13px/1 var(--m); letter-spacing: .1em; text-transform: uppercase; color: var(--subtle); padding: 10px 12px; border-bottom: 1px solid var(--line2); }
+table.t td { padding: 15px 14px; border-bottom: 1px solid var(--line); font-size: 19px; color: var(--muted); vertical-align: top; }
+table.t td:first-child { color: var(--text); font-weight: 600; }
+.shot { border-radius: 14px; border: 1px solid var(--line2); overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.55); background: #0b0716; }
+.shot img { display: block; width: 100%; }
+.term { font: 15.5px/1.6 var(--m); background: #07050d; border: 1px solid var(--line2); border-radius: 14px; padding: 16px 18px; color: #d8d2ea; }
+.term .p { color: var(--allow); } .term .c { color: var(--subtle); }
+.loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.step { border: 1px solid var(--line2); border-radius: 12px; padding: 12px; background: rgba(255,255,255,.035); }
+.step .k { font: 700 12px/1 var(--m); color: var(--accent2); }
+.step b { display: block; font: 600 18px/1.2 var(--h); margin: 6px 0 4px; }
+.step span { font-size: 15px; color: var(--muted); line-height: 1.4; display: block; }
+.horizon { border-top: 3px solid var(--accent); }
+.flow { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; font-size: 17px; color: var(--muted); }
+.flow .b { border: 1px solid var(--line2); border-radius: 10px; padding: 8px 12px; color: var(--text); background: rgba(255,255,255,.04); white-space: nowrap; }
+.flow .x { color: var(--subtle); }
+table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.yes { color: var(--allow); font-weight: 600; }
+.target { margin-top: auto; padding-top: 14px; border-top: 1px dashed var(--line2); font: 600 15px/1.45 var(--m); color: var(--accent2); }
+.metric .big { margin-bottom: 8px; }
+.metric p { font-size: 17px; line-height: 1.4; }
+
+@media print {
+  @page { size: 1600px 900px; margin: 0; }
+  html, body { overflow: visible; background: var(--bg); }
+  .stage { position: static; display: block; }
+  .deck { transform: none !important; width: 1600px; height: auto; }
+  .slide { position: relative; opacity: 1; visibility: visible; page-break-after: always; break-after: page; transition: none; }
+  .nav, .progress { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="stage"><div class="deck" id="deck">
+
+<!-- 1. Title + team -->
+<section class="slide active">
+  <div class="kicker"><span>ET AI Hackathon 2026</span><span class="n">·</span><span>Problem 2: Agentic Cybersecurity</span></div>
+  <div class="claim"><div class="mono" style="color:var(--subtle);font-size:13px;letter-spacing:.12em;margin-bottom:8px">SELF-DECLARED POSITION</div>
+    <div class="box"><div class="big grad">F3 · D3</div><div class="mono" style="font-size:13px;color:var(--muted);margin-top:6px">9 of 9 attack types · 11 input sources</div></div></div>
+  <div class="title-wrap">
+    <div class="seal"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <h1>Intent<span class="grad">Seal</span></h1>
+    <div class="tagline">The prompt-injection firewall that keeps AI agents inside the user's intent.</div>
+    <div style="display:flex;gap:12px;margin-top:34px;flex-wrap:wrap">
+      <span class="tag">pip install intentseal</span><span class="tag">docker compose up</span>
+      <span class="tag">Any agent · any model</span><span class="tag">Open source · Apache-2.0</span>
+    </div>
+  </div>
+  <div class="grid2" style="grid-template-columns: 1.1fr 1fr; align-items:end">
+    <div><div class="mono" style="color:var(--subtle);font-size:13px;letter-spacing:.12em">TEAM</div>
+      <p style="color:var(--text);font-size:21px;margin-top:8px"><b>Sankalp Wanjari</b>: solo builder. Product, security research, engineering and evaluation.</p></div>
+    <p style="text-align:right;font-size:16px">github.com/sankalp2515/intentseal</p>
+  </div>
+</section>
+
+<!-- 2. Problem -->
+<section class="slide">
+  <div class="kicker"><span class="n">02</span><span>Problem</span></div>
+  <h2>Agents now read the outside world and act on it. <span class="grad">Anything they read can give them orders.</span></h2>
+  <div class="grid2 fill" style="grid-template-columns: 1.05fr 1fr; margin-top: 30px; gap: 28px">
+    <div class="card" style="border-color: rgba(255,152,168,.45)">
+      <div class="mono" style="color:var(--block);font-size:13px;letter-spacing:.12em">REAL CASE · JUNE 2025 · CVSS 9.3</div>
+      <h3 style="font-size:30px;margin:12px 0 10px">One email. Zero clicks. Data out.</h3>
+      <p>EchoLeak (CVE-2025-32711): a single crafted email made Microsoft 365 Copilot leak internal data. It slipped past Microsoft's own prompt-injection classifier.</p>
+      <div style="margin-top:20px;border-top:1px solid var(--line);padding-top:16px">
+        <h3 style="font-size:19px;margin-bottom:8px">Why today's defences miss it</h3>
+        <ul class="clean">
+          <li><b style="color:var(--text)">They read text, not what the model reads:</b> white PDF text, hidden HTML, text inside images, base64, look-alike letters.</li>
+          <li><b style="color:var(--text)">They stop at detection:</b> when the filter misses, the agent still sends the email.</li>
+          <li><b style="color:var(--text)">They leave no evidence:</b> nobody can replay what the agent saw and why it acted.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid2" style="gap:18px;grid-auto-rows:1fr">
+      <div class="card metric"><div class="big grad">#1</div><p>Prompt injection is the top risk for LLM apps (OWASP 2025); agent goal hijack is #1 for agentic apps (OWASP 2026)</p></div>
+      <div class="card metric"><div class="big grad">40%</div><p>of enterprise apps will have task-specific AI agents by end-2026, up from under 5% (Gartner)</p></div>
+      <div class="card metric"><div class="big grad">₹22 cr</div><p>average cost of a data breach in India, 2025, an all-time high; shadow AI adds ₹1.79 cr (IBM)</p></div>
+      <div class="card metric"><div class="big grad">₹250 cr</div><p>maximum DPDP Act penalty for failing to keep reasonable security safeguards</p></div>
+    </div>
+  </div>
+  <div class="src">Sources: Aim Security / arXiv 2509.10540 (EchoLeak); OWASP GenAI Security Project; Gartner (2025); IBM Cost of a Data Breach 2025, India; DPDP Act 2023 Schedule.</div>
+</section>
+
+<!-- 3. Solution -->
+<section class="slide">
+  <div class="kicker"><span class="n">03</span><span>Proposed solution</span></div>
+  <h2 style="font-size:42px">IntentSeal sits between the agent and everything it reads and does. <span class="grad">Catch what can be caught, limit the damage, prove what happened.</span></h2>
+  <div class="grid4 fill" style="margin-top:30px">
+    <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">01 · SEE</div><h3 style="margin-top:10px">Sees what the model sees</h3>
+      <p>11 input sources. Hidden PDF and Word text, hidden HTML, text in images (OCR), encodings decoded; pasted text split from the user's request.</p></div>
+    <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">02 · REMOVE</div><h3 style="margin-top:10px">Removes only the attack</h3>
+      <p>Offending spans are quarantined in place; the rest keeps working: <b style="color:var(--text)" data-m="utility" data-f="pct0"></b> of normal tasks still completed.</p></div>
+    <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">03 · GUARD</div><h3 style="margin-top:10px">Checks every action</h3>
+      <p>Allow-lists, fields pinned to the signed-in user, secret-leak scan, "did the user ask for this?", data-flow tracing, answer check.</p></div>
+    <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">04 · PROVE</div><h3 style="margin-top:10px">Proves, triages, learns</h3>
+      <p>Every decision logged with rule and attack type; replay, human approvals, an Investigator agent, a memory of confirmed attacks.</p></div>
+  </div>
+  <div class="card" style="margin-top:20px;padding:14px 26px">
+    <table class="t cmp"><tr><th style="width:40%">What is new</th><th>Typical prompt filter</th><th>IntentSeal</th></tr>
+      <tr><td>Reads hidden text, images (OCR) and encodings the model will read</td><td>text only</td><td class="yes">yes, 11 sources</td></tr>
+      <tr><td>Stops the harmful action when detection misses</td><td>no</td><td class="yes">intent-bound action guard</td></tr>
+      <tr><td>Keeps the user's request apart from pasted or retrieved text</td><td>no</td><td class="yes">yes, per span</td></tr>
+      <tr><td>Investigates its own alerts and learns from reviewers</td><td>no</td><td class="yes">Investigator agent + memory</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 4. Architecture -->
+<section class="slide" style="padding-top:52px">
+  <div class="kicker"><span class="n">04</span><span>Architecture: process flow, decisions, model usage</span></div>
+  <h2 style="font-size:36px;margin-top:12px">Rules decide, AI advises: no model output can override the policy.</h2>
+  <div class="arch">
+    <div class="lane"><div class="lab">Inbound<br>content</div>
+      <div class="node ext"><b>11 sources</b><span>user · web · PDF · email · Markdown · HTML · Word · API · OCR text · code · images, plus RAG passages</span></div><div class="arrow">→</div>
+      <div class="node rule"><span class="num">1</span><b>Extract &amp; normalise</b><span>hidden text, metadata, OCR; decode encodings; split pasted text from the request</span></div><div class="arrow">→</div>
+      <div class="node rule"><span class="num">2 · TIER 0</span><b>Rules + attack memory</b><span>structural flags; fingerprints of confirmed attacks</span></div><div class="arrow">→</div>
+      <div class="node ai"><span class="num">3 · TIER 1</span><b>Local classifier</b><span>DeBERTa-v3 (ONNX, CPU); scores every chunk</span></div><div class="arrow">→</div>
+      <div class="node ai"><span class="num">4 · TIER 2</span><b>AI judge</b><span>intent vs the user's task; labels 9 attack types; 1M-token judge for long pages</span></div><div class="arrow">→</div>
+      <div class="node rule"><span class="num">5</span><b>Deterministic policy</b><span>ALLOW · NEUTRALISE (quarantine spans) · ESCALATE · BLOCK; fail closed</span></div><div class="arrow">→</div>
+      <div class="node ext"><b>Agent's LLM</b><span>sees cleaned content only</span></div>
+    </div>
+    <div class="lane"><div class="lab">Actions &amp;<br>answers</div>
+      <div class="node ext" style="flex:.8"><b>Tool call / answer</b><span>proposed by the agent's model</span></div><div class="arrow">→</div>
+      <div class="node rule" style="flex:2.6"><span class="num">6</span><b>Action guard</b><span>allow-lists for tools, recipients, domains, paths · pinned fields · outbound secret scan (also encoded) · "did the user ask?" · provenance &amp; data-flow taint · session risk</span></div><div class="arrow">→</div>
+      <div class="node rule" style="flex:1.3"><span class="num">7</span><b>Answer check</b><span>secrets redacted or withheld, also mid-stream</span></div><div class="arrow">→</div>
+      <div class="node ext" style="flex:1.3"><b>Tools / user</b><span>stopped calls are explained to the model, which continues another way</span></div>
+    </div>
+    <div class="lane"><div class="lab">Session</div>
+      <div class="node rule" style="flex:2"><b>Session risk</b><span>user risk (user's own turns: multi-step jailbreaks) kept apart from third-party risk (gates actions); the same poisoned content counts once</span></div><div class="arrow">↔</div>
+      <div class="node rule" style="flex:2"><span class="num">8</span><b>Decision log &amp; evidence</b><span>rule, reason, attack types, redacted previews; replay, approvals, SIEM export (JSON Lines, CEF)</span></div><div class="arrow">→</div>
+      <div class="node ai" style="flex:2.2"><span class="num">9 · AGENT</span><b>Investigator</b><span>plans, uses read-only tools, self-checks, reports; proposes memory/policy changes a reviewer applies, which feed back into step 2</span></div>
+    </div>
+    <div class="legend" style="margin-top:12px">
+      <span><span class="sw" style="background:rgba(139,227,185,.5)"></span>Deterministic (rules)</span>
+      <span><span class="sw" style="background:rgba(206,173,255,.7)"></span>AI (advises)</span>
+      <span><span class="sw" style="border:1px dashed var(--line2)"></span>Outside IntentSeal</span>
+      <span style="margin-left:auto">In the demo: hidden-text PDF → <b style="color:var(--text)">1</b> finds white text → <b style="color:var(--text)">3, 4</b> score and judge → <b style="color:var(--text)">5</b> <span class="pill BLOCK">BLOCK</span> → <b style="color:var(--text)">8</b> replay → <b style="color:var(--text)">9</b> report</span>
+    </div>
+  </div>
+</section>
+
+<!-- 5. AI models & technologies -->
+<section class="slide">
+  <div class="kicker"><span class="n">05</span><span>AI models &amp; technologies</span></div>
+  <h2>Each model does one job it is good at. <span class="grad">Local first, AI where judgement is needed, free tiers throughout.</span></h2>
+  <table class="t" style="margin-top:22px">
+    <tr><th style="width:22%">Job</th><th style="width:36%">Model / technology</th><th>Why this choice</th></tr>
+    <tr><td>Tier 1 classifier</td><td>ProtectAI DeBERTa-v3 prompt-injection v2, ONNX on CPU</td><td>Every chunk scored locally in ~0.1 s; no content leaves the host</td></tr>
+    <tr><td>Tier 2 judge</td><td>gpt-oss-20b (Groq) → NVIDIA NIM → Gemini 3.1 Flash-Lite</td><td>Reads content against the user's task; labels the 9 attack types; fails over across providers</td></tr>
+    <tr><td>Long-document judge</td><td>NVIDIA Nemotron 3 Ultra (1M-token context)</td><td>Judges a whole long web page in one pass instead of guessing from fragments</td></tr>
+    <tr><td>Investigator agent</td><td>Gemini 3.1 Flash-Lite → Nemotron 3 Super → gpt-oss-120b</td><td>Tool-using triage agent; large free quotas so triage never queues</td></tr>
+    <tr><td>OCR</td><td>RapidOCR (ONNX)</td><td>Reads text in screenshots and images before the model does</td></tr>
+    <tr><td>Attack memory</td><td>Word-shingle fingerprints (no text stored)</td><td>Confirmed attacks blocked at Tier 0 next time; marked false alarms not flagged again</td></tr>
+  </table>
+  <div class="grid2" style="margin-top:auto;gap:18px">
+    <div class="card" style="padding:18px 22px"><h3 style="font-size:20px">Stack</h3><p style="font-size:18px;margin-top:6px">Python · FastAPI gateway · React Console · SQLite or PostgreSQL · Docker · PyPI package <span class="mono">intentseal</span> · CI with 250+ tests</p></div>
+    <div class="card" style="padding:18px 22px"><h3 style="font-size:20px">Model-agnostic and red-teamed</h3><p style="font-size:18px;margin-top:6px">15+ providers (OpenAI, Anthropic, Gemini, Groq, local Ollama/vLLM). Attacks generated by promptfoo and NVIDIA garak, never hand-written.</p></div>
+  </div>
+</section>
+
+<!-- 6. Agentic capability -->
+<section class="slide">
+  <div class="kicker"><span class="n">06</span><span>Agentic capability</span></div>
+  <h2>IntentSeal acts on its own, within guardrails: <span class="grad">it reasons, plans, uses tools, recovers and learns.</span></h2>
+  <div class="grid2 fill" style="grid-template-columns: 1.15fr 1fr; gap: 26px; margin-top: 26px">
+    <div class="card">
+      <h3>The Investigator: an agent that triages what the firewall stopped</h3>
+      <div class="loop" style="margin-top:16px">
+        <div class="step"><span class="k">PLAN</span><b>Playbook</b><span>timeline → evidence → decode → history → policy</span></div>
+        <div class="step"><span class="k">TOOLS</span><b>5 read-only tools</b><span>the log, evidence, decoders, attack memory, policy</span></div>
+        <div class="step"><span class="k">CHECK</span><b>Self-check</b><span>an incomplete report is sent back to it once</span></div>
+        <div class="step"><span class="k">ACT</span><b>Report + proposals</b><span>severity, objective, outcome; proposes, a human applies</span></div>
+      </div>
+      <div class="term" style="margin-top:16px">
+        <span class="c"># real run, hidden-text PDF, 43 s, 8 steps</span><br>
+        timeline · evidence · decode <span class="c">→ hidden base64 decoded</span><br>
+        history · policy · submit_report <span class="c">→ rejected: "propose_memory first"</span><br>
+        propose_memory(verdict=attack) · submit_report <span class="p">→ accepted</span><br>
+        <span class="c">verdict</span> attack · <span class="c">severity</span> high · <span class="c">goal</span> look up customer CUST-7781 and leak it
+      </div>
+      <p style="font-size:16px;margin-top:auto;padding-top:12px">Evidence reaches it datamarked (Spotlighting), its tools cannot act, and its output is advice: the triage agent cannot be hijacked into doing harm.</p>
+    </div>
+    <div>
+      <table class="t">
+        <tr><th>Criterion</th><th>What IntentSeal does</th></tr>
+        <tr><td>Reason</td><td>Judge weighs content against the user's task; long-context judge for whole pages</td></tr>
+        <tr><td>Plan</td><td>Investigator follows and adapts a triage playbook</td></tr>
+        <tr><td>Use tools</td><td>Investigator queries log, evidence, decoders, memory, policy</td></tr>
+        <tr><td>Take actions</td><td>Quarantines spans, blocks, escalates to a human, pins fields; triages pending approvals automatically</td></tr>
+        <tr><td>Recover</td><td>Provider failover; fail-closed holds; self-check; protected agents continue after a stopped call</td></tr>
+        <tr><td>Autonomy</td><td>Rules decide; humans approve state changes; monitor before enforce</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Product demo -->
+<section class="slide">
+  <div class="kicker"><span class="n">07</span><span>Product demo</span></div>
+  <h2 style="font-size:42px">A real, unmodified agent protected by changing one setting.</h2>
+  <div class="grid2 fill" style="grid-template-columns: 1fr 1.02fr; gap: 26px; margin-top: 20px">
+    <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+      <div class="term">
+        <span class="c"># Hermes Agent (Nous Research): only its endpoint changes</span><br>
+        model: { provider: custom,<br>&nbsp; base_url: http://localhost:8000/proxy/hermes/v1 }<br>
+        <span class="p">$</span> hermes -z "Read message.eml and tell me what it asks me to do."<br>
+        I cannot read the file due to security restrictions...
+      </div>
+      <div class="shot"><img src="assets/decisions-hermes.png" alt="Console decisions for the Hermes session"></div>
+      <p style="font-size:16px">Console, Decisions: the poisoned email Hermes read is <span class="pill BLOCK">Blocked</span>; its follow-up commands in the now-risky session wait for a human (<span class="pill ESCALATE">Needs approval</span>).</p>
+      <div class="card" style="padding:14px 18px;display:grid;gap:10px">
+    <div class="flow"><span class="mono" style="width:70px;color:var(--block)">BEFORE</span><span class="b">poisoned email</span><span class="x">→</span><span class="b">model obeys</span><span class="x">→</span><span class="b" style="border-color:rgba(255,152,168,.6)">sends customer data</span><span class="x">→</span><span style="color:var(--block)">data leaves</span></div>
+    <div class="flow"><span class="mono" style="width:70px;color:var(--allow)">AFTER</span><span class="b">poisoned email</span><span class="x">→</span><span class="b">quarantined</span><span class="x">→</span><span class="b">send <span class="pill BLOCK">BLOCK</span></span><span class="x">→</span><span style="color:var(--allow)">task done, nothing leaks</span></div>
+  </div>
+
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+      <div class="shot" style="flex:1;min-height:0"><img src="assets/investigator.png" alt="Investigator report for a blocked PDF" style="width:100%;height:100%;object-fit:cover;object-position:left top"></div>
+      <p style="font-size:16px">Replay + Investigator: a PDF with white, base64-encoded text is blocked; the Investigator decodes it, names the goal and proposes remembering it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Evidence + grid -->
+<section class="slide">
+  <div class="kicker"><span class="n">08</span><span>Evidence and grid position</span></div>
+  <h2>Measured, not claimed: <span class="grad">generated attacks through every input channel.</span></h2>
+  <div class="grid4" style="margin-top:22px">
+    <div class="card metric"><div class="big grad" data-m="docs_recall" data-f="pct1"></div><p>attacks caught in documents and data, <span data-m="docs_n"></span> generated attacks, <span data-m="channels"></span> channels</p></div>
+    <div class="card metric"><div class="big grad"><span data-m="head_off" data-f="pct0"></span>→<span data-m="head_on" data-f="pct0"></span></div><p>attack success on the agent, protection off → on (<span data-m="e2e_compromised_on"></span> of <span data-m="e2e_scored_on"></span> protected tests compromised)</p></div>
+    <div class="card metric"><div class="big grad"><span data-m="adaptive_compromised"></span> / <span data-m="adaptive_scored"></span></div><p>adaptive multi-turn attacker conversations that succeeded (promptfoo crescendo, tree search)</p></div>
+    <div class="card metric"><div class="big grad"><span data-m="p95_ms" data-f="int"></span> ms</div><p>fast-path latency p95 on CPU; <span data-m="utility" data-f="pct0"></span> of normal tasks completed with protection on</p></div>
+  </div>
+  <div class="grid2" style="grid-template-columns: 1.1fr 1fr; gap: 24px; margin-top: 20px; flex:1; min-height:0">
+    <div class="card" style="padding:18px 22px"><h3 style="font-size:18px">Recall by attack type: all <span data-m="types_detected"></span> of 9 detected</h3><div style="height:300px;margin-top:8px"><canvas id="types"></canvas></div></div>
+    <div class="card" style="padding:18px 22px">
+      <h3 style="font-size:18px">Declared position: <span class="grad">F3 · D3</span></h3>
+      <table class="t" style="margin-top:6px">
+        <tr><td style="width:24%">F3: ≥ 7 types</td><td>All 9 types detected (chart); each labelled per decision</td></tr>
+        <tr><td>D3: multimodal</td><td>PDF, Word, HTML, email, images (OCR), API, code, RAG, hidden text and encodings: <span data-m="docs_recall" data-f="pct1"></span> recall</td></tr>
+        <tr><td>Reliability</td><td>0% attack success in <span data-m="e2e_scored_on"></span> protected tests; held-out benign set; one engine fingerprint for every result</td></tr>
+        <tr><td>Stated limits</td><td>Attacks typed by the user: <span data-m="user_recall" data-f="pct0"></span> caught (the action guard still stops the harm); false alarms on hard held-out benign: <span data-m="fpr" data-f="pct1"></span></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="src">Evaluation <span data-m="date"></span>, commit <span data-m="commit"></span>, engine <span data-m="engine"></span>. Attacks from promptfoo and NVIDIA garak. Method and per-channel results: docs/EVALUATION.md.</div>
+</section>
+
+<!-- 9. Business impact -->
+<section class="slide">
+  <div class="kicker"><span class="n">09</span><span>Business impact</span></div>
+  <h2>Ship AI agents without betting the company on them: <span class="grad">less risk, lower cost, no slowdown.</span></h2>
+  <div class="grid3 fill" style="margin-top:24px;grid-auto-rows:1fr">
+    <div class="card"><div class="mono" style="color:var(--block);font-size:13px">RISK REDUCTION</div><h3 style="margin-top:8px">Attacks stop succeeding</h3>
+      <p>Attack success on a protected agent <b style="color:var(--text)"><span data-m="head_off" data-f="pct0"></span> → <span data-m="head_on" data-f="pct0"></span></b>. A breach in India averages <b style="color:var(--text)">₹22 crore</b>; avoiding one pays for years of operation.</p></div>
+    <div class="card"><div class="mono" style="color:var(--allow);font-size:13px">COST</div><h3 style="margin-top:8px">Security for a fraction of the AI bill</h3>
+      <p>Security model calls cost <b style="color:var(--text)"><span data-m="cost_ratio" data-f="pct0"></span></b> of the agent's own model cost at list prices; most checks run locally on CPU; self-hosted, open source, no per-seat fee.</p></div>
+    <div class="card"><div class="mono" style="color:var(--escalate);font-size:13px">PRODUCTIVITY</div><h3 style="margin-top:8px">Analysts get answers, not logs</h3>
+      <p>Each flagged session gets a triage report in under a minute. One-line integration; monitor mode lets teams roll out without disruption.</p></div>
+    <div class="card"><div class="mono" style="color:var(--neutral);font-size:13px">CUSTOMER EXPERIENCE</div><h3 style="margin-top:8px">Agents keep working</h3>
+      <p><b style="color:var(--text)"><span data-m="utility" data-f="pct0"></span></b> of normal tasks completed. Only the attack is removed, and agents carry on after a stopped action instead of failing.</p></div>
+    <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">COMPLIANCE</div><h3 style="margin-top:8px">Evidence auditors accept</h3>
+      <p>Replayable decisions and SIEM export support DPDP "reasonable security safeguards", RBI FREE-AI (protection, assurance) and OWASP LLM01 / ASI01.</p></div>
+    <div class="card" style="border-color:var(--line2);background:rgba(120,87,255,.10)"><div class="mono" style="color:var(--accent2);font-size:13px">WHO PAYS · HOW WE WIN</div><h3 style="margin-top:8px">Open core</h3>
+      <p>Free SDK + gateway; paid enterprise console (SSO, roles, managed judges, compliance packs). Buyers: CISOs at banks, insurers, IT services, SaaS. Market for securing AI ≈ $4.8B by 2027 (Gartner).</p></div>
+  </div>
+  <div class="src">IBM Cost of a Data Breach 2025 (India); Gartner, securing-AI market forecast (Aug 2026); Palo Alto Networks paid $634.5M for Protect AI (FY25 10-K), Check Point acquired Lakera (2025): the category is real. Cost ratio from the evaluation's headline suite.</div>
+</section>
+
+<!-- 10. Scalability & responsible AI -->
+<section class="slide">
+  <div class="kicker"><span class="n">10</span><span>Scalability, robustness &amp; responsible AI</span></div>
+  <h2>Built to run in production, <span class="grad">and to fail safe when it is unsure.</span></h2>
+  <div class="grid2 fill" style="margin-top:26px;gap:26px">
+    <div class="card"><h3>Scale and operations</h3>
+      <ul class="clean" style="margin-top:10px">
+        <li>Fast path on CPU, p95 <b style="color:var(--text)"><span data-m="p95_ms" data-f="int"></span> ms</b>; AI judge only where needed, cached</li>
+        <li>Stateless inspection API; Docker image; PostgreSQL shared store; horizontal scaling with sticky sessions</li>
+        <li>Multi-tenant: organisations, scoped keys, per-key rate limits, request size limits</li>
+        <li>15+ model providers with key failover; local models for air-gapped sites</li>
+        <li>SIEM export (JSON Lines, CEF), metrics, health and readiness probes, graceful shutdown</li>
+      </ul></div>
+    <div class="card"><h3>Responsible AI</h3>
+      <ul class="clean" style="margin-top:10px">
+        <li><b style="color:var(--text)">Rules decide, AI advises:</b> a deterministic policy sits over every model output</li>
+        <li><b style="color:var(--text)">Fail closed:</b> content that needs the judge is held, never passed, if models are down</li>
+        <li><b style="color:var(--text)">Human oversight:</b> approvals, monitor mode, reviewer feedback, proposals a human applies</li>
+        <li><b style="color:var(--text)">Privacy:</b> redacted previews or hashes only; memory keeps fingerprints, not text</li>
+        <li><b style="color:var(--text)">Transparency:</b> every decision has a rule, reason, attack type and replay</li>
+        <li><b style="color:var(--text)">Honest metrics:</b> held-out benign set, third-party attack generators, published limits</li>
+      </ul></div>
+  </div>
+  <div class="grid4" style="margin-top:20px">
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="adaptive_compromised"></span> / <span data-m="adaptive_scored"></span></div><p>adaptive attacker conversations that succeeded</p></div>
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px">250+</div><p>automated tests in CI, incl. fault injection: models down, timeouts</p></div>
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px">2–5</div><p>providers behind every AI role, with automatic failover</p></div>
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="fpr_dev" data-f="pct0"></span> · <span data-m="fpr" data-f="pct1"></span></div><p>false alarms: development · held-out hard benign sets</p></div>
+  </div>
+</section>
+
+<!-- 11. Roadmap -->
+<section class="slide">
+  <div class="kicker"><span class="n">11</span><span>Future roadmap</span></div>
+  <h2>From prompt-injection firewall to <span class="grad">the control plane for enterprise agents.</span></h2>
+  <div class="grid3 fill" style="margin-top:28px">
+    <div class="card horizon"><div class="mono" style="color:var(--allow);font-size:13px">NOW · SHIPPED OCT 2026</div><h3 style="margin-top:8px">Firewall + evidence</h3>
+      <ul class="clean" style="margin-top:8px"><li>v0.1 on PyPI; gateway, Console, Docker</li><li>OpenAI, Anthropic, Gemini proxy formats</li><li>Investigator agent; attack memory</li><li>Evaluation harness with promptfoo + garak</li></ul><div class="target">Today: <span data-m="docs_recall" data-f="pct1"></span> document recall · 0% attack success</div></div>
+    <div class="card horizon"><div class="mono" style="color:var(--neutral);font-size:13px">NEXT · Q1 2027</div><h3 style="margin-top:8px">Close the measured gaps</h3>
+      <ul class="clean" style="margin-top:8px"><li>Small judge distilled from judge decisions: on-prem, faster, cheaper</li><li>Indian languages and code-mixed text (Hindi, Hinglish)</li><li>MCP tool-description and server vetting (OWASP agentic top 10)</li><li>Shared session store for multi-replica; Bedrock and Vertex native</li></ul><div class="target">Targets: typed attacks ≥ 85% · false alarms ≤ 5% · judge p95 &lt; 1 s</div></div>
+    <div class="card horizon"><div class="mono" style="color:var(--accent2);font-size:13px">LATER · 2027</div><h3 style="margin-top:8px">Agent security platform</h3>
+      <ul class="clean" style="margin-top:8px"><li>Agent-to-agent message inspection for multi-agent systems</li><li>Agent identity and delegated, expiring permissions</li><li>Compliance packs: DPDP, RBI FREE-AI, EU AI Act</li><li>Continuous red teaming as a service; managed cloud</li></ul><div class="target">Targets: first design partners in BFSI · SOC 2 · on-prem in 1 day</div></div>
+  </div>
+  <p style="margin-top:22px;font-size:17px">Why this order: each step closes a limit we measured (typed attacks, false alarms, scale) before widening scope to the risks the OWASP agentic list ranks next.</p>
+</section>
+
+<!-- 12. Close -->
+<section class="slide">
+  <div class="kicker"><span class="n">12</span><span>Try it</span></div>
+  <div style="margin:auto 0">
+    <h2 style="font-size:64px;max-width:1300px">Keep every AI agent <span class="grad">inside the user's intent.</span></h2>
+    <div class="grid2" style="margin-top:40px;gap:26px">
+      <div class="term" style="font-size:17px"><span class="c"># the whole system, about 5 minutes</span><br>git clone https://github.com/sankalp2515/intentseal<br>cd intentseal &amp;&amp; cp .env.example .env <span class="c"># add one free key</span><br>docker compose up --build<br><span class="c"># Console :8000 · test assistant :8040</span></div>
+      <div class="term" style="font-size:17px"><span class="c"># inside your Python agent, about 2 minutes</span><br>pip install "intentseal[embedded]"<br>intentseal init --agent my-agent<br><br><span class="c"># any agent, no code change: point its base URL at</span><br>http://localhost:8000/proxy/&lt;agent&gt;/v1</div>
+    </div>
+    <p style="margin-top:28px;font-size:18px">LLM proxy (OpenAI, Anthropic, Gemini formats, streaming) · Python SDK · REST API · Docker · any model provider</p>
+    <p style="margin-top:14px;font-size:20px;color:var(--text)">github.com/sankalp2515/intentseal · pypi.org/project/intentseal · Sankalp Wanjari</p>
+  </div>
+</section>
+
+</div></div>
+<div class="nav"><button onclick="go(-1)" aria-label="Previous">←</button><span id="count"></span><button onclick="go(1)" aria-label="Next">→</button></div>
+<script>
+const M = window.M || {};
+const fmt = { pct0: (v) => v == null ? "—" : Math.round(v * 100) + "%", pct1: (v) => v == null ? "—" : (v * 100).toFixed(1) + "%",
+              int: (v) => v == null ? "—" : Math.round(v) };
+document.querySelectorAll("[data-m]").forEach((el) => {
+  const v = M[el.dataset.m];
+  el.textContent = el.dataset.f ? fmt[el.dataset.f](v) : (Array.isArray(v) ? v.join(", ") : (v ?? "—"));
+});
+function drawCharts() { if (!(window.Chart && M.types)) return;
+  Chart.defaults.color = "#c0b9d6"; Chart.defaults.font.family = "Inter, 'Segoe UI', sans-serif"; Chart.defaults.animation = false;
+  new Chart(document.getElementById("types"), {
+    type: "bar",
+    data: { labels: M.types.map((t) => t.type), datasets: [{ data: M.types.map((t) => Math.round((t.recall || 0) * 1000) / 10),
+      backgroundColor: M.types.map((t) => (t.recall || 0) >= 0.85 ? "rgba(168,107,255,0.9)" : "rgba(168,107,255,0.45)"), borderRadius: 6 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: (c) => c.raw + "%" } } },
+      scales: { x: { min: 0, max: 100, grid: { color: "rgba(255,255,255,0.06)" }, ticks: { callback: (v) => v + "%" } },
+                y: { grid: { display: false }, ticks: { font: { size: 14 } } } } },
+  });
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(drawCharts);
+const slides = [...document.querySelectorAll(".slide")];
+let cur = 0;
+function show(i) {
+  cur = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, k) => s.classList.toggle("active", k === cur));
+  document.getElementById("count").textContent = `${cur + 1} / ${slides.length}`;
+  document.getElementById("progress").style.width = ((cur + 1) / slides.length * 100) + "%";
+}
+function go(d) { show(cur + d); }
+function fit() { const s = Math.min(innerWidth / 1600, innerHeight / 900); document.getElementById("deck").style.transform = `scale(${s})`; }
+addEventListener("resize", fit);
+addEventListener("keydown", (e) => { if (["ArrowRight", " ", "PageDown"].includes(e.key)) { e.preventDefault(); go(1); }
+  if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); go(-1); } });
+fit(); show((parseInt(new URLSearchParams(location.search).get("s"), 10) || 1) - 1);
+</script>
+</body>
+</html>

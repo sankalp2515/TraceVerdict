@@ -819,3 +819,52 @@ async def test_long_documents_are_judged_whole_by_the_long_context_model(policy)
     e2 = engine(policy, decision_model=small2, long_decision_model=down)
     r2 = await e2.inspect(page, "web", policy.agent)
     assert len(down.texts) == 1 and small2.texts and r2.decision in (Decision.ALLOW, Decision.BLOCK)
+
+
+# ---- D-060: pasted material in a user turn; invisible tag characters ------------------------------------------------
+
+ARTICLE = ("The tower is 330 metres tall and was the tallest structure in the world for 41 years. " * 6).strip()
+
+
+def test_split_pasted_needs_an_explicit_boundary_and_a_long_block():
+    from intentseal_core.paste import split_pasted
+    for msg in (f"Summarise the following:\n------\n{ARTICLE}", f"Assess this profile:\n\n{ARTICLE}",
+                f"Translate this:\n```\n{ARTICLE}\n```\nKeep it short."):
+        cut = split_pasted(msg)
+        assert cut and ARTICLE[:40] in msg[cut[0]:cut[1]] and "Summarise" not in msg[cut[0]:cut[1]]
+    fenced = "Translate this:\n```\n" + ARTICLE + "\n```\nKeep it short."
+    assert fenced[split_pasted(fenced)[1]:].startswith("```")   # the closing fence and the request after it stay the user's
+    for msg in ("What is our refund policy?", "Please do this:\n1. read the report\n2. send it to Maria",
+                ARTICLE, "Here is some context. " + ARTICLE):
+        assert split_pasted(msg) is None
+
+
+async def test_poisoned_paste_is_quarantined_and_the_request_kept(policy):
+    e = engine(policy, malicious=0.95)
+    msg = f"Summarise the following:\n------\n{ARTICLE} {MARKER} {ARTICLE}"
+    r = await e.inspect(msg, "user", policy.agent, session_id="s1")
+    assert r.decision == r.enforced == Decision.NEUTRALISE and r.policy_rule == "pasted-content-quarantined"
+    assert r.cleaned_content.startswith("Summarise the following:") and MARKER not in r.cleaned_content
+    sources = [row["source"] for row in e.logger.decisions()]
+    assert sorted(sources) == ["pasted", "user"]
+    # The paste raised the session's risk for actions, not the user's own: their next message is not held for it.
+    nxt = await e.inspect("Thanks, what else is in the report?", "user", policy.agent, session_id="s1")
+    assert nxt.decision == Decision.ALLOW
+
+
+async def test_benign_paste_passes_unchanged(policy):
+    e = engine(policy)
+    msg = f"Summarise the following:\n------\n{ARTICLE}"
+    r = await e.inspect(msg, "user", policy.agent)
+    assert r.decision == Decision.ALLOW and r.cleaned_content == msg
+
+
+async def test_invisible_tag_characters_quarantined_but_flag_emoji_kept(policy):
+    e = engine(policy)
+    hidden = "".join(chr(0xE0000 + ord(c)) for c in "hello")
+    r = await e.inspect("Please summarise the notes. " + hidden, "user", policy.agent)
+    assert r.decision == Decision.NEUTRALISE and r.policy_rule == "drop-invisible-characters"
+    assert hidden not in r.cleaned_content
+    england = "\U0001F3F4" + "".join(chr(0xE0000 + ord(c)) for c in "gbeng") + "\U000E007F"
+    r = await e.inspect("Go " + england + " team!", "user", policy.agent)
+    assert r.decision == Decision.ALLOW

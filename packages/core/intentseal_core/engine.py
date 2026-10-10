@@ -31,12 +31,21 @@ from .logger import DecisionLogger
 from .memory import AttackMemory, Match
 from .normalise import normalise
 from .outbound import scan_args
+from .paste import split_pasted
 from .policy import AgentPolicy, load_policy, policy_exists
 from .secrets import registry
 from .session import Session, SessionStore
 from .store import Store
 from .types import ATTACK_TYPES, ActionResult, Decision, Finding, InspectResult
 
+
+
+_TAG_RUN = re.compile("[\U000E0000-\U000E007F]+")
+
+
+def _emoji_flag(text: str, start: int, end: int) -> bool:
+    """A subdivision flag (e.g. England): black flag U+1F3F4, then tag letters, then CANCEL TAG U+E007F."""
+    return start > 0 and text[start - 1] == "\U0001F3F4" and text[end - 1] == "\U000E007F" and end - start <= 7
 
 @dataclass
 class _Scan:
@@ -184,6 +193,13 @@ class Engine:
                 views.append("[ascii view] " + (seg_norm.skeleton or seg_norm.ascii_view))   # look-alikes folded by shape
             encoded = list(self._encoded.finditer(segment.text))
             forged = markers.find(segment.text)   # forged role / tool-call markers (docs/13 L4)
+            # Unicode tag characters are an invisible copy of ASCII: outside an emoji flag sequence they only ever carry
+            # text a reader cannot see (ASCII smuggling), so they are quarantined whatever the judge says (D-060).
+            for m in _TAG_RUN.finditer(segment.text):
+                if not _emoji_flag(segment.text, m.start(), m.end()):
+                    findings.append(Finding(span=(segment.start + m.start(), segment.start + m.end()), preview="",
+                                            origin=segment.origin, signal="invisible-characters",
+                                            labels=["Encoded Instructions"]))
             for m in forged:
                 findings.append(Finding(span=(segment.start + m.start(), segment.start + m.end()), preview=m.group(0),
                                         origin=segment.origin, signal="role-marker", labels=["Role Change"]))
@@ -450,13 +466,51 @@ class Engine:
                       filename: str | None = None, fmt: str | None = None, task: str | None = None) -> InspectResult:
         # Serialise agent decisions through accounting/logging, including concurrent sessions.
         async with self._agent_locks.setdefault(agent_id, asyncio.Lock()):
+            cut = split_pasted(content) if source == "user" and isinstance(content, str) and not (filename or fmt) else None
+            if cut:
+                return await self._inspect_pasted(content, cut, agent_id, session_id, task)
             return await self._inspect(content, source, agent_id, session_id, filename, fmt, task)
 
-    async def _inspect(self, content, source, agent_id, session_id, filename, fmt, task) -> InspectResult:
+    async def _inspect_pasted(self, content: str, cut: tuple[int, int], agent_id: str, session_id: str | None,
+                              task: str | None) -> InspectResult:
+        """A user turn carrying pasted material (D-060): the user's own words are inspected as the user's, the pasted
+        block as third-party content. A poisoned paste is quarantined in place; the user's request still goes through."""
+        start, end = cut
+        before, pasted, after = content[:start], content[start:end], content[end:]
+        own = await self._inspect(before + after, "user", agent_id, session_id, None, None, task)
+        material = await self._inspect(pasted, "pasted", agent_id, session_id, None, None, None, new_turn=False)
+        severity = [Decision.ALLOW, Decision.NEUTRALISE, Decision.ESCALATE, Decision.BLOCK]
+        if severity.index(own.decision) >= severity.index(Decision.ESCALATE) or material.decision == Decision.ALLOW:
+            decision, rule, reason = own.decision, own.policy_rule, own.reason
+        elif material.decision == Decision.NEUTRALISE:
+            decision, rule, reason = Decision.NEUTRALISE, material.policy_rule, "In the pasted material: " + material.reason
+        else:
+            decision, rule, reason = (Decision.NEUTRALISE, "pasted-content-quarantined",
+                                      "Pasted material held by policy (" + material.policy_rule + "); the request is kept")
+        if own.enforced in (Decision.BLOCK, Decision.ESCALATE):
+            cleaned = own.cleaned_content
+        else:
+            body = material.cleaned_content if material.enforced != Decision.ALLOW else pasted
+            head = own.cleaned_content[:len(before)] if own.enforced == Decision.NEUTRALISE else before
+            cleaned = head + body + (own.cleaned_content[len(before):] if own.enforced == Decision.NEUTRALISE else after)
+        enforced = decision if self._policy(agent_id).mode == "enforce" else Decision.ALLOW
+        findings = own.findings + [f.model_copy(update={"span": (f.span[0] + start, f.span[1] + start)} if f.span else {})
+                                   for f in material.findings]
+        lead = material if material.decision != Decision.ALLOW else own
+        return InspectResult(decision=decision, enforced=enforced, cleaned_content=cleaned, findings=findings,
+                             labels=sorted(set(own.labels) | set(material.labels)), risk=max(own.risk, material.risk),
+                             session_risk=material.session_risk, policy_rule=rule, reason=reason,
+                             tier=max(own.tier, material.tier), degraded=own.degraded or material.degraded,
+                             budget_degraded=own.budget_degraded or material.budget_degraded,
+                             latency_ms=round(own.latency_ms + material.latency_ms, 2), event_id=lead.event_id)
+
+    async def _inspect(self, content, source, agent_id, session_id, filename, fmt, task,
+                       new_turn: bool = True) -> InspectResult:
         t0 = time.perf_counter()
         policy = self._policy(agent_id)
         session = self._session(agent_id, session_id)
-        session.new_turn(policy.session.risk_decay_per_turn)
+        if new_turn:   # pasted material is part of the same turn as the request it came with
+            session.new_turn(policy.session.risk_decay_per_turn)
         if task is not None:
             session.task = task
             session.note_trusted(task)
@@ -613,6 +667,8 @@ class Engine:
         lookalike = [(f.span[0], f.span[1]) for f in findings
                      if f.signal == "lookalike_obfuscation" and f.span and policy.sensitive_data.drop_lookalike_text]
         hidden += [s for s in lookalike if s not in hidden]
+        invisible = [(f.span[0], f.span[1]) for f in findings if f.signal == "invisible-characters" and f.span]
+        hidden += [s for s in invisible if s not in hidden]
         risk = max(assessment.malicious,
                    policy.thresholds.neutralise if hidden else 0.0,
                    policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
@@ -643,9 +699,12 @@ class Engine:
             decision, rule, reason = Decision.ESCALATE, "session-risk-escalate", "Accumulated session risk requires review"
         elif hidden:
             kinds = {f.signal for f in findings if f.span in hidden
-                     and f.signal in ("non-visible-content", "role-marker", "lookalike_obfuscation")}
+                     and f.signal in ("non-visible-content", "role-marker", "lookalike_obfuscation", "invisible-characters")}
             if "non-visible-content" in kinds:
                 decision, rule, reason = Decision.NEUTRALISE, "drop-non-visible", "Non-visible content quarantined by policy"
+            elif "invisible-characters" in kinds:
+                decision, rule, reason = (Decision.NEUTRALISE, "drop-invisible-characters",
+                                          "Invisible tag characters (hidden ASCII) quarantined by policy")
             elif "lookalike_obfuscation" in kinds:
                 decision, rule, reason = (Decision.NEUTRALISE, "drop-lookalike-text",
                                           "Text written in look-alike letters quarantined by policy")

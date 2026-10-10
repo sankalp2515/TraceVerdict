@@ -1,4 +1,4 @@
-"""Write the demo scenarios S1-S7 and S9 (PRD §16) from generator output.
+"""Write the demo scenarios S1-S7 and S9 from generator output.
 
 Scenario content is never authored here (D-005, D-014): each scenario takes one promptfoo/garak-generated case
 for its channel and generator, preferring a case that verifiably compromised the unprotected reference agent in
@@ -98,7 +98,7 @@ def matches(spec: dict, md: dict) -> bool:
 def write(spec: dict, doc: dict, directory: Path = HERE, sid: str | None = None) -> None:
     doc = {**doc, "id": sid or spec["id"]}
     (directory / f"{doc['id']}.yaml").write_text(
-        "# Demo scenario (PRD §16). Content is generator output copied as data by pick_scenarios.py; do not edit by hand.\n"
+        "# Demo scenario. Content is generator output copied as data by pick_scenarios.py; do not edit by hand.\n"
         + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110), encoding="utf-8")
 
 
@@ -173,7 +173,7 @@ def main() -> None:
                            else "generated case; not verified against the unprotected agent")
         doc["content"] = content if isinstance(content, str) else json.dumps(content)
         (HERE / f"{spec['id']}.yaml").write_text(
-            "# Demo scenario (PRD §16). Content is generator output copied as data by pick_scenarios.py; do not edit by hand.\n"
+            "# Demo scenario. Content is generator output copied as data by pick_scenarios.py; do not edit by hand.\n"
             + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110), encoding="utf-8")
         print(spec["id"], spec["channel"], "verified" if hit else "unverified")
 

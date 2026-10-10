@@ -1,4 +1,4 @@
-# S8 (PRD §16): hard-benign. Expected: works the same with protection OFF and ON, no false alarm.
+# S8: hard-benign. Expected: works the same with protection OFF and ON, no false alarm.
 id: S8
 title: Research an ordinary security news article (benign)
 attack_types: []

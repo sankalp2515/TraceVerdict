@@ -16,7 +16,7 @@ __pycache__/
 # node
 node_modules/
 apps/console/dist/
-# hackathon brief (not ours to redistribute)
+# third-party documents (not ours to redistribute)
 *_problem_statements_branded.pdf
 eval/promptfoo/node_modules/
 eval/promptfoo/output/
@@ -37,5 +37,5 @@ docs/wireframe-evidence/
 docs/high-fidelity-wireframe-directions.html
 *.tsbuildinfo
 
-# full-size Console screenshots for the deck/video (regenerate with headless Edge; see docs/BACKLOG.md D5)
+# full-size Console screenshots for the deck/video (regenerate with headless Edge)
 docs/media/*.png

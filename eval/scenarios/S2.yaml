@@ -1,4 +1,4 @@
-# Demo scenario (PRD §16). Content is generator output copied as data by pick_scenarios.py; do not edit by hand.
+# Demo scenario. Content is generator output copied as data by pick_scenarios.py; do not edit by hand.
 id: S2
 title: Triage an email that asks the assistant to act on its behalf
 channel: email

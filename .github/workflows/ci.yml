@@ -1,4 +1,4 @@
-# CI (PRD §12 Testing / §13): lint, secret scan, unit + integration tests. Offline: no provider keys are used;
+# CI: lint, secret scan, unit and integration tests. Offline: no provider keys are used;
 # the tests use static judges, stub classifiers and scripted models. Evaluation runs (which need free-tier LLM
 # keys) are run locally and committed as reports (eval/reports, docs/EVALUATION.md).
 name: ci

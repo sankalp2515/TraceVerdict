@@ -2,6 +2,17 @@
 
 All notable changes to IntentSeal. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `docker compose up` runs the whole system on one machine: gateway, LLM proxy, the Security Console (now served by
+  the gateway at `/`) and the test assistant with sample files and a labelled attack test pack.
+- LLM proxy: `GET /proxy/<agent>/v1/models` for clients that discover models first (agent frameworks, chat UIs).
+- Policies for the test assistant (`my-assistant`) and for Hermes Agent connected through the proxy (`hermes`).
+
+### Fixed
+- Empty key placeholders written by `intentseal init` no longer hide a key set in the project's own `.env`.
+
 ## [0.1.0] - 2026-10-09
 
 First public release.

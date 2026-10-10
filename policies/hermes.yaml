@@ -1,0 +1,31 @@
+# Policy for Hermes Agent (NousResearch, github.com/NousResearch/hermes-agent) connected through the LLM proxy:
+# Hermes' custom endpoint is http://localhost:8000/proxy/hermes/v1 (docs/INTEGRATION.md, "Connect an existing agent").
+# Everything Hermes reads comes back as a tool result and is inspected before the model sees it; the tools that can
+# change things or send data out are checked before Hermes runs them. Hermes has 40+ tools: the ones below are the
+# ones that act; the rest (search, memory, todo, skills, ...) are allowed and their results are still inspected.
+# No upstream: Hermes' model calls use the gateway's own model chain (Groq, Gemini, NVIDIA), which fails over when one is busy.
+agent: hermes
+version: "1"
+mode: enforce
+task_scope: "A personal assistant that reads the user's files, email and web pages, runs commands and writes files when asked."
+tools:
+  read_file:        { risk: low,    failure: open }
+  search_files:     { risk: low,    failure: open }
+  web_search:       { risk: low,    failure: open }
+  web_extract:      { risk: medium, failure: open }
+  browser_navigate: { risk: medium, failure: open }
+  write_file:       { risk: medium, failure: closed }
+  patch:            { risk: medium, failure: closed }
+  terminal:         { risk: high,   failure: closed, escalate_if_uncertain: true,
+                      intent_terms: [run, execute, command, terminal, shell, install, build, test, list, check] }
+  execute_code:     { risk: high,   failure: closed, escalate_if_uncertain: true,
+                      intent_terms: [run, execute, code, script, python, calculate, compute, analyse, analyze] }
+  send_message:     { risk: high,   failure: closed, escalate_if_uncertain: true,
+                      intent_terms: [send, email, mail, reply, forward, message, notify, share] }
+unknown_tools: allow
+sensitive_data:
+  patterns: [api_key, credential, customer_record]
+  canaries: [from_env]
+  drop_non_visible: true
+thresholds:
+  judge_untrusted: always

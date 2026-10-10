@@ -465,6 +465,12 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     app.include_router(gemini_router)
     from .setup import router as setup_router
     app.include_router(setup_router)
+    # One-container setup: the built Console served from the gateway's own origin (the Docker image sets this).
+    # Mounted last, so every API route above takes precedence.
+    console_dir = os.environ.get("INTENTSEAL_CONSOLE_DIR")
+    if console_dir and (Path(console_dir) / "index.html").is_file():
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/", StaticFiles(directory=console_dir, html=True), name="console")
     return app
 
 

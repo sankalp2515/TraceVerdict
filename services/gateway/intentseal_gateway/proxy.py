@@ -245,6 +245,17 @@ async def agent_chat_completions(agent_id: str, request: Request, p: Principal =
     return await _complete(request, agent_id, p)
 
 
+@router.get("/proxy/{agent_id}/v1/models")
+async def agent_models(agent_id: str, request: Request, p: Principal = require("project")) -> dict[str, Any]:
+    """Model list for clients that discover models first (agent frameworks, chat UIs): the model the policy pins
+    (it replaces whatever the client asks for), a placeholder when the gateway's own role answers, and nothing when
+    the client's own model is forwarded."""
+    require_agent(request, p, agent_id)
+    up = request.app.state.engine.policy_loader(agent_id).upstream
+    model = up.model or (None if up.provider else "intentseal-default")
+    return {"object": "list", "data": [{"id": model, "object": "model", "created": 0, "owned_by": "intentseal"}] if model else []}
+
+
 async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
     require_agent(request, p, agent_id)
     try:

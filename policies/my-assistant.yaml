@@ -1,0 +1,25 @@
+# Policy for the test assistant (examples/assistant): the "Knowledge assistant (RAG)" template, in enforce mode so
+# attacks are stopped, not only recorded. Switch to monitor in the Console (Policy) to watch without blocking.
+agent: my-assistant
+version: "1"
+mode: enforce
+task_scope: "Answer the user's questions from the knowledge base, the user's files and email, and web sources."
+tools:
+  search_knowledge: { risk: low,    failure: open }
+  list_files:       { risk: low,    failure: open, path_arg: folder }
+  read_file:        { risk: low,    failure: open, path_arg: path }
+  ocr_image:        { risk: low,    failure: open, path_arg: path }
+  read_email:       { risk: low,    failure: open }
+  web_fetch:        { risk: medium, failure: open, allowed_domains: ["*"], url_arg: url }
+  call_api:         { risk: medium, failure: open, allowed_domains: ["*"], url_arg: url }
+  write_file:       { risk: medium, failure: closed, path_arg: path }
+  send_message:     { risk: high,   failure: closed, escalate_if_uncertain: true,
+                      allowed_recipients: ["@example.com"], recipient_arg: to,
+                      intent_terms: [send, email, mail, reply, forward, message, notify, share] }
+unknown_tools: block
+sensitive_data:
+  patterns: [api_key, credential, customer_record]
+  canaries: [from_env]
+  drop_non_visible: true
+thresholds:
+  judge_untrusted: always

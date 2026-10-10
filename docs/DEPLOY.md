@@ -1,11 +1,11 @@
 # Deploying IntentSeal
 
-Two parts, deployed separately:
+Two parts, deployed together (the Docker image serves the Console) or separately:
 
 | Part | What it is | Where it can run |
 |---|---|---|
 | **Gateway** (`Dockerfile`) | Gateway API, OpenAI-compatible LLM proxy, demo runner, Core Engine with the local classifier (baked into the image), OCR | Any Docker host: Hugging Face Spaces (Docker), Render, Fly.io, a VM with `docker compose` |
-| **Console** (`apps/console`) | Static React site (HashRouter: no rewrite rules needed) | Any static host: Vercel, Netlify, Cloudflare Pages, GitHub Pages |
+| **Console** (`apps/console`) | Static React site (HashRouter: no rewrite rules needed). The Docker image also serves it from the gateway's own origin at `/` | Any static host: Vercel, Netlify, Cloudflare Pages, GitHub Pages; or the gateway image |
 
 The Console only ever holds the **public read-only key**. Reviewers sign in with their own admin key, which stays in
 that browser tab's session storage (D-037).
@@ -44,15 +44,23 @@ Generate keys with `python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ```bash
 cp .env.example .env            # fill in provider keys and the INTENTSEAL_* values above
-docker compose up --build -d    # gateway on :8000, data in the intentseal-data volume
+docker compose up --build -d    # gateway + Console on :8000, test assistant on :8040
 curl http://localhost:8000/readyz
 ```
+
+`docker-compose.yml` is set up for one machine: without `INTENTSEAL_API_KEYS` / `INTENTSEAL_PUBLIC_KEY` in `.env` it
+uses well-known local keys, and it publishes the ports on 127.0.0.1 only. On a shared host set your own keys (the
+Console's build argument `VITE_API_KEY` follows `INTENTSEAL_PUBLIC_KEY`), set `INTENTSEAL_PROJECT_KEY` to the test
+assistant's project key (or remove the `assistant` service), and change the port mappings.
 
 With PostgreSQL on the same host: set `POSTGRES_PASSWORD` and
 `INTENTSEAL_DATABASE_URL=postgresql://intentseal:<password>@postgres:5432/intentseal` in `.env`, then
 `docker compose --profile postgres up --build -d`.
 
-### Hugging Face Spaces (free CPU tier)
+### Hugging Face Spaces (Docker)
+
+Docker Spaces may need a paid Hugging Face plan for new accounts; check the hardware your account offers. The
+image needs about 2 GB of memory (local classifier and OCR), so 512 MB free tiers elsewhere are too small.
 
 1. Create a Space with the **Docker** SDK (blank template), public.
 2. Push this repository to the Space (or the files the image needs: `Dockerfile`, `.dockerignore`, `requirements.lock`,

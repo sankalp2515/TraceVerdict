@@ -52,3 +52,22 @@ def test_wheels_carry_the_package_data():
     sdk = tomllib.loads((ROOT / "packages" / "sdk" / "pyproject.toml").read_text(encoding="utf-8"))
     assert f"intentseal-core=={core['project']['version']}" in sdk["project"]["dependencies"]
     assert sdk["project"]["version"] == core["project"]["version"]
+
+
+def test_empty_placeholder_in_home_env_does_not_hide_project_key(tmp_path, monkeypatch):
+    """`intentseal init` writes empty provider placeholders to ~/.intentseal/.env; a key in the project's .env wins."""
+    from intentseal_core import config
+
+    home, project = tmp_path / "home", tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    (home / ".env").write_text("TEST_PROVIDER_KEY=\nTEST_ONLY_HOME=h\n", encoding="utf-8")
+    (project / ".env").write_text("TEST_PROVIDER_KEY=from-project\n", encoding="utf-8")
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(config, "repo_root", lambda: home)
+    for k in ("TEST_PROVIDER_KEY", "TEST_ONLY_HOME"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("TEST_PROVIDER_KEY", "")            # an empty value in the environment counts as unset
+    config.load_env()
+    import os
+    assert os.environ["TEST_PROVIDER_KEY"] == "from-project" and os.environ["TEST_ONLY_HOME"] == "h"

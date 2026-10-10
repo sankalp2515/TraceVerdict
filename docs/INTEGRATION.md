@@ -124,6 +124,39 @@ with guard.session(user_id=user.id, task=user_message, trusted={"customer_id": u
 def issue_refund(customer_id: str, amount: float): ...
 ```
 
+### Connect an existing agent (Hermes Agent)
+
+Any agent that lets you set a custom OpenAI-compatible endpoint can be protected without touching its code. Example:
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT), a personal agent with 40+ tools
+(files, terminal, web, browser, memory). With the gateway running (README, Quick start, Option 1), which ships a policy
+for it (`policies/hermes.yaml`, enforce mode, the acting tools checked):
+
+1. Install Hermes from its official repository only (Windows PowerShell: `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`;
+   Linux, macOS, WSL2: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`).
+2. Point it at IntentSeal: `hermes model` → **Custom endpoint**, base URL `http://localhost:8000/proxy/hermes/v1`,
+   API key `local-project-key` (your IntentSeal project key), model `intentseal-default`, context length `128000`.
+   Or in Hermes' `config.yaml`:
+
+   ```yaml
+   model:
+     provider: custom
+     base_url: http://localhost:8000/proxy/hermes/v1
+     api_key: local-project-key
+     default: intentseal-default
+     context_length: 128000
+   ```
+3. Run `hermes` and work as usual.
+
+Which model answers: the policy sets no `upstream`, so Hermes' calls go to the gateway's own model chain (Groq, then
+Gemini, then NVIDIA, with the keys in the gateway's `.env`), which fails over when a free tier is busy. To pin a model,
+set `upstream: { provider: gemini, model: <model> }` (or any provider in `config/providers.yaml`) in the Console
+(Policy) or in `policies/hermes.yaml`.
+
+What is checked: every file, page, command output and search result Hermes receives comes back as a tool result and
+is inspected before the model sees it; `terminal`, `execute_code`, `write_file`, `patch` and `send_message` calls are
+checked before Hermes runs them; the answer is checked for protected data. Each decision appears in the Console under
+the agent `hermes`.
+
 ## 5. What changes for the agent
 
 - Clean content: unchanged. Content with an instruction aimed at the model: the instruction is quarantined in place

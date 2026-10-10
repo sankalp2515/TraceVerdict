@@ -9,8 +9,15 @@
 !eval/scenarios/
 !eval/reports/*.json
 !examples/openai_agent/
+!examples/assistant/
+examples/assistant/workspace/
+!apps/console/
+apps/console/node_modules/
+apps/console/dist/
+apps/console/*.tsbuildinfo
 **/__pycache__
 **/*.egg-info
 **/*.pyc
 .env
 .env.*
+**/.env

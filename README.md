@@ -46,42 +46,73 @@ what a hijacked agent can do, and proves what happened.
 
 ## Quick start
 
-**Python SDK** (any model provider):
+Both options need **one free model key** for IntentSeal's AI judge: [Groq](https://console.groq.com/keys) or
+[Google AI Studio (Gemini)](https://aistudio.google.com/apikey), about a minute to create. Without a key IntentSeal
+fails closed: content that needs the judge is held, not passed.
+
+### Option 1: the whole system with Docker (about 5 minutes)
+
+Gateway, LLM proxy, Security Console and a protected test assistant with sample files and a labelled attack pack.
+Needs [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 ```bash
-pip install "intentseal[embedded]"                    # engine in your process
+git clone https://github.com/sankalp2515/intentseal.git
+cd intentseal
+cp .env.example .env            # Windows: copy .env.example .env   ·   then set GROQ_API_KEY= (or GEMINI_API_KEY=) in .env
+docker compose up --build       # first build takes a few minutes
+```
+
+| Open | What you can do |
+|---|---|
+| http://localhost:8040 | **Test assistant.** Ask *"Summarise test-pack/hidden-text.pdf"* or *"Read my inbox"*: under each answer, *What IntentSeal checked* shows every file, page, message and action with its decision. [The test pack](examples/assistant/test-pack/README.md) lists the attack files (PDF, Word, HTML, email, Markdown, image, API response, code, knowledge base); ordinary files are in `uploads/`, `inbox/` and `kb/` |
+| http://localhost:8000 | **Security Console.** Decisions, session replay, policy. *Reviewer sign-in* with `local-admin-key` unlocks review, approvals and agent set-up |
+| http://localhost:8000/docs | **REST API** (OpenAPI) |
+
+The local keys (`local-project-key`, `local-admin-key`) work only on this machine; set your own in `.env` for
+anything shared ([docs/DEPLOY.md](docs/DEPLOY.md)).
+
+### Option 2: the Python package (about 2 minutes, no Docker)
+
+```bash
+pip install "intentseal[embedded]"
 intentseal init --agent my-agent --template research-assistant
 ```
+
+`init` writes a policy and a key file (`~/.intentseal/.env`; it prints both paths). Put `GROQ_API_KEY=...` (or
+`GEMINI_API_KEY=...`) in that key file, download an attack file from the test pack, for example
+[hidden-text.pdf](examples/assistant/test-pack/hidden-text.pdf), and run:
 
 ```python
 from intentseal import Guard
 
-guard = Guard("my-agent")                              # or Guard("my-agent", remote="https://<gateway>", api_key=...)
+guard = Guard("my-agent")                              # or Guard("my-agent", remote="http://localhost:8000", api_key=...)
 
-with guard.session(user_id="u-42", task=user_message):
-    page = guard.inspect(html, source="web")           # cleaned content, or a short safe notice
-    doc = guard.inspect(pdf_bytes, source="pdf", filename="report.pdf")
+with guard.session(user_id="u-42", task="Summarise this report"):
+    result = guard.inspect_result(open("hidden-text.pdf", "rb").read(), source="pdf", filename="hidden-text.pdf")
+    print(result.decision, result.labels, result.policy_rule)     # BLOCK, attack types, the rule that decided
 
     @guard.tool()                                      # arguments checked before it runs
     def send_message(to: str, subject: str, body: str): ...
 
-    answer = guard.check_output(model_answer)          # secrets never reach the reader
+    answer = guard.check_output("model answer")        # protected data never reaches the reader
 ```
 
-**LLM proxy** (no code change, any language): point the agent's model client at the gateway.
+**What `pip install` gives you:** the Python SDK and the full detection engine (extraction, OCR, local classifier,
+AI judge, policy, action guard, decision log), running inside your Python app. The **gateway** (REST API for any
+language, the LLM proxy) and the **Security Console** come with the repository (Option 1).
+
+### Connect your own agent
+
+**LLM proxy** (no code change, any language): point the agent's model client at the gateway. Agents that let you set
+a custom OpenAI-compatible endpoint work as they are, for example
+[Hermes Agent](docs/INTEGRATION.md#connect-an-existing-agent-hermes-agent).
 
 ```bash
-OPENAI_BASE_URL=https://<gateway>/proxy/<agent>/v1           OPENAI_API_KEY=<IntentSeal key>   # OpenAI-compatible clients
-ANTHROPIC_BASE_URL=https://<gateway>/proxy/<agent>/anthropic ANTHROPIC_API_KEY=<IntentSeal key> # Anthropic SDK
+OPENAI_BASE_URL=http://localhost:8000/proxy/<agent>/v1           OPENAI_API_KEY=<IntentSeal key>   # OpenAI-compatible clients
+ANTHROPIC_BASE_URL=http://localhost:8000/proxy/<agent>/anthropic ANTHROPIC_API_KEY=<IntentSeal key> # Anthropic SDK
 ```
 
-**Gateway and Security Console** (Docker):
-
-```bash
-docker compose up --build        # gateway (REST API and LLM proxy) on :8000; OpenAPI docs at /docs
-```
-
-Then open the Console, **Set up** an agent from a template, copy the snippet for your stack and run the self-test.
+In the Console, **Set up** registers an agent from a template, gives the snippet for your stack and runs a self-test.
 Step-by-step for teams, RAG apps included: [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## How it works
@@ -175,11 +206,11 @@ The SDK and REST API inspect content and check tools rather than the model call,
 ```
 packages/core        intentseal-core: extraction, detection, policy, action guard, decision log
 packages/sdk         intentseal: the Python SDK (embedded or remote)
-services/gateway     REST API, LLM proxy (OpenAI and Anthropic formats), onboarding, SIEM export
+services/gateway     REST API, LLM proxy (OpenAI, Anthropic and Gemini formats), onboarding, SIEM export, serves the Console
 apps/console         Security Console (React)
 config               model providers, judge roles, policy templates
 policies             example agent policy
-examples             test assistant, OpenAI and LangGraph agents protected by IntentSeal
+examples             test assistant (with a labelled attack test pack), OpenAI and LangGraph agents protected by IntentSeal
 agents               reference research agent used by the evaluation
 eval                 evaluation harness (promptfoo, garak), benign sets, scenarios, generated reports
 tests                offline test suite

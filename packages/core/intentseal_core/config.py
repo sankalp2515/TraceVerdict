@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 from .secrets import ApiKey, load_keys
 
@@ -36,8 +36,12 @@ def config_path(*parts: str) -> Path:
 
 
 def load_env() -> None:
-    load_dotenv(repo_root() / ".env", override=False)
-    load_dotenv(Path.cwd() / ".env", override=False)   # an installed package: the project's own .env
+    # The project's own .env (an installed package) first, then the home or repo .env. A value is taken only where the
+    # environment has none: the empty placeholders `intentseal init` writes never hide a key set elsewhere.
+    for path in (Path.cwd() / ".env", repo_root() / ".env"):
+        for key, value in (dotenv_values(path) if path.is_file() else {}).items():
+            if value and not os.environ.get(key):
+                os.environ[key] = value
     from . import adopt_legacy_env
 
     adopt_legacy_env()

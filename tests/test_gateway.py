@@ -414,6 +414,26 @@ def test_policy_round_trip_keeps_redacted_canaries(env, monkeypatch):
     assert saved["mode"] == "monitor" and saved["sensitive_data"]["canaries"] == ["from_env", "sk-literal-canary-0001"]
 
 
+def test_console_served_from_the_gateway_when_built(env, monkeypatch):
+    console = env / "console"
+    console.mkdir()
+    (console / "index.html").write_text("<title>IntentSeal Console</title>")
+    monkeypatch.setenv("INTENTSEAL_CONSOLE_DIR", str(console))
+    with make_client(env) as c:
+        assert "IntentSeal Console" in c.get("/").text
+        assert c.get("/healthz").json()["ok"] is True                  # API routes take precedence
+        assert c.get("/proxy/research-agent/v1/models", headers=H(PROJECT)).status_code == 200
+
+
+def test_proxy_lists_models_for_clients_that_discover_them(env):
+    with make_client(env) as c:
+        r = c.get("/proxy/research-agent/v1/models", headers=H(PROJECT))
+        assert r.status_code == 200 and r.json()["object"] == "list"
+        assert [m["object"] for m in r.json()["data"]] == ["model"]
+        assert c.get("/proxy/research-agent/v1/models").status_code == 401
+        assert c.get("/proxy/no-such-agent/v1/models", headers=H(PROJECT)).status_code == 404
+
+
 def test_unknown_agent_is_refused_not_run_unprotected(env):
     """F4: an agent with no policy file would run the default monitor policy (nothing enforced): 404 instead."""
     with make_client(env, FakeRouter(content="hello")) as c:

@@ -23,7 +23,12 @@ real mail is sent). Both are checked before they run.
 
 ## Run it
 
-You need the repo's virtual environment (`.venv`) and one model API key (Groq, Gemini, OpenAI, Anthropic, ...).
+**Quickest:** `docker compose up --build` from the repository root (README, Quick start, Option 1) runs the gateway,
+the Console and this assistant, with the sample files and the test pack already in its workspace, and the agent
+`my-assistant` registered in enforce mode (`policies/my-assistant.yaml`). Open http://localhost:8040.
+
+**From source:** you need the repo's virtual environment (`.venv`) and one model API key (Groq, Gemini, OpenAI,
+Anthropic, ...).
 
 1. **Start IntentSeal** (local, dev keys):
    ```bash
@@ -39,7 +44,7 @@ You need the repo's virtual environment (`.venv`) and one model API key (Groq, G
    (`upstream` matters only for proxy mode.)
 3. **Configure the assistant**: copy `.env.example` to `.env`, set the provider and its key.
 4. **Sample files** (ordinary documents in every format), plus an optional **test pack** of attack files made from the
-   payloads promptfoo and garak generated for this repo (local only):
+   payloads promptfoo and garak generated for this repo (shipped in `test-pack/`, labelled by attack type):
    ```bash
    .venv/Scripts/python examples/assistant/make_workspace.py --test-pack
    ```

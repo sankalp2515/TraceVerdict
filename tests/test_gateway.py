@@ -316,7 +316,10 @@ class ScriptedRouter(FakeRouter):
 
     async def chat(self, role: str, req: Any) -> ChatResult:
         self.requests.append(req)
-        content, tcs = self.script.pop(0) if self.script else ("done", [])
+        step = self.script.pop(0) if self.script else ("done", [])
+        if isinstance(step, Exception):   # a provider failure, scripted
+            raise step
+        content, tcs = step
         return ChatResult(content=content, tool_calls=tcs, finish_reason="tool_calls" if tcs else "stop", provider="fake",
                           model="m", key_alias=None, input_tokens=5, output_tokens=2, latency_ms=1, est_cost_usd=0,
                           cached=False, attempts=[])
@@ -598,23 +601,6 @@ def test_answer_with_protected_data_is_redacted_or_withheld(env):
 
 
 # ---- Investigator (D-061) --------------------------------------------------------------------------------------------
-
-class ScriptedRouter(FakeRouter):
-    """Replies in order; each reply is (content, tool_calls) or an exception to raise."""
-
-    def __init__(self, script: list[Any]) -> None:
-        super().__init__()
-        self.script = list(script)
-
-    async def chat(self, role: str, req: Any) -> ChatResult:
-        self.requests.append(req)
-        step = self.script.pop(0) if self.script else ("", [])
-        if isinstance(step, Exception):
-            raise step
-        content, tcs = step
-        return ChatResult(content=content, tool_calls=tcs, finish_reason="stop", provider="fake", model="m", key_alias=None,
-                          input_tokens=5, output_tokens=2, latency_ms=1, est_cost_usd=0, cached=False, attempts=[])
-
 
 def _flagged_session(c) -> tuple[str, str]:
     sid = c.post("/v1/sessions", json={"agent_id": "research-agent", "task": "Summarise the page"}, headers=H(PROJECT)).json()["session_id"]

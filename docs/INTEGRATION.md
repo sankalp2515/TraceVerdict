@@ -145,7 +145,13 @@ for it (`policies/hermes.yaml`, enforce mode, the acting tools checked):
      default: intentseal-default
      context_length: 128000
    ```
-3. Run `hermes` and work as usual.
+3. Run `hermes` and work as usual. Each new conversation is a new IntentSeal session.
+
+Verified with Hermes Agent (Nous Research, October 2026 main branch): a poisoned email read with `read_file` or
+`execute_code` is blocked (Credential Theft, Indirect Prompt Injection, Tool Abuse) and Hermes tells the user it could
+not read it; ordinary files are read and summarised; after the poisoned email, Hermes' commands in that conversation
+wait for a reviewer (Console, Review), and the Investigator triages them. When a call is stopped the model is told and
+continues another way (D-062), so Hermes is never left hanging.
 
 Which model answers: the policy sets no `upstream`, so Hermes' calls go to the gateway's own model chain (Groq, then
 Gemini, then NVIDIA, with the keys in the gateway's `.env`), which fails over when a free tier is busy. To pin a model,

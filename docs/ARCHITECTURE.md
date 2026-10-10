@@ -93,6 +93,12 @@ Each content decision adds its risk to the session; risk decays per turn. Conten
 can still escalate or block the session (`tests/test_engine.py::test_session_accumulation_decay_and_cached_scan`).
 Action violations add risk too, and high-risk tools are held in a risky session.
 
+Two risks are kept apart (D-053): the user's own turns (multi-step jailbreaks hold the user's next messages) and
+third-party content (holds actions). The same content read again counts once, and third-party content is held for
+session risk only when it carries a signal of its own (D-063), so one poisoned email does not stop the agent reading
+the rest of the inbox. A user turn with pasted material (D-060) is split: the request is the user's, the pasted block
+is inspected as third-party content (source `pasted`).
+
 ## 5. Fail-safe, cost, modes
 
 | Concern | Behaviour |
@@ -135,6 +141,17 @@ keyed hashes of word 5-shingles, never as text. Later content whose shingles con
 is blocked at Tier 0 (`known-attack-match`) without an AI call, including when it is embedded in a larger
 document. False-positive marks are exact-content and per agent; they skip the AI tiers but never structural
 rules or the action guard.
+
+### Investigator (D-061)
+
+`services/gateway/intentseal_gateway/investigator.py`: an agent that triages a flagged session. Loop: plan along a
+playbook → call read-only tools (`timeline`, `evidence`, `decode`, `history`, `policy`) → `submit_report`, which a
+self-check returns once if a step or a proposal is missing → report (verdict, severity, entry point, objective, outcome,
+approval recommendation, next steps) and proposals (`propose_memory`, `propose_policy`) that a reviewer applies with
+`POST /v1/suggestions/{id}`. Facts in the report (events, flagged, actions stopped and run) are counted from the log,
+not by the model. Evidence is datamarked; the agent's model chain fails over across providers; a time budget and a
+deterministic report from the log guarantee an answer. A watcher triages sessions with pending approvals (rate-capped).
+API: `POST /v1/sessions/{id}/investigate` (reviewer), `GET /v1/sessions/{id}/investigations`, `GET /v1/investigations`.
 
 ## 9. Gateway API
 

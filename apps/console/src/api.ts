@@ -193,6 +193,20 @@ export interface NewAgent {
   upstream: { provider: string | null; model: string | null; key: "gateway" | "client" };
 }
 
+export interface InvestigationReport {
+  verdict: "attack" | "likely_attack" | "false_alarm" | "inconclusive"; severity: "none" | "low" | "medium" | "high" | "critical";
+  summary: string; attack_types?: string[]; entry_point?: string; objective: string; outcome: string;
+  approval_recommendation?: string; next_steps?: string[]; confidence?: number;
+  facts: { events: number; flagged: number; inbound_flagged: number; actions_attempted: number; actions_stopped: number;
+           actions_run: number; attack_types: string[]; max_session_risk: number };
+}
+export interface InvestigationStep { step: "thought" | "tool" | "failover" | "error"; tool?: string; args?: Record<string, string>; ok?: boolean; detail?: string }
+export interface Suggestion { id: string; kind: "memory" | "policy"; status: "pending" | "applied" | "dismissed"; payload: Record<string, string>; resolved_by?: string | null }
+export interface Investigation {
+  id: string; session_id: string; agent_id: string; trigger: string; status: "running" | "done" | "fallback"; model: string;
+  created_at: number; finished_at: number | null; report: InvestigationReport | null; steps: InvestigationStep[]; suggestions: Suggestion[];
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -244,6 +258,8 @@ export const api = {
   providers: () => call<ProviderInfo[]>("/v1/providers"),
   templates: () => call<PolicyTemplate[]>("/v1/setup/templates"),
   connect: (agent: string) => call<Connect>(`/v1/agents/${encodeURIComponent(agent)}/connect`),
+  investigations: (sessionId: string) => call<Investigation[]>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations`),
+  recentInvestigations: (limit = 50) => call<Investigation[]>(`/v1/investigations?limit=${limit}`),
 };
 
 /** Reviewer (admin-key) actions. The key is the reviewer's own, typed at sign-in; it is never part of the build. */
@@ -258,6 +274,10 @@ export const admin = {
     call<{ agent: string; mode: string; version: string; tools: string[] }>("/v1/agents", { method: "POST", body: JSON.stringify(body) }, key),
   selfTest: (key: string, agent: string) =>
     call<SelfTest>(`/v1/agents/${encodeURIComponent(agent)}/self-test`, { method: "POST" }, key),
+  investigate: (key: string, sessionId: string) =>
+    call<Investigation>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigate`, { method: "POST" }, key),
+  resolveSuggestion: (key: string, id: string, apply: boolean) =>
+    call<{ status: string; memory_id?: string }>(`/v1/suggestions/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ apply }) }, key),
   putPolicy: (key: string, agent: string, body: unknown) =>
     call<{ version: string; mode: string }>(`/v1/policies/${encodeURIComponent(agent)}`, { method: "PUT", body: JSON.stringify(body) }, key),
 };

@@ -80,6 +80,10 @@ class ApprovalRequest(BaseModel):
     note: str = ""
 
 
+class SuggestionRequest(BaseModel):
+    apply: bool
+
+
 access = logging.getLogger("intentseal.access")
 
 
@@ -112,7 +116,15 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         app.state.keys.add(app.state.internal_key, Principal("internal-demo", "project", ALL_ORGS))
         app.state.reports = reports_dir or repo_root() / "eval" / "reports"
         app.state.started = time.time()
+        from .investigator import Investigator
+        app.state.investigator = Investigator(app.state.engine)
+        watcher = None
+        if engine is None and os.environ.get("INTENTSEAL_INVESTIGATOR_AUTO", "1") != "0":
+            import asyncio
+            watcher = asyncio.create_task(app.state.investigator.watch())   # sessions awaiting approval get triaged
         yield
+        if watcher is not None:
+            watcher.cancel()
         router = getattr(app.state.engine, "router", None)
         if router is not None and hasattr(router, "aclose"):
             await router.aclose()
@@ -371,6 +383,50 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         if not request.app.state.engine.logger.resolve_approval(event_id, body.approve, p.name, body.note):
             raise HTTPException(404, "no pending approval with this id")
         return {"event_id": event_id, "status": "approved" if body.approve else "denied"}
+
+    # ---- Investigator: agentic triage of flagged sessions (D-061) ------------------------------
+    def _session_owner(request: Request, p: Principal, session_id: str) -> str:
+        e = request.app.state.engine
+        owner = e.store.query("SELECT agent_id FROM sessions WHERE id = ?", (session_id,))
+        agent = owner[0]["agent_id"] if owner else None
+        if agent is None or not tenancy.can_see(request, p, agent):
+            raise HTTPException(404, "unknown session")
+        return agent
+
+    @app.post("/v1/sessions/{session_id}/investigate", tags=["review"])
+    async def investigate(session_id: str, request: Request, p: Principal = require("admin")) -> dict[str, Any]:
+        """Run the Investigator on one session: it plans, uses read-only tools on the log, evidence, decoders, memory
+        and policy, and returns a report with recommendations and proposals that wait for a reviewer."""
+        _session_owner(request, p, session_id)
+        try:
+            return await request.app.state.investigator.investigate(session_id, trigger=f"requested by {p.name}")
+        except KeyError:
+            raise HTTPException(404, "unknown session") from None
+
+    @app.get("/v1/sessions/{session_id}/investigations", tags=["review"])
+    async def session_investigations(session_id: str, request: Request, p: Principal = require("public")) -> list[dict[str, Any]]:
+        _session_owner(request, p, session_id)
+        return request.app.state.investigator.for_session(session_id)
+
+    @app.get("/v1/investigations", tags=["review"])
+    async def investigations(request: Request, limit: int = Query(50, ge=1, le=200),
+                             p: Principal = require("public")) -> list[dict[str, Any]]:
+        return request.app.state.investigator.recent(visible_agents(request, p), limit)
+
+    @app.post("/v1/suggestions/{suggestion_id}", tags=["review"])
+    async def resolve_suggestion(suggestion_id: str, body: SuggestionRequest, request: Request,
+                                 p: Principal = require("admin")) -> dict[str, Any]:
+        """Apply or dismiss an Investigator proposal. Memory proposals are applied like reviewer feedback; policy
+        proposals are advice: applying one marks it accepted, the policy itself is edited on the Policy page."""
+        rows = request.app.state.engine.store.query("SELECT agent_id FROM suggestions WHERE id = ?", (suggestion_id,))
+        if not rows or not tenancy.can_see(request, p, rows[0]["agent_id"]):
+            raise HTTPException(404, "no pending suggestion with this id")
+        try:
+            return request.app.state.investigator.resolve(suggestion_id, body.apply, p.name)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc).strip("'")) from None
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
 
     # ---- Observability (NFR §12) -------------------------------------------------------------
     @app.get("/v1/metrics", tags=["ops"])

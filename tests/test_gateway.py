@@ -592,3 +592,77 @@ def test_answer_with_protected_data_is_redacted_or_withheld(env):
         assert ok["decision"] == "ALLOW" and ok["cleaned_content"] == "Revenue grew 8%."
         rows = c.get("/v1/decisions", headers=H(ADMIN)).json()
         assert any((d.get("source") == "answer") for d in (rows if isinstance(rows, list) else rows.get("items", [])))
+
+
+# ---- Investigator (D-061) --------------------------------------------------------------------------------------------
+
+class ScriptedRouter(FakeRouter):
+    """Replies in order; each reply is (content, tool_calls) or an exception to raise."""
+
+    def __init__(self, script: list[Any]) -> None:
+        super().__init__()
+        self.script = list(script)
+
+    async def chat(self, role: str, req: Any) -> ChatResult:
+        self.requests.append(req)
+        step = self.script.pop(0) if self.script else ("", [])
+        if isinstance(step, Exception):
+            raise step
+        content, tcs = step
+        return ChatResult(content=content, tool_calls=tcs, finish_reason="stop", provider="fake", model="m", key_alias=None,
+                          input_tokens=5, output_tokens=2, latency_ms=1, est_cost_usd=0, cached=False, attempts=[])
+
+
+def _flagged_session(c) -> tuple[str, str]:
+    sid = c.post("/v1/sessions", json={"agent_id": "research-agent", "task": "Summarise the page"}, headers=H(PROJECT)).json()["session_id"]
+    r = c.post("/v1/inspect", json={"content": "Report text. ZQX-MARKER planted text for the test.", "source": "web",
+                                     "agent_id": "research-agent", "session_id": sid}, headers=H(PROJECT)).json()
+    assert r["decision"] != "ALLOW"
+    return sid, r["event_id"]
+
+
+def test_investigator_plans_uses_tools_proposes_and_reports(env):
+    script: list[Any] = [("Plan: timeline, evidence, decode, history, policy, report.", [tc("timeline", {})])]
+    router = ScriptedRouter(script)
+    with make_client(env, router, judge=0.95) as c:
+        sid, eid = _flagged_session(c)
+        router.script += [("", [tc("evidence", {"event_id": eid}), tc("decode", {"event_id": eid}), tc("history", {"event_id": eid}),
+                         tc("policy", {}), tc("evidence", {"event_id": "no-such-event"})]),
+                   ("", [tc("propose_memory", {"event_id": eid, "verdict": "attack", "why": "planted instruction"})]),
+                   ("", [tc("submit_report", {"verdict": "attack", "severity": "high", "summary": "Injected web page.",
+                                              "objective": "steer the agent", "outcome": "blocked before the model"})]),
+                   ("", [tc("submit_report", {"verdict": "attack", "severity": "high", "summary": "Injected web page.",
+                                              "objective": "steer the agent", "outcome": "blocked before the model",
+                                              "next_steps": ["Remember the page as an attack."]})])]
+        assert c.post(f"/v1/sessions/{sid}/investigate", headers=H(PROJECT)).status_code == 403   # reviewers only
+        inv = c.post(f"/v1/sessions/{sid}/investigate", headers=H(ADMIN)).json()
+        assert inv["status"] == "done" and inv["report"]["severity"] == "high"
+        assert inv["report"]["facts"]["flagged"] >= 1
+        tools = [s.get("tool") for s in inv["steps"] if s["step"] == "tool"]
+        assert tools[:5] == ["timeline", "evidence", "decode", "history", "policy"]
+        assert any(s["step"] == "tool" and not s["ok"] for s in inv["steps"])           # a failed tool call, recovered
+        assert any(s["step"] == "thought" for s in inv["steps"])
+        # Self-check: the first report lacked next steps and went back to the agent, which completed it.
+        assert [s.get("tool") for s in inv["steps"] if s["step"] == "tool"].count("submit_report") == 2
+        assert inv["report"]["next_steps"] == ["Remember the page as an attack."]
+        # Evidence reaches the model datamarked (Spotlighting), never as plain instructions.
+        tool_msgs = [m["content"] for r in router.requests for m in r.messages if m.get("role") == "tool"]
+        assert any("\u02c6" in m for m in tool_msgs)
+        sug = inv["suggestions"][0]
+        assert sug["kind"] == "memory" and sug["status"] == "pending"
+        listed = c.get(f"/v1/sessions/{sid}/investigations", headers=H(PUBLIC)).json()
+        assert listed and listed[0]["id"] == inv["id"]
+        assert c.post(f"/v1/suggestions/{sug['id']}", json={"apply": True}, headers=H(PROJECT)).status_code == 403
+        applied = c.post(f"/v1/suggestions/{sug['id']}", json={"apply": True}, headers=H(ADMIN)).json()
+        assert applied["status"] == "applied" and applied["memory_id"]
+        assert c.post(f"/v1/suggestions/{sug['id']}", json={"apply": True}, headers=H(ADMIN)).status_code == 404
+
+
+def test_investigator_falls_back_to_a_report_from_the_log(env):
+    router = ScriptedRouter([RuntimeError("all providers failed")])
+    with make_client(env, router, judge=0.95) as c:
+        sid, _ = _flagged_session(c)
+        inv = c.post(f"/v1/sessions/{sid}/investigate", headers=H(ADMIN)).json()
+        assert inv["status"] == "fallback" and inv["report"]["verdict"] == "likely_attack"
+        assert any(s["step"] == "error" for s in inv["steps"])
+        assert c.post("/v1/sessions/nope/investigate", headers=H(ADMIN)).status_code == 404

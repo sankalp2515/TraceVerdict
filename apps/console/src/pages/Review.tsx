@@ -4,6 +4,20 @@ import { admin, api, PRODUCT_NAME, type Approval } from "../api";
 import { useReviewer } from "../reviewer";
 import { ago, Card, CardTitle, Empty, ErrorNote, Loading, PageHeader, Stat, Tag, useAsync } from "../components/ui";
 
+/** The Investigator's recommendation for a pending approval (sessions waiting for a human are triaged automatically). */
+function Triage({ sessionId }: { sessionId: string }) {
+  const { data } = useAsync(() => api.investigations(sessionId), [sessionId]);
+  const r = data?.[0]?.report;
+  if (!r) return <p className="subtle m-0 mt-3 text-xs">Investigator: no report yet for this session.</p>;
+  return (
+    <div className="well mt-3 p-3 text-[13px]">
+      <span className="section-label block pb-1">Investigator · {r.verdict.replace("_", " ")} · severity {r.severity}</span>
+      <p className="m-0">{r.approval_recommendation || r.summary}</p>
+      <Link className="text-link text-xs" to={`/replay?session=${sessionId}`}>Full report</Link>
+    </div>
+  );
+}
+
 const STATUSES = ["pending", "approved", "denied"] as const;
 
 function Decide({ a, onDone }: { a: Approval; onDone: () => void }) {
@@ -63,6 +77,7 @@ function Approvals() {
                 <p className="subtle m-0 mt-1 text-xs">{a.agent_id} · {ago(a.created_at)} · <Link className="text-link" to={`/replay?session=${a.session_id}`}>session</Link></p>
                 <p className="m-0 mt-3 text-[13px]">{a.reason}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">{a.labels.map((l) => <Tag key={l}>{l}</Tag>)}</div>
+                {a.status === "pending" && <Triage sessionId={a.session_id} />}
               </div>
               <div>
                 <span className="section-label block pb-2">Exact request (redacted)</span>

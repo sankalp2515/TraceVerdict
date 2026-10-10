@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, type EventRow } from "../api";
 import { Timeline } from "../components/Timeline";
+import { InvestigationPanel } from "../components/Investigation";
 import { Card, Empty, ErrorNote, PageHeader, Stat } from "../components/ui";
 
 export function Replay() {
@@ -60,6 +61,7 @@ export function Replay() {
           <Timeline events={events} />
         </Card>
       )}
+      {events !== null && events.length > 0 && params.get("session") && <InvestigationPanel sessionId={params.get("session")!} />}
     </div>
   );
 }

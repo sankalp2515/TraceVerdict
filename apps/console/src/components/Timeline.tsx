@@ -41,7 +41,7 @@ export function Timeline({ events }: { events: EventRow[] }) {
               <div className="grid gap-5 pb-5 pl-0 text-[13px] sm:pl-10 md:grid-cols-2">
                 <div className="space-y-3">
                   {e.reason && <p className="m-0"><span className="section-label block pb-1">Reason</span>{e.reason}</p>}
-                  {e.labels?.length ? (
+                  {e.labels?.length && e.decision !== "ALLOW" ? (
                     <div><span className="section-label block pb-2">Attack types</span><div className="flex flex-wrap gap-1.5">{e.labels.map((l) => <Tag key={l}>{l}</Tag>)}</div></div>
                   ) : null}
                   {e.tier !== null && <p className="m-0"><span className="section-label block pb-1">Deepest check</span>{TIER[e.tier] ?? e.tier}</p>}

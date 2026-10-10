@@ -107,7 +107,7 @@ export function Decisions() {
                     <td><DecisionBadge decision={r.decision} />{r.enforced !== r.decision && <span className="subtle mt-1 block text-[11px]">monitor mode</span>}</td>
                     <td className="text-xs">{r.source.replace("tool:", "tool · ")}</td>
                     <td><span className="mono" style={{ color: "var(--accent-soft)" }}>{r.policy_rule}</span><span className="subtle mt-1 block text-xs">{r.reason}</span></td>
-                    <td><div className="flex flex-wrap gap-1.5">{r.labels.map((l) => <Tag key={l}>{l}</Tag>)}</div></td>
+                    <td><div className="flex flex-wrap gap-1.5">{r.decision !== "ALLOW" && r.labels.map((l) => <Tag key={l}>{l}</Tag>)}</div></td>
                     <td><Link className="text-link mono" to={`/replay?session=${r.session_id}`}>{r.session_id.slice(0, 10)}</Link></td>
                     {reviewer && <td><Label row={r} /></td>}
                   </tr>

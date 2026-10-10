@@ -27,6 +27,7 @@ import os
 import re
 import time
 import uuid
+from dataclasses import replace
 from collections import OrderedDict
 from typing import Any
 
@@ -199,7 +200,20 @@ async def _check(engine: Any, name: str, args: Any, agent_id: str, session_id: s
 
 async def _check_tool_calls(engine: Any, tool_calls: list[dict[str, Any]], agent_id: str,
                             session_id: str) -> tuple[list[dict[str, Any]], list[str]]:
-    kept, notices = [], []
+    kept, stopped = await _check_tool_calls_detailed(engine, tool_calls, agent_id, session_id)
+    return kept, [notice for _, notice in stopped]
+
+
+# The model is told what was stopped, as the result of the stopped call, and asked to go on (D-062): the agent's work
+# continues another way instead of ending on a notice. At most this many extra model calls per request.
+CONTINUE_ROUNDS = 2
+CONTINUE_NOTE = (" The call was not run. Continue the user's task without it if you can (another way within the "
+                 "rules); otherwise tell the user what was stopped and why.")
+
+
+async def _check_tool_calls_detailed(engine: Any, tool_calls: list[dict[str, Any]], agent_id: str, session_id: str
+                                     ) -> tuple[list[dict[str, Any]], list[tuple[dict[str, Any], str]]]:
+    kept, stopped = [], []
     for tc in tool_calls:
         fn = tc.get("function") or {}
         try:
@@ -208,10 +222,29 @@ async def _check_tool_calls(engine: Any, tool_calls: list[dict[str, Any]], agent
             args = {"_raw": fn.get("arguments")}
         final, notice = await _check(engine, fn.get("name", ""), args, agent_id, session_id)
         if notice:
-            notices.append(notice)
+            stopped.append((tc, notice))
         else:
             kept.append({**tc, "function": {**fn, "arguments": json.dumps(final) if final is not args else fn.get("arguments", "{}")}})
-    return kept, notices
+    return kept, stopped
+
+
+async def _continue_after_stop(engine: Any, call: Any, req: ChatRequest, content: str,
+                               stopped: list[tuple[dict[str, Any], str]], agent_id: str, session_id: str
+                               ) -> tuple[str, list[dict[str, Any]], list[tuple[dict[str, Any], str]], Any]:
+    """Every call in the model's turn was stopped: tell the model (as the calls' results) and let it continue, up to
+    CONTINUE_ROUNDS times. Returns the final (content, kept calls, still-stopped calls, last upstream result)."""
+    messages, res = list(req.messages), None
+    for _ in range(CONTINUE_ROUNDS):
+        for tc, _n in stopped:
+            tc["id"] = tc.get("id") or f"call_{uuid.uuid4().hex[:12]}"
+        messages += [{"role": "assistant", "content": content or None, "tool_calls": [tc for tc, _ in stopped]}]
+        messages += [{"role": "tool", "tool_call_id": tc["id"], "content": notice + CONTINUE_NOTE} for tc, notice in stopped]
+        res = await call(replace(req, messages=messages))
+        content = res.content or ""
+        kept, stopped = await _check_tool_calls_detailed(engine, res.tool_calls, agent_id, session_id)
+        if kept or not stopped:
+            return content, kept, stopped, res
+    return content, [], stopped, res
 
 
 def _upstream(request: Request, agent_id: str) -> tuple[Any, str | None]:
@@ -308,15 +341,33 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
             upstream = (await engine.router.call_upstream(up.provider, model, req, client_key, stream=True) if up.provider
                         else await engine.router.stream_chat(PROXY_ROLE, req))
             include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
+            async def call_once(r: ChatRequest) -> Any:
+                return (await engine.router.call_upstream(up.provider, model, r, client_key) if up.provider
+                        else await engine.router.chat(PROXY_ROLE, r))
+
+            async def resume(content: str, stopped: list[tuple[dict[str, Any], str]]) -> Any:
+                return await _continue_after_stop(engine, call_once, req, content, stopped, agent_id, session_id)
             return StreamingResponse(_stream(engine, upstream, agent_id, session_id, security, include_usage,
-                                             model if up.provider else None), media_type="text/event-stream")
+                                             model if up.provider else None, resume), media_type="text/event-stream")
         res = (await engine.router.call_upstream(up.provider, model, req, client_key) if up.provider
                else await engine.router.chat(PROXY_ROLE, req))
     except (AllProvidersFailed, ProviderError) as e:
         return _openai_error(e)
 
-    kept, notices = await _check_tool_calls(engine, res.tool_calls, agent_id, session_id)
-    content = res.content or ""
+    async def call(r: ChatRequest) -> Any:
+        return (await engine.router.call_upstream(up.provider, model, r, client_key) if up.provider
+                else await engine.router.chat(PROXY_ROLE, r))
+
+    kept, stopped = await _check_tool_calls_detailed(engine, res.tool_calls, agent_id, session_id)
+    content, blocked = res.content or "", len(stopped)
+    if stopped and not kept:
+        try:
+            content, kept, stopped, res2 = await _continue_after_stop(engine, call, req, content, stopped, agent_id, session_id)
+            blocked += len(stopped)
+            res = res2 or res
+        except (AllProvidersFailed, ProviderError):
+            pass   # no second answer: the notices below tell the agent what was stopped
+    notices = [n for _, n in stopped]
     if content:   # protected data in the answer is redacted, or the answer withheld
         content = (await engine.check_output(content, agent_id, session_id=session_id)).cleaned_content
     if notices:
@@ -330,7 +381,7 @@ async def _complete(request: Request, agent_id: str, p: Principal) -> Any:
         "choices": [{"index": 0, "message": message, "finish_reason": "tool_calls" if kept else "stop"}],
         "usage": {"prompt_tokens": res.input_tokens, "completion_tokens": res.output_tokens,
                   "total_tokens": res.input_tokens + res.output_tokens},
-        "x_security": {**security, "blocked_tool_calls": len(notices)},
+        "x_security": {**security, "blocked_tool_calls": blocked},
     }
 
 
@@ -385,7 +436,7 @@ def _sse(obj: Any) -> str:
 
 
 async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, security: dict[str, Any],
-                  include_usage: bool, model_name: str | None = None):
+                  include_usage: bool, model_name: str | None = None, resume: Any = None):
     """PRX-6: text deltas stream through as they arrive; tool-call deltas are buffered until the upstream stream
     ends, assembled, checked, and only then released (allowed calls) or replaced by a notice (blocked calls).
     If the upstream fails part-way, buffered tool calls are never released."""
@@ -428,9 +479,19 @@ async def _stream(engine: Any, upstream: Any, agent_id: str, session_id: str, se
     ordered = [calls[i] for i in sorted(calls)]
     for tc in ordered:
         tc["id"] = tc["id"] or f"call_{uuid.uuid4().hex[:12]}"
-    kept, notices = await _check_tool_calls(engine, ordered, agent_id, session_id)
-    blocked = len(notices)
-    notices = ([withheld] if withheld else []) + notices
+    kept, stopped = await _check_tool_calls_detailed(engine, ordered, agent_id, session_id)
+    blocked = len(stopped)
+    if stopped and not kept and resume is not None and not withheld:
+        try:   # every call was stopped: the model is told and continues (D-062); its next answer is checked as well
+            more, kept, stopped, _ = await resume("", stopped)
+            blocked += len(stopped)
+            if more:
+                more = (await engine.check_output(more, agent_id, session_id=session_id)).cleaned_content
+                yield chunk({**({} if started else {"role": "assistant"}), "content": ("\n\n" if started else "") + more})
+                started = True
+        except (AllProvidersFailed, ProviderError):
+            pass
+    notices = ([withheld] if withheld else []) + [n for _, n in stopped]
     if notices:
         text = ("\n\n" if started else "") + "\n".join(notices)
         yield chunk({**({} if started else {"role": "assistant"}), "content": text})

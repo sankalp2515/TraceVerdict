@@ -152,16 +152,35 @@ async def test_session_accumulation_decay_and_cached_scan(policy):
     e = engine(policy, malicious=0.4)
     s = e.start_session(policy.agent, task="Summarise the report")
     decisions = []
-    for _ in range(7):
-        decisions.append(await e.inspect(FLAGGED, "web", policy.agent, s.session_id))
+    for i in range(7):   # seven different suspicious documents: a multi-step attack spread over pages
+        doc = f"<p>Quarterly report part {i} ready.</p><span hidden>{HIDDEN_NOTE}</span>"
+        decisions.append(await e.inspect(doc, "web", policy.agent, s.session_id))
     assert decisions[0].decision == Decision.ALLOW
     assert any(r.policy_rule == "session-risk-escalate" for r in decisions)
     assert decisions[-1].policy_rule == "session-risk-block"
     assert s.risk == pytest.approx(1.6) and s.turns == 7
+    # D-063: a clean document is not held for the session's risk (it carries none of its own) ...
+    notes = "Team meeting notes. Q3 revenue rose 8 percent to 4.2 million EUR. " * 6   # long enough to be judged
+    e.decision_model = StaticDecisionModel(0.0)   # the judge reads the notes and finds nothing
+    clean = await e.inspect(notes, "web", policy.agent, s.session_id)
+    assert clean.tier == 2   # judged, not skipped
+    assert clean.decision == Decision.ALLOW and s.risk == pytest.approx(1.4)
+    # ... while a high-risk action still is
+    act = await e.check_action("send_message", {"to": "a@example-corp.test", "subject": "s", "body": "b"},
+                               policy.agent, session_id=s.session_id)
+    assert act.decision in (Decision.BLOCK, Decision.ESCALATE)
+
+
+async def test_same_content_read_again_counts_once(policy):
+    """D-063: an agent re-reading one poisoned file (another tool, a retry) is one attack, not several."""
+    policy.sensitive_data.drop_non_visible = False
+    e = engine(policy, malicious=0.4)
+    s = e.start_session(policy.agent, task="Summarise the report")
+    for _ in range(5):
+        await e.inspect(FLAGGED, "web", policy.agent, s.session_id)
+    assert s.risk <= 0.4   # added once (then decayed), not five times
     # every chunk (the visible one too, D-051) is scored once; the cached scan and scores serve the repeats
     assert e.decision_model.calls == 1 and len(e.classifiers[0].calls) == 2
-    await e.inspect("Ordinary report.", "web", policy.agent, s.session_id)
-    assert s.risk == pytest.approx(1.4)
 
 
 async def test_monitor_and_enforce_same_decision_different_content(policy):

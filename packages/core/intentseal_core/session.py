@@ -78,6 +78,7 @@ class Session:
     trusted_words: set[str] = field(default_factory=set)   # words of the user's own messages (explicit-intent rule)
     untrusted_entities: set[str] = field(default_factory=set)
     flagged_untrusted: bool = False        # any finding in untrusted content this session
+    risk_seen: set[str] = field(default_factory=set)   # content already counted toward risk (D-063: once per content)
     taint: TaintTracker = field(default_factory=TaintTracker)   # CORE-17 data-flow origins (fingerprints only)
     created_at: float = field(default_factory=time.time)
 
@@ -110,7 +111,14 @@ class Session:
         self.risk = max(0.0, self.risk - decay)
         self.user_risk = max(0.0, self.user_risk - decay)
 
-    def add_risk(self, amount: float, labels: list[str] | None = None, user: bool = False) -> None:
+    def add_risk(self, amount: float, labels: list[str] | None = None, user: bool = False, key: str | None = None) -> None:
+        """key: a fingerprint of the content. The same content read again (another tool, a retry) adds no new risk:
+        an agent re-reading one poisoned file is one attack, not several (D-063)."""
+        if key is not None and amount > 0:
+            if key in self.risk_seen:
+                self.labels |= set(labels or [])
+                return
+            self.risk_seen.add(key)
         self.risk += max(0.0, amount)
         if user:
             self.user_risk += max(0.0, amount)

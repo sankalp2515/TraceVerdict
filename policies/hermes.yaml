@@ -16,10 +16,11 @@ tools:
   browser_navigate: { risk: medium, failure: open }
   write_file:       { risk: medium, failure: closed }
   patch:            { risk: medium, failure: closed }
-  terminal:         { risk: high,   failure: closed, escalate_if_uncertain: true,
-                      intent_terms: [run, execute, command, terminal, shell, install, build, test, list, check] }
-  execute_code:     { risk: high,   failure: closed, escalate_if_uncertain: true,
-                      intent_terms: [run, execute, code, script, python, calculate, compute, analyse, analyze] }
+  # Hermes runs commands for ordinary work (reading, listing, searching), so commands are not tied to the user's
+  # wording. They are held for approval when the session has taken in flagged content, or when an argument carries
+  # text from flagged content (data-flow trace): the ways an injection turns into a command.
+  terminal:         { risk: high,   failure: closed, escalate_if_uncertain: true }
+  execute_code:     { risk: high,   failure: closed, escalate_if_uncertain: true }
   send_message:     { risk: high,   failure: closed, escalate_if_uncertain: true,
                       intent_terms: [send, email, mail, reply, forward, message, notify, share] }
 unknown_tools: allow

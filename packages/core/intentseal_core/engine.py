@@ -40,6 +40,9 @@ from .types import ATTACK_TYPES, ActionResult, Decision, Finding, InspectResult
 
 
 
+# Third-party content needs at least this much risk of its own before session risk can hold it (D-063).
+SESSION_GATE_FLOOR = 0.3
+
 _TAG_RUN = re.compile("[\U000E0000-\U000E007F]+")
 
 
@@ -536,6 +539,7 @@ class Engine:
                 scan.doc.warnings.append("inspection unavailable")
         too_large = too_large or len(scan.doc.text) > self.max_text_chars
         findings = [f.model_copy(deep=True) for f in scan.findings]
+        structural = bool(scan.chunks)   # hidden text, encodings, look-alikes, forged markers (before judge selection)
         if scan.doc.warnings:
             degraded = True
             findings.append(Finding(signal="extraction-unavailable", labels=["Indirect Prompt Injection"]))
@@ -673,10 +677,16 @@ class Engine:
                    policy.thresholds.neutralise if hidden else 0.0,
                    policy.thresholds.block if known is not None and known.kind == "attack" else 0.0)
         labels = sorted({label for f in findings for label in f.labels})
-        session.add_risk(risk, labels, user=source == "user")
+        session.add_risk(risk, labels, user=source == "user",
+                         key=hashlib.sha256(scan.doc.text.encode("utf-8", "ignore")).hexdigest()[:24])
         # A poisoned document raises the session's risk for actions and further documents, but the user's own words are
         # held only for risk the user's own turns built up (multi-step attacks).
         gate = session.user_risk if source == "user" else session.risk
+        # Third-party content is held for session risk only when it carries a signal of its own (a judge score, a
+        # structural flag, an incomplete inspection): one poisoned email must not stop the agent reading the rest of
+        # the inbox. Actions stay gated by session risk in the action guard, whatever the content (D-063).
+        if source != "user" and not (risk >= SESSION_GATE_FLOOR or structural or degraded or scan.doc.warnings):
+            gate = 0.0
         if too_large:
             decision, rule, reason = (Decision.BLOCK, "content-too-large",
                                       f"Content exceeds the inspection limit ({self.max_text_chars} characters)")

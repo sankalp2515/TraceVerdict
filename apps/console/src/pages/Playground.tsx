@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, PRODUCT_NAME, type DemoResult, type Scenario } from "../api";
 import { Timeline } from "../components/Timeline";
 import { Card, CardTitle, DecisionBadge, Dot, Empty, ErrorNote, Loading, PageHeader, Tag } from "../components/ui";
@@ -72,6 +72,8 @@ function Lane({ mode, result, loading, error, proxy }: { mode: Mode; result: Dem
 }
 
 export function Playground() {
+  const [params] = useSearchParams();
+  const requestedScenario = params.get("scenario");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [selected, setSelected] = useState("");
   const [res, setRes] = useState<Record<Mode, DemoResult | null>>({ off: null, on: null });
@@ -81,10 +83,10 @@ export function Playground() {
 
   useEffect(() => {
     api.scenarios()
-      .then((s) => { setScenarios(s); if (s.length) setSelected(s[0].id); })
+      .then((s) => { setScenarios(s); if (s.length) setSelected(s.find((item) => item.id === requestedScenario)?.id ?? s[0].id); })
       .catch((e) => setErr((x) => ({ ...x, list: (e as Error).message })))
       .finally(() => setListLoading(false));
-  }, []);
+  }, [requestedScenario]);
 
   const scenario = scenarios.find((s) => s.id === selected);
   const proxy = scenario?.surface === "proxy";

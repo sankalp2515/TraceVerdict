@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Decision } from "../api";
 
 /* ---- brand ---------------------------------------------------------------------------------- */
@@ -117,24 +117,28 @@ export function ago(ts: number): string {
 
 /* ---- data ----------------------------------------------------------------------------------- */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
+  const request = useRef(0);
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const run = useCallback(fn, deps);
   const reload = useCallback(async () => {
+    const id = ++request.current;
     setLoading(true);
     setError(null);
     try {
-      setData(await run());
+      const result = await run();
+      if (id === request.current) { setData(result); setError(null); }
     } catch (e) {
-      setError((e as Error).message);
+      if (id === request.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (id === request.current) setLoading(false);
     }
   }, [run]);
   useEffect(() => {
     reload();
+    return () => { request.current += 1; };
   }, [reload]);
   return { data, error, loading, reload };
 }

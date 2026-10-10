@@ -1,24 +1,33 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { api, ApiError, PRODUCT_NAME } from "../api";
+import { api, PRODUCT_NAME } from "../api";
 import { ReviewerSignIn } from "./ReviewerSignIn";
 import { SealMark } from "./ui";
+import { LandingFooter, LandingHeader } from "./LandingNav";
 
 type Status = "checking" | "ok" | "waking" | "down";
+const BackendStatusContext = createContext<Status>("checking");
+export const useBackendAvailability = () => useContext(BackendStatusContext);
+const WAKE_GRACE_MS = 150_000;
 
 function useBackendStatus(): Status {
   const [status, setStatus] = useState<Status>("checking");
   useEffect(() => {
     let alive = true;
-    let failures = 0;
+    let firstFailureAt: number | null = null;
+    let pending = false;
     const tick = async () => {
+      if (pending || !alive) return;
+      pending = true;
       try {
         await api.health();
-        failures = 0;
+        firstFailureAt = null;
         if (alive) setStatus("ok");
-      } catch (e) {
-        failures += 1;
-        if (alive) setStatus(e instanceof ApiError && e.status === 0 && failures < 3 ? "waking" : "down");
+      } catch {
+        firstFailureAt ??= Date.now();
+        if (alive) setStatus(Date.now() - firstFailureAt < WAKE_GRACE_MS ? "waking" : "down");
+      } finally {
+        pending = false;
       }
     };
     tick();
@@ -38,13 +47,13 @@ function StatusBanner({ status }: { status: Status }) {
   return (
     <div role="status" className="mx-4 mb-3 rounded-2xl border px-4 py-3 text-[13px] sm:mx-8" style={{ borderColor: `color-mix(in srgb, ${tone} 45%, transparent)`, color: tone }}>
       {waking
-        ? "The security backend is waking up (free hosting sleeps when idle). This can take up to a minute."
+        ? "The security backend is waking up (free hosting sleeps when idle). This can take 2–3 minutes."
         : "The security backend is unavailable. Results shown may be out of date; live runs are paused."}
     </div>
   );
 }
 
-function ThemeToggle() {
+function useTheme() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -58,6 +67,10 @@ function ThemeToggle() {
       /* storage unavailable */
     }
   };
+  return { dark, toggle };
+}
+
+function ThemeToggle({ dark, toggle }: { dark: boolean; toggle: () => void }) {
   return (
     <button className="pill pill-sm" style={{ minHeight: 40, width: 40, padding: 0 }} onClick={toggle}
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"} title={dark ? "Light theme" : "Dark theme"}>
@@ -81,15 +94,24 @@ const NAV = [
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
+  const theme = useTheme();
   const status = useBackendStatus();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const landing = pathname === "/";
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    const section = pathname === "/" ? new URLSearchParams(search).get("section") : null;
+    const target = section ? document.getElementById(section) : null;
+    if (target) { target.scrollIntoView({ behavior: "instant" }); target.focus({ preventScroll: true }); }
+    else window.scrollTo({ top: 0, behavior: "instant" });
+  }, [pathname, search]);
   return (
-    <div className="min-h-screen">
-      <a href="#main" className="sr-only skip pill">Skip to content</a>
-      <header className="sticky top-0 z-20 backdrop-blur-md" style={{ background: "color-mix(in srgb, var(--bg) 78%, transparent)" }}>
+    <BackendStatusContext.Provider value={status}><div className="min-h-screen">
+      <a href={landing ? "#/?section=main" : `#${pathname}`} className="sr-only skip pill" onClick={(event) => {
+        event.preventDefault();
+        document.getElementById("main")?.focus();
+        document.getElementById("main")?.scrollIntoView({ behavior: "instant" });
+      }}>Skip to content</a>
+      {landing ? <LandingHeader themeToggle={<ThemeToggle {...theme} />} /> : <header className="sticky top-0 z-20 backdrop-blur-md" style={{ background: "color-mix(in srgb, var(--bg) 78%, transparent)" }}>
         <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-4 sm:px-8">
           <Link to="/" className="flex items-center gap-2.5 text-[20px] tracking-tight" aria-label={`${PRODUCT_NAME} overview`}>
             <span style={{ color: "var(--accent-soft)" }}><SealMark /></span>
@@ -106,7 +128,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 style={{ background: status === "ok" ? "var(--allow)" : status === "checking" ? "var(--subtle)" : "var(--block)" }} />
               {status === "ok" ? "Backend online" : status === "checking" ? "Checking" : status === "waking" ? "Waking" : "Offline"}
             </span>
-            <ThemeToggle />
+            <ThemeToggle {...theme} />
             <ReviewerSignIn />
             <Link to="/playground" className="pill pill-primary pill-sm hidden xl:inline-flex">Run the demo</Link>
           </div>
@@ -118,13 +140,13 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
         <div className="h-px w-full" style={{ background: "var(--line)" }} />
         <StatusBanner status={status} />
-      </header>
-      <main id="main" className="mx-auto max-w-[1440px] px-4 py-10 sm:px-8 sm:py-14">{children}</main>
-      <footer className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 pb-10 pt-6 text-[11px] sm:flex-row sm:justify-between sm:px-8" style={{ color: "var(--subtle)", borderTop: "1px solid var(--line)" }}>
+      </header>}
+      <main id="main" tabIndex={-1} className={landing ? "landing-main" : "mx-auto max-w-[1440px] px-4 py-10 sm:px-8 sm:py-14"}>{children}</main>
+      {landing ? <LandingFooter /> : <footer className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 pb-10 pt-6 text-[11px] sm:flex-row sm:justify-between sm:px-8" style={{ color: "var(--subtle)", borderTop: "1px solid var(--line)" }}>
         <span className="brand-text text-[15px]">{PRODUCT_NAME}</span>
         <span>Catch what can be caught. Limit the damage. Prove what happened.</span>
         <span>Demo actions run in a sandbox · rules decide, AI advises</span>
-      </footer>
-    </div>
+      </footer>}
+    </div></BackendStatusContext.Provider>
   );
 }

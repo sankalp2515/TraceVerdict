@@ -69,5 +69,8 @@ class RemoteEngine:
         body = {"agent_id": agent_id, "session_id": session_id, "text": text}
         return InspectResult.model_validate(await asyncio.to_thread(self._post, "/v1/outputs/check", body))
 
+    def record_execution(self, event_id: str, executed: bool, detail: str = "") -> bool:
+        return bool(self._post(f"/v1/actions/{event_id}/receipt", {"executed": executed, "detail": detail}).get("ok"))
+
     def close(self) -> None:
         self.http.close()

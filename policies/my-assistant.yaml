@@ -16,6 +16,10 @@ tools:
   send_message:     { risk: high,   failure: closed, escalate_if_uncertain: true,
                       allowed_recipients: ["@example.com"], recipient_arg: to,
                       intent_terms: [send, email, mail, reply, forward, message, notify, share] }
+contract:                # D-064 intent contract: what the user authorised, compiled from the user's own words
+  mode: enforce
+  require_mention: [send, submit, purchase, delete]   # high-impact: only when the user asks for it
+  out_of_scope: escalate   # escalate | block
 unknown_tools: block
 sensitive_data:
   patterns: [api_key, credential, customer_record]

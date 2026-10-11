@@ -45,6 +45,13 @@ _SCHEMA = [
         event_id TEXT PRIMARY KEY, session_id TEXT, agent_id TEXT, tool TEXT, args_hash TEXT, reason TEXT,
         status TEXT DEFAULT 'pending', reviewer TEXT, note TEXT, created_at REAL, resolved_at REAL, used_at REAL)""",
     "CREATE INDEX IF NOT EXISTS ix_approvals_key ON approvals(session_id, tool, args_hash, status)",
+    # D-064: every version of a session's intent contract (immutable; each names its parent's hash)
+    """CREATE TABLE IF NOT EXISTS contracts (
+        session_id TEXT, version INTEGER, hash TEXT, parent TEXT, origin TEXT, body TEXT, created_at REAL,
+        PRIMARY KEY (session_id, version))""",
+    # Execution receipts: the application reports whether an allowed call actually ran (provenance evidence)
+    """CREATE TABLE IF NOT EXISTS receipts (
+        event_id TEXT PRIMARY KEY, executed INTEGER, detail TEXT, created_at REAL)""",
 ]
 
 
@@ -61,7 +68,8 @@ class DecisionLogger:
         self.store = store
         self.store.ensure_schema(_SCHEMA)
         for table, column in (("decisions", "output_tokens INTEGER DEFAULT 0"),   # G7b
-                              ("actions", "taint TEXT")):                          # CORE-17
+                              ("actions", "taint TEXT"),                           # CORE-17
+                              ("actions", "contract TEXT")):                       # D-064
             try:   # databases created before the column existed
                 self.store.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
             except Exception:
@@ -128,11 +136,12 @@ class DecisionLogger:
     def action(self, session_id: str, agent_id: str, tool: str, args: dict[str, Any], r: ActionResult,
                session_risk: float) -> str:
         eid = self.event(session_id, agent_id, "action", f"tool:{tool}")
-        self.store.execute("INSERT INTO actions (event_id, tool, args_redacted, final_args_redacted, pinned_overrides, taint) "
-                           "VALUES (?,?,?,?,?,?)",
+        self.store.execute("INSERT INTO actions (event_id, tool, args_redacted, final_args_redacted, pinned_overrides, taint, "
+                           "contract) VALUES (?,?,?,?,?,?,?)",
                            (eid, self._redact(tool), self.scrub_obj(args), self.scrub_obj(r.final_args) if r.final_args else None,
                             self.scrub_obj(r.pinned_overrides) if r.pinned_overrides else None,
-                            json.dumps(r.taint) if r.taint else None))
+                            json.dumps(r.taint) if r.taint else None,
+                            self._redact(json.dumps(r.contract, ensure_ascii=False)) if r.contract else None))
         self._decision(eid, agent_id, session_id, r.decision.value, r.enforced.value, r.policy_rule, r.reason, r.labels,
                        0.0, session_risk, 0, r.latency_ms, r.degraded, False, None, 0, 0.0, kind="action", source=f"tool:{tool}")
         if r.decision.value == "ESCALATE":
@@ -201,6 +210,25 @@ class DecisionLogger:
             except Exception:
                 pass
 
+    def contract(self, c: Any) -> None:
+        """Store one contract version (D-064). The user's words in clause quotes are redacted like any preview."""
+        body = self._redact(json.dumps(c.as_dict(), ensure_ascii=False))
+        self.store.execute("INSERT INTO contracts (session_id, version, hash, parent, origin, body, created_at) "
+                           "VALUES (?,?,?,?,?,?,?) ON CONFLICT (session_id, version) DO NOTHING",
+                           (c.session_id, c.version, c.hash, c.parent, self._redact(c.origin), body, c.created_at))
+
+    def receipt(self, event_id: str, executed: bool, detail: str = "") -> bool:
+        """The application's record that an action did or did not run. Only for action events; first report wins."""
+        if not self.store.query("SELECT 1 AS x FROM actions WHERE event_id = ?", (event_id,)):
+            return False
+        self.store.execute("INSERT INTO receipts (event_id, executed, detail, created_at) VALUES (?,?,?,?) "
+                           "ON CONFLICT (event_id) DO NOTHING", (event_id, int(bool(executed)), self.scrub(detail, 200), time.time()))
+        return True
+
+    def contracts(self, session_id: str) -> list[dict[str, Any]]:
+        return [json.loads(r["body"]) for r in
+                self.store.query("SELECT body FROM contracts WHERE session_id = ? ORDER BY version", (session_id,))]
+
     # ---- readers (API / Console) ------------------------------------------------------------
     def session_events(self, session_id: str) -> list[dict[str, Any]]:
         rows = self.store.query(
@@ -211,10 +239,14 @@ class DecisionLogger:
             r["labels"] = json.loads(r["labels"]) if r.get("labels") else []
             r["findings"] = [dict(f, labels=json.loads(f["labels"] or "[]"))
                              for f in self.store.query("SELECT * FROM findings WHERE event_id = ?", (r["id"],))]
-            act = self.store.query("SELECT tool, args_redacted, final_args_redacted, pinned_overrides, taint FROM actions "
-                                   "WHERE event_id = ?", (r["id"],))
+            act = self.store.query("SELECT tool, args_redacted, final_args_redacted, pinned_overrides, taint, contract "
+                                   "FROM actions WHERE event_id = ?", (r["id"],))
             if act:
                 act[0]["taint"] = json.loads(act[0]["taint"]) if act[0]["taint"] else []
+                act[0]["contract"] = json.loads(act[0]["contract"]) if act[0].get("contract") else None
+                rec = self.store.query("SELECT executed, detail, created_at FROM receipts WHERE event_id = ?", (r["id"],))
+                act[0]["receipt"] = ({"executed": bool(rec[0]["executed"]), "detail": rec[0]["detail"],
+                                      "at": rec[0]["created_at"]} if rec else None)
             r["action"] = act[0] if act else None
         return rows
 

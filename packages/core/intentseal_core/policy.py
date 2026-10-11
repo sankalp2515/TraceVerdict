@@ -26,6 +26,8 @@ class ToolPolicy(BaseModel):
     # Explicit intent (docs/13 L1, confused deputy): when set, the user's own words in this session must contain one of
     # these terms (word prefix match: "send" matches "sending") or the call is escalated for approval.
     intent_terms: list[str] = Field(default_factory=list)
+    # D-064: the capability this tool exercises (send, submit, purchase, delete, execute, write, read); unset: from its name
+    capability: str | None = None
 
 
 class Thresholds(BaseModel):
@@ -69,6 +71,15 @@ class TaintPolicy(BaseModel):
     flagged_to_high_risk: str = "escalate"              # escalate | block | record: flagged content into a high-risk tool
 
 
+class ContractPolicy(BaseModel):
+    """D-064 Intent contracts: each session gets a versioned contract compiled from the user's own words."""
+    mode: str = "off"                                   # off | enforce
+    # capabilities the user must ask for (in words, as a verb); a call outside them is out of scope
+    require_mention: list[str] = Field(default_factory=lambda: ["send", "submit", "purchase", "delete"])
+    out_of_scope: str = "escalate"                      # escalate | block
+    # a capability the user prohibited ("do not contact them") is always blocked
+
+
 class UpstreamPolicy(BaseModel):
     """Where the LLM proxy forwards this agent's model calls (docs/INTEGRATION.md).
 
@@ -95,6 +106,10 @@ class AgentPolicy(BaseModel):
     budgets: Budgets = Field(default_factory=Budgets)
     memory: MemoryPolicy = Field(default_factory=MemoryPolicy)
     taint: TaintPolicy = Field(default_factory=TaintPolicy)
+    contract: ContractPolicy = Field(default_factory=ContractPolicy)
+    # "on": content is inspected. "observe": content is recorded for provenance (origins, named targets) but never
+    # scored or judged - an evaluation switch that shows what the action layer stops with the detectors bypassed.
+    content_checks: str = "on"
     upstream: UpstreamPolicy = Field(default_factory=UpstreamPolicy)
     decision_model: str = "generative_free"
     version: str = "1"

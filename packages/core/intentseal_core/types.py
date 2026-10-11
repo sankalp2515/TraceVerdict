@@ -55,6 +55,7 @@ class ActionResult(BaseModel):
     final_args: dict[str, Any] | None = None
     pinned_overrides: dict[str, Any] = Field(default_factory=dict)
     taint: list[dict[str, Any]] = Field(default_factory=list)   # CORE-17: where argument text came from
+    contract: dict[str, Any] | None = None     # D-064: contract version/hash and the clause that ruled on the call
     labels: list[str] = Field(default_factory=list)
     policy_rule: str = ""
     reason: str = ""

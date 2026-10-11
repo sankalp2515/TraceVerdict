@@ -80,6 +80,8 @@ class Session:
     flagged_untrusted: bool = False        # any finding in untrusted content this session
     risk_seen: set[str] = field(default_factory=set)   # content already counted toward risk (D-063: once per content)
     taint: TaintTracker = field(default_factory=TaintTracker)   # CORE-17 data-flow origins (fingerprints only)
+    entity_origin: dict[str, tuple[str, str]] = field(default_factory=dict)   # untrusted entity -> (event id, source)
+    contract: Any = None                   # D-064 current intent contract (contract.Contract), immutable versions
     created_at: float = field(default_factory=time.time)
 
     def __post_init__(self) -> None:
@@ -94,8 +96,18 @@ class Session:
         self.trusted_words |= set(re.findall(r"[a-z0-9]+", (text or "").lower()))
         self.taint.observe(text, "", "user", trusted=True, flagged=False)
 
-    def note_untrusted(self, text: str) -> None:
-        self.untrusted_entities |= entities(text) - self.trusted_entities
+    def note_untrusted(self, text: str, event_id: str = "", source: str = "") -> None:
+        new = entities(text) - self.trusted_entities
+        self.untrusted_entities |= new
+        if event_id:                       # provenance: the first untrusted content each target appeared in
+            for e in new:
+                self.entity_origin.setdefault(e, (event_id, source))
+
+    def untrusted_origin(self, value: str) -> tuple[str, str] | None:
+        for e in entities(value) or {value.lower().strip()}:
+            if e in self.entity_origin and e not in self.trusted_entities:
+                return self.entity_origin[e]
+        return None
 
     def user_asked_for(self, terms: list[str]) -> bool:
         """Did the user's own words include any of these terms (word prefix: "send" matches "sends", "sending")?"""

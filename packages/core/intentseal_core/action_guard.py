@@ -9,6 +9,9 @@ Checks, in order (first hard violation wins; all observations are recorded):
   6. path stays inside the sandbox (file tools)
   7. provenance: high-risk target that appears only in untrusted content
   8. session risk: high-risk tool while the session carries risk from untrusted content
+  8b. intent contract (D-064): a capability the user prohibited is blocked; a high-impact capability the user never
+      asked for is out of scope (held for approval). Without a contract: the explicit-intent terms
+  9. data flow: flagged content copied into a high-risk tool
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from dataclasses import dataclass, field
 from email.utils import getaddresses
 from typing import Any
 
+from . import contract as contracts
 from .outbound import scan_args
 from .policy import AgentPolicy, ToolPolicy
 from .session import Session, domain_of
@@ -124,9 +128,13 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
         checks.append(ActionCheck("path-outside-sandbox", Decision.BLOCK, "path leaves the workspace", ["Tool Abuse"]))
 
     # 7. provenance of high-risk targets
+    targets: list[dict[str, Any]] = []
     if tp.risk == "high":
         for key in (tp.recipient_arg, tp.url_arg):
             if key in args and session.from_untrusted_only(str(args[key])):
+                if origin := session.untrusted_origin(str(args[key])):
+                    targets.append({"arg": key, "origin": origin[0], "source": origin[1], "flagged": False,
+                                    "coverage": 1.0, "kind": "target"})
                 checks.append(ActionCheck("target-from-untrusted-content",
                                           Decision.ESCALATE if tp.escalate_if_uncertain else Decision.BLOCK,
                                           f"'{key}' value appears only in untrusted content, not in the user's request",
@@ -139,8 +147,23 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
                                   f"session risk {session.risk:.2f} after untrusted content",
                                   sorted(session.labels) or ["Multi-Step Jailbreaks"]))
 
-    # 8b. explicit intent (reported after the more specific rules above) (docs/13 L1): a share/destructive tool the user never asked for is held for approval
-    if tp.intent_terms and not session.user_asked_for(tp.intent_terms):
+    # 8b. intent contract (D-064): what the user authorised, from the user's own words only
+    verdict = None
+    if session.contract is not None and policy.contract.mode == "enforce":
+        verdict = contracts.evaluate(session.contract, tool, tp.capability, policy.contract.require_mention)
+        clause = verdict.clause
+        if verdict.effect == "prohibit" and clause is not None:
+            checks.append(ActionCheck("contract-prohibited", Decision.BLOCK,
+                                      f"the user ruled out '{verdict.capability}' (contract v{session.contract.version}, "
+                                      f"clause {clause.id}: \"{clause.quote}\")", ["Tool Abuse"]))
+        elif verdict.effect == "out-of-scope":
+            checks.append(ActionCheck("contract-out-of-scope",
+                                      Decision.BLOCK if policy.contract.out_of_scope == "block" else Decision.ESCALATE,
+                                      f"'{verdict.capability}' is outside what the user asked for (contract "
+                                      f"v{session.contract.version}); it needs the user's explicit authorisation",
+                                      ["Tool Abuse"]))
+    # 8b'. explicit intent without a contract (docs/13 L1): a share/destructive tool the user never asked for is held
+    if verdict is None and tp.intent_terms and not session.user_asked_for(tp.intent_terms):
         checks.append(ActionCheck("action-not-requested", Decision.ESCALATE,
                                   f"the user's messages do not ask for this action ({', '.join(tp.intent_terms[:4])}…)",
                                   ["Tool Abuse"]))
@@ -167,8 +190,15 @@ def check_action(tool: str, args: dict[str, Any], policy: AgentPolicy, session: 
         notice = f"Action '{tool}' needs human approval ({worst.reason}). It was not performed; tell the user it is awaiting approval."
     if decision != Decision.ALLOW:
         session.add_risk(0.5 if decision == Decision.BLOCK else 0.3, labels)
+    ruling = None
+    if session.contract is not None and policy.contract.mode == "enforce":
+        ruling = (verdict.as_dict(session.contract) if verdict is not None else
+                  {"version": session.contract.version, "hash": session.contract.hash, "effect": "not-governed",
+                   "capability": None, "clause": None})
+        ruling["rule"] = worst.rule if worst else "allow"
     return ActionResult(decision=decision, enforced=enforced,
                         final_args=args if enforced == Decision.ALLOW else None,
-                        pinned_overrides=overrides, labels=labels, taint=[h.as_dict() for h in taint],
+                        pinned_overrides=overrides, labels=labels, contract=ruling,
+                        taint=[h.as_dict() for h in taint] + targets,
                         policy_rule=worst.rule if worst else "allow", reason=reason, notice=notice,
                         latency_ms=round((time.perf_counter() - t0) * 1000, 2))

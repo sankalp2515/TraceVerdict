@@ -172,6 +172,17 @@ class Guard:
     def check(self, tool: str, args: dict[str, Any], session_id: str | None = None) -> ActionResult:
         return _run(self.acheck(tool, args, session_id))
 
+    def record_execution(self, result: ActionResult | str | None, executed: bool, detail: str = "") -> None:
+        """Execution receipt: tell IntentSeal whether an allowed call actually ran (the Console's provenance view shows
+        it as evidence). Best effort: a receipt never breaks the tool call."""
+        event_id = result.event_id if isinstance(result, ActionResult) else result
+        if not event_id:
+            return
+        try:
+            self.engine.record_execution(event_id, executed, detail)
+        except Exception as e:
+            log.debug("execution receipt not recorded (%s)", type(e).__name__)
+
     def tool(self, name: str | None = None, pinned: dict[str, Any] | None = None,
              on_block: str = "notice") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorate a tool function. Arguments are checked (and pinned fields rewritten) before it runs.
@@ -206,7 +217,13 @@ class Guard:
                     r = await self.acheck(tool_name, bind(args, kwargs))
                     if r.enforced != Decision.ALLOW:
                         return blocked(r)
-                    return await fn(**(r.final_args or {}))
+                    try:
+                        out = await fn(**(r.final_args or {}))
+                    except Exception as e:
+                        self.record_execution(r, False, f"raised {type(e).__name__}")
+                        raise
+                    self.record_execution(r, True)
+                    return out
                 return awrapper
 
             @functools.wraps(fn)
@@ -215,7 +232,13 @@ class Guard:
                 r = self.check(tool_name, bind(args, kwargs))
                 if r.enforced != Decision.ALLOW:
                     return blocked(r)
-                return fn(**(r.final_args or {}))
+                try:
+                    out = fn(**(r.final_args or {}))
+                except Exception as e:
+                    self.record_execution(r, False, f"raised {type(e).__name__}")
+                    raise
+                self.record_execution(r, True)
+                return out
             return wrapper
 
         return deco

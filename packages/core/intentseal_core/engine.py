@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from . import action_guard
+from . import contract as contracts
 from .classifier import local_classifier
 from .decision_model import Assessment, DecisionModel, make_decision_model
 from . import markers
@@ -155,7 +156,32 @@ class Engine:
         session = self.sessions.create(agent_id, user_ref=user_ref, task=task, trusted=dict(trusted or {}),
                                        session_id=session_id)
         self.logger.session(session.session_id, agent_id, session.user_ref, task)
+        self._contract(session, self._policy(agent_id))
         return session
+
+    def _contract(self, session: Session, policy: AgentPolicy) -> Any:
+        """D-064: the session's intent contract, compiled from the policy and the task on first use."""
+        if policy.contract.mode == "off":
+            return None
+        if session.contract is None or session.contract.agent_id != session.agent_id:
+            session.contract = contracts.compile_contract(session.agent_id, session.session_id, policy, session.task)
+            self.logger.contract(session.contract)
+        return session.contract
+
+    def _amend_contract(self, session: Session, policy: AgentPolicy, text: str, origin: str) -> None:
+        """Only the user's own words reach this (the task, user turns that were not held)."""
+        current = self._contract(session, policy)
+        if current is None:
+            return
+        session.contract = contracts.amend(current, text, origin)
+        if session.contract.version != current.version:
+            self.logger.contract(session.contract)
+
+    def contract(self, agent_id: str, session_id: str) -> dict[str, Any] | None:
+        """The current contract of a live session (None when contracts are off for the agent)."""
+        policy = self._policy(agent_id)
+        c = self._contract(self._session(agent_id, session_id), policy)
+        return c.as_dict() if c is not None else None
 
     def _session(self, agent_id: str, session_id: str | None) -> Session:
         session = self.sessions.get(session_id, agent_id)
@@ -517,6 +543,7 @@ class Engine:
         if task is not None:
             session.task = task
             session.note_trusted(task)
+            self._amend_contract(session, policy, task, "task")
         assessment, tier, degraded, budget_degraded = Assessment(0), 0, False, False
         unjudged: list[tuple[int, int]] = []
         oversize_hold = False
@@ -548,6 +575,8 @@ class Engine:
         else:
             session.note_untrusted(scan.doc.text)
             session.flagged_untrusted |= bool(scan.chunks or scan.doc.warnings)
+        if policy.content_checks == "observe":
+            return self._observe(session, policy, agent_id, source, content, scan, t0)
         known: Match | None = None
         if policy.memory.enabled and source != "system" and scan.doc.text:
             known = self.memory.match(scan.doc.text, agent_id, policy.memory.match_threshold)
@@ -746,16 +775,43 @@ class Engine:
                                                   assessment.model, assessment.input_tokens, assessment.est_cost,
                                                   assessment.output_tokens)
         self._remember_recent(result.event_id, agent_id, scan.doc.text)
+        if source == "user" and decision not in (Decision.BLOCK, Decision.ESCALATE):
+            self._amend_contract(session, policy, scan.doc.text, f"user turn {session.turns}")
+        elif source != "user":
+            session.note_untrusted(scan.doc.text, result.event_id or "", source)
         if policy.taint.enabled and source != "user":   # CORE-17: where this content came from (fingerprints only;
             # the user's own words were recorded as trusted above)
             session.taint.observe(scan.doc.text, result.event_id or "", source, trusted=False,
                                   flagged=decision != Decision.ALLOW or risk >= policy.thresholds.neutralise)
         return result
 
+    def _observe(self, session: Session, policy: AgentPolicy, agent_id: str, source: str, content: Any, scan: Any,
+                 t0: float) -> InspectResult:
+        """content_checks: observe. Recorded for provenance and the contract, never scored or judged (evaluation of
+        the action layer with the detectors bypassed)."""
+        original = content if isinstance(content, str) and scan.doc.format == "text" else scan.doc.text
+        result = InspectResult(decision=Decision.ALLOW, enforced=Decision.ALLOW, cleaned_content=original,
+                               session_risk=session.risk, policy_rule="content-checks-off",
+                               reason="Recorded for provenance; content checks are off for this agent",
+                               latency_ms=round((time.perf_counter() - t0) * 1000, 2))
+        result.event_id = self.logger.inspection(session.session_id, agent_id, source, scan.doc.text, result)
+        if source == "user":
+            self._amend_contract(session, policy, scan.doc.text, f"user turn {session.turns}")
+        else:
+            session.note_untrusted(scan.doc.text, result.event_id or "", source)
+            if policy.taint.enabled:
+                session.taint.observe(scan.doc.text, result.event_id or "", source, trusted=False, flagged=False)
+        return result
+
+    def record_execution(self, event_id: str, executed: bool, detail: str = "") -> bool:
+        """The application reports whether an allowed action actually ran (execution receipt)."""
+        return self.logger.receipt(event_id, executed, detail)
+
     async def check_action(self, tool: str, args: dict[str, Any], agent_id: str,
                            session_id: str | None = None) -> ActionResult:
         async with self._agent_locks.setdefault(agent_id, asyncio.Lock()):
             policy, session = self._policy(agent_id), self._session(agent_id, session_id)
+            self._contract(session, policy)
             result = action_guard.check_action(tool, args, policy, session, self._secrets)
             if result.decision == Decision.ESCALATE:
                 approved = self.logger.take_approval(session.session_id, tool, args)

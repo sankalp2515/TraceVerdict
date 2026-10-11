@@ -42,8 +42,11 @@ export function ReviewerSignIn({ label = "Reviewer sign-in" }: { label?: string 
         <form onSubmit={submit} className="flex flex-col gap-4">
           <h2 className="h3">Reviewer sign-in</h2>
           <p className="subtle m-0 text-xs leading-6">
-            Paste your reviewer (admin) key to run investigations, approve escalated actions, confirm attacks or false alarms, and edit policy.
+            Paste your reviewer (admin) key to approve escalated actions, confirm attacks or false alarms, register agents and edit policy.
             It stays in this browser tab only and is cleared when the tab closes.
+          </p>
+          <p className="subtle m-0 text-xs leading-6">
+            Running the local Docker setup? The default reviewer key is <span className="mono">local-admin-key</span> (it works only on this machine).
           </p>
           <label className="flex flex-col gap-2 text-xs">
             <span className="section-label">Reviewer key</span>

@@ -94,7 +94,7 @@ function Approvals() {
       )}
       {!reviewer && (
         <div className="subtle mt-5 flex flex-wrap items-center gap-3 text-xs leading-6">
-          <span>Approving or denying needs a reviewer key. Without it this page is read-only.</span><ReviewerSignIn />
+          <span>View-only: anyone can see this inbox. Approving or denying is for reviewers (local Docker key: <span className="mono">local-admin-key</span>).</span><ReviewerSignIn />
         </div>
       )}
     </Card>

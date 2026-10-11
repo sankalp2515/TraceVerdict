@@ -5,6 +5,12 @@ Product: IntentSeal (code: `intentseal` SDK, `intentseal_core`, `intentseal_gate
 **Principle: rules decide, AI advises.** Every decision is made by a deterministic policy rule. Classifiers and the
 LLM judge produce signals; no AI signal alone can allow high-risk content or a high-risk action.
 
+![IntentSeal in context](assets/architecture/system-context.svg)
+
+![Component architecture](assets/architecture/components.svg)
+
+All five diagrams, their sources and the files that verify them: [diagrams/README.md](diagrams/README.md).
+
 ## 1. One engine, four surfaces
 
 ```
@@ -108,6 +114,10 @@ chain per attempted action: untrusted source (proven by data-flow fingerprints o
 otherwise earlier flagged content, marked as context), evidence, proposed call, deciding rule and contract clause,
 outcome. Applications report execution (`POST /v1/actions/{id}/receipt`, automatic in the SDK's `@guard.tool`); a
 blocked call reported as run is a contradiction. Console: Replay → Intent contract and Attack to action.
+
+![Runtime sequence: inspection, then an action check](assets/architecture/runtime-sequence.svg)
+
+![Security provenance: from untrusted content to an attempted action](assets/architecture/provenance.svg)
 
 ## 4. Session risk (CORE-6)
 
@@ -217,6 +227,8 @@ through a bounded queue (delivery counters in `/v1/metrics`). Records carry reda
 content or arguments.
 
 ## 10. Evaluation
+
+![Evaluation architecture](assets/architecture/evaluation.svg)
 
 ```
 promptfoo (MIT) / garak (Apache-2.0)  ->  attack cases (we never author attack text: D-005, D-014)

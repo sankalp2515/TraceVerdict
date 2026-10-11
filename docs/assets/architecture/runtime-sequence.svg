@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1532" viewBox="0 0 1560 1532" font-family="Arial, Helvetica, sans-serif" role="img">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/></marker></defs>
+<rect width="1560" height="1532" fill="#FAFAF7"/>
+<rect x="250" y="796" width="1260" height="500" rx="10" fill="#EEF2F8" stroke="#1F3A5F" stroke-width="1.2"/>
+<rect x="250" y="298" width="1260" height="482" rx="10" fill="#FFF7F0" stroke="#C2410C" stroke-width="1.2"/>
+<path d="M130,142 L130,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M360,142 L360,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M680,142 L680,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M980,142 L980,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M1210,142 L1210,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M1420,142 L1420,1452" stroke="#B6BDC8" stroke-width="1.4" stroke-dasharray="4 4"/>
+<path d="M280,1160 L1480,1160" stroke="#6B7280" stroke-width="1.2" stroke-dasharray="5 4"/>
+<rect x="280" y="988" width="1200" height="292" rx="6" fill="none" stroke="#6B7280" stroke-width="1.2" stroke-dasharray="5 4"/>
+<rect x="35" y="96" width="190" height="46" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<rect x="265" y="96" width="190" height="46" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<rect x="585" y="96" width="190" height="46" rx="8" fill="#1F3A5F" stroke="#C2410C" stroke-width="2.6"/>
+<rect x="885" y="96" width="190" height="46" rx="8" fill="#F4F6FA" stroke="#4A6A93" stroke-width="1.4" stroke-dasharray="2 3"/>
+<rect x="1115" y="96" width="190" height="46" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<rect x="1325" y="96" width="190" height="46" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M130,182 L360,182" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M360,228 L680,228" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M680,274 L1420,274" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M360,356 L1210,356" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M1210,402 L360,402" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<path d="M360,448 L680,448" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="470.0" y="472" width="420" height="50" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M680,552 L980,552" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M980,598 L680,598" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<rect x="470.0" y="622" width="420" height="50" rx="8" fill="#1F3A5F" stroke="#C2410C" stroke-width="2.6"/>
+<path d="M680,702 L1420,702" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M680,748 L360,748" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<path d="M360,854 L680,854" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="420.0" y="878" width="520" height="50" rx="8" fill="#1F3A5F" stroke="#C2410C" stroke-width="2.6"/>
+<path d="M680,958 L1420,958" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M680,1036 L360,1036" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<path d="M360,1082 L1210,1082" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M360,1128 L680,1128" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M680,1202 L360,1202" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<rect x="1050" y="1218" width="320" height="50" rx="8" fill="#F9E7E5" stroke="#9B1C1C" stroke-width="1.6"/>
+<path d="M360,1344 L680,1344" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M680,1390 L360,1390" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<path d="M360,1436 L130,1436" fill="none" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<text x="40" y="44" font-size="22" font-weight="700" fill="#13213C">Runtime sequence: a poisoned email, then a hijacked action</text>
+<text x="40" y="68" font-size="13.5" fill="#5B6472">One session through the SDK or REST API. Through the LLM proxy, the inspection (6) and the action check (13) happen inside the proxy, as the tool result and the tool call pass through it.</text>
+<text x="130.0" y="124.0" font-size="15" font-weight="700" fill="#1F2937" text-anchor="middle">User</text>
+<text x="360.0" y="124.0" font-size="15" font-weight="700" fill="#1F2937" text-anchor="middle">Agent</text>
+<text x="680.0" y="124.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">IntentSeal engine</text>
+<text x="980.0" y="124.0" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">AI judge (advises)</text>
+<text x="1210.0" y="124.0" font-size="15" font-weight="700" fill="#1F2937" text-anchor="middle">Tool</text>
+<text x="1420.0" y="124.0" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Decision log</text>
+<rect x="37.5" y="161" width="415.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="245.0" y="174" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">1</tspan>  task: &quot;summarise the partner email; do not reply to anyone&quot;</text>
+<rect x="439.25" y="207" width="161.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="220" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">2</tspan>  start session (task)</text>
+<rect x="884.75" y="253" width="330.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="1050.0" y="266" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">3</tspan>  intent contract v1: permit read, prohibit send</text>
+<text x="266" y="316" font-size="11.5" font-weight="700" fill="#C2410C" text-anchor="start">THE AGENT READS UNTRUSTED CONTENT</text>
+<rect x="730.25" y="335" width="109.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="785.0" y="348" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">4</tspan>  read_email()</text>
+<rect x="668.5" y="381" width="233.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="785.0" y="394" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">5</tspan>  raw email (third-party content)</text>
+<rect x="400.25" y="427" width="239.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="440" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">6</tspan>  inspect(content, source = email)</text>
+<text x="680.0" y="493.5" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">7  Extract, normalise, decode</text>
+<text x="680.0" y="511.5" font-size="12.5" fill="#3B4A63" text-anchor="middle">Tier 0 rules and attack memory · Tier 1 classifier score</text>
+<rect x="690.75" y="531" width="278.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="830.0" y="544" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">8</tspan>  assess flagged chunks against the task</text>
+<rect x="697.25" y="577" width="265.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="830.0" y="590" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">9</tspan>  risk · attack types · evidence spans</text>
+<text x="680.0" y="643.5" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">10  Deterministic policy decision</text>
+<text x="680.0" y="661.5" font-size="12.5" fill="#D6DEEA" text-anchor="middle">ALLOW · NEUTRALISE · ESCALATE · BLOCK</text>
+<rect x="865.25" y="681" width="369.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="1050.0" y="694" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">11</tspan>  content decision · findings · data-flow fingerprint</text>
+<rect x="393.75" y="727" width="252.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="740" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">12</tspan>  cleaned content, or a held notice</text>
+<text x="266" y="814" font-size="11.5" font-weight="700" fill="#1F3A5F" text-anchor="start">THE MODEL PROPOSES AN ACTION</text>
+<rect x="322.25" y="833" width="395.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="846" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">13</tspan>  check_action(send_message, to = partner@vendor.example)</text>
+<text x="680.0" y="899.5" font-size="13.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">14  Action checks: worst result wins</text>
+<text x="680.0" y="917.5" font-size="12.5" fill="#D6DEEA" text-anchor="middle">contract · allow-lists · pinned · secret scan · provenance · data flow · risk</text>
+<rect x="852.25" y="937" width="395.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="1050.0" y="950" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">15</tspan>  action decision · contract clause · links to its source</text>
+<rect x="280" y="988" width="44" height="20" rx="4" fill="#1F3A5F"/><text x="302" y="1002" font-size="11.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">alt</text>
+<text x="334" y="1003" font-size="12.5" font-weight="700" fill="#2F6B4F" text-anchor="start">[ALLOW]</text>
+<rect x="387.25" y="1015" width="265.5" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="1028" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">16</tspan>  allowed, with the checked arguments</text>
+<rect x="727.0" y="1061" width="116.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="785.0" y="1074" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">17</tspan>  run the tool</text>
+<rect x="364.5" y="1107" width="311.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="1120" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">18</tspan>  execution receipt: ran (stored in the log)</text>
+<text x="334" y="1176" font-size="12.5" font-weight="700" fill="#9B1C1C" text-anchor="start">[BLOCK or ESCALATE]</text>
+<rect x="377.5" y="1181" width="285.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="1194" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">19</tspan>  notice: not performed, with the reason</text>
+<text x="1210.0" y="1239.5" font-size="13.5" font-weight="700" fill="#7F1D1D" text-anchor="middle">The tool is never called</text>
+<text x="1210.0" y="1257.5" font-size="12.5" fill="#9B1C1C" text-anchor="middle">an ESCALATE waits for a reviewer&#x27;s approval</text>
+<rect x="436.0" y="1323" width="168.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="1336" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">20</tspan>  check_output(answer)</text>
+<rect x="384.0" y="1369" width="272.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="520.0" y="1382" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">21</tspan>  answer, secrets redacted or withheld</text>
+<rect x="206.5" y="1415" width="77.0" height="17" rx="3" fill="#FAFAF7"/>
+<text x="245.0" y="1428" font-size="12.5" fill="#13213C" text-anchor="middle"><tspan font-weight="700" fill="#1F3A5F">22</tspan>  answer</text>
+<rect x="40" y="1481" width="26" height="16" rx="4" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<text x="74" y="1494" font-size="12.5" fill="#13213C">Outside IntentSeal</text>
+<rect x="222.8" y="1481" width="26" height="16" rx="4" fill="#1F3A5F" stroke="#C2410C" stroke-width="2"/>
+<text x="256.8" y="1494" font-size="12.5" fill="#13213C">Enforcement point</text>
+<rect x="399.0" y="1481" width="26" height="16" rx="4" fill="#F4F6FA" stroke="#4A6A93" stroke-width="1.4" stroke-dasharray="2 3"/>
+<text x="433.0" y="1494" font-size="12.5" fill="#13213C">AI model (advises)</text>
+<rect x="581.8" y="1481" width="26" height="16" rx="4" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<text x="615.8" y="1494" font-size="12.5" fill="#13213C">IntentSeal processing</text>
+<path d="M784.4,1489 L810.4,1489" stroke="#4B5563" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<text x="818.4" y="1494" font-size="12.5" fill="#13213C">Reply</text>
+</svg>

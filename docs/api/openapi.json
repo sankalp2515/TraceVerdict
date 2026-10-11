@@ -1,0 +1,2310 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "IntentSeal Gateway API",
+  "description": "Keep AI agents inside the user's intent. Inspect content, check actions, replay sessions. Rules decide; AI advises.",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/healthz": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Healthz",
+    "operationId": "healthz_healthz_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Healthz Healthz Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/readyz": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Readyz",
+    "description": "Readiness: database answers, policies load, Tier 1 classifier loaded. LLM providers are reported, not\nrequired: without them flagged content is held (fail closed), which is degraded but safe.",
+    "operationId": "readyz_readyz_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/whoami": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Whoami",
+    "description": "Which key is this? Lets the Console confirm a reviewer key is admin-scoped before showing reviewer actions.",
+    "operationId": "whoami_v1_whoami_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Whoami V1 Whoami Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/inspect": {
+   "post": {
+    "tags": [
+     "engine"
+    ],
+    "summary": "Inspect",
+    "operationId": "inspect_v1_inspect_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InspectRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Inspect V1 Inspect Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/actions/check": {
+   "post": {
+    "tags": [
+     "engine"
+    ],
+    "summary": "Check",
+    "operationId": "check_v1_actions_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActionRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Check V1 Actions Check Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/outputs/check": {
+   "post": {
+    "tags": [
+     "engine"
+    ],
+    "summary": "Check Output",
+    "operationId": "check_output_v1_outputs_check_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OutputRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Check Output V1 Outputs Check Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions": {
+   "post": {
+    "tags": [
+     "sessions"
+    ],
+    "summary": "New Session",
+    "operationId": "new_session_v1_sessions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SessionRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response New Session V1 Sessions Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions/{session_id}/events": {
+   "get": {
+    "tags": [
+     "sessions"
+    ],
+    "summary": "Session Events",
+    "operationId": "session_events_v1_sessions__session_id__events_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Session Events V1 Sessions  Session Id  Events Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/decisions": {
+   "get": {
+    "tags": [
+     "evidence"
+    ],
+    "summary": "Decisions",
+    "operationId": "decisions_v1_decisions_get",
+    "parameters": [
+     {
+      "name": "decision",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Decision"
+      }
+     },
+     {
+      "name": "label",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Label"
+      }
+     },
+     {
+      "name": "agent",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Agent"
+      }
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Since"
+      }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Before"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "minimum": 1,
+       "default": 100,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Decisions V1 Decisions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/scorecard/{agent}": {
+   "get": {
+    "tags": [
+     "evidence"
+    ],
+    "summary": "Scorecard",
+    "operationId": "scorecard_v1_scorecard__agent__get",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Scorecard V1 Scorecard  Agent  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/policies/{agent}": {
+   "get": {
+    "tags": [
+     "policy"
+    ],
+    "summary": "Policy",
+    "operationId": "policy_v1_policies__agent__get",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Policy V1 Policies  Agent  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "policy"
+    ],
+    "summary": "Put Policy",
+    "description": "Replace an agent's policy. Validated against the policy schema, version bumped, written atomically.\nA new agent joins the key's organisation; only an all-organisations key can move an agent between them.",
+    "operationId": "put_policy_v1_policies__agent__put",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "additionalProperties": true,
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Put Policy V1 Policies  Agent  Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/costs": {
+   "get": {
+    "tags": [
+     "evidence"
+    ],
+    "summary": "Costs",
+    "operationId": "costs_v1_costs_get",
+    "parameters": [
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 90,
+       "minimum": 1,
+       "default": 7,
+       "title": "Days"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Costs V1 Costs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/costs/{agent}": {
+   "get": {
+    "tags": [
+     "evidence"
+    ],
+    "summary": "Agent Costs",
+    "description": "Security spend attributed to one agent: decisions and judge tokens/cost by tier (CORE-14).",
+    "operationId": "agent_costs_v1_costs__agent__get",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     },
+     {
+      "name": "days",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 90,
+       "minimum": 1,
+       "default": 7,
+       "title": "Days"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Agent Costs V1 Costs  Agent  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/feedback": {
+   "post": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Feedback",
+    "operationId": "feedback_v1_feedback_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedbackRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Feedback V1 Feedback Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/memory": {
+   "get": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Memory",
+    "operationId": "memory_v1_memory_get",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(attack|benign)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Memory V1 Memory Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/memory/{memory_id}": {
+   "delete": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Forget",
+    "operationId": "forget_v1_memory__memory_id__delete",
+    "parameters": [
+     {
+      "name": "memory_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Memory Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "boolean"
+         },
+         "title": "Response Forget V1 Memory  Memory Id  Delete"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/approvals": {
+   "get": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Approvals",
+    "operationId": "approvals_v1_approvals_get",
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^(pending|approved|denied)$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": "pending",
+       "title": "Status"
+      }
+     },
+     {
+      "name": "agent",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Approvals V1 Approvals Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/approvals/{event_id}": {
+   "post": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Resolve",
+    "description": "Approve or deny one escalated action. An approval lets the same call in the same session run once.",
+    "operationId": "resolve_v1_approvals__event_id__post",
+    "parameters": [
+     {
+      "name": "event_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Event Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApprovalRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resolve V1 Approvals  Event Id  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions/{session_id}/contract": {
+   "get": {
+    "tags": [
+     "sessions"
+    ],
+    "summary": "Session Contract",
+    "description": "D-064: every version of the session's intent contract (immutable, hash-chained), newest last.",
+    "operationId": "session_contract_v1_sessions__session_id__contract_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Session Contract V1 Sessions  Session Id  Contract Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions/{session_id}/provenance": {
+   "get": {
+    "tags": [
+     "sessions"
+    ],
+    "summary": "Session Provenance",
+    "description": "D-065: attack-to-action chains (untrusted source -> content -> proposed call -> control -> outcome), built\nfrom the decision log, contracts and execution receipts.",
+    "operationId": "session_provenance_v1_sessions__session_id__provenance_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Session Provenance V1 Sessions  Session Id  Provenance Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/actions/{event_id}/receipt": {
+   "post": {
+    "tags": [
+     "engine"
+    ],
+    "summary": "Action Receipt",
+    "description": "Execution receipt: the application reports whether an allowed (or blocked) call actually ran.",
+    "operationId": "action_receipt_v1_actions__event_id__receipt_post",
+    "parameters": [
+     {
+      "name": "event_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Event Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReceiptRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Action Receipt V1 Actions  Event Id  Receipt Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions/{session_id}/investigate": {
+   "post": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Investigate",
+    "description": "Run the Investigator on one session: it plans, uses read-only tools on the log, evidence, decoders, memory\nand policy, and returns a report with recommendations and proposals that wait for a reviewer.",
+    "operationId": "investigate_v1_sessions__session_id__investigate_post",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Investigate V1 Sessions  Session Id  Investigate Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/sessions/{session_id}/investigations": {
+   "get": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Session Investigations",
+    "operationId": "session_investigations_v1_sessions__session_id__investigations_get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Session Investigations V1 Sessions  Session Id  Investigations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/investigations": {
+   "get": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Investigations",
+    "operationId": "investigations_v1_investigations_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Investigations V1 Investigations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/suggestions/{suggestion_id}": {
+   "post": {
+    "tags": [
+     "review"
+    ],
+    "summary": "Resolve Suggestion",
+    "description": "Apply or dismiss an Investigator proposal. Memory proposals are applied like reviewer feedback; policy\nproposals are advice: applying one marks it accepted, the policy itself is edited on the Policy page.",
+    "operationId": "resolve_suggestion_v1_suggestions__suggestion_id__post",
+    "parameters": [
+     {
+      "name": "suggestion_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Suggestion Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SuggestionRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Resolve Suggestion V1 Suggestions  Suggestion Id  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/metrics": {
+   "get": {
+    "tags": [
+     "ops"
+    ],
+    "summary": "Metrics",
+    "description": "Decisions by type and rule, tier escalation rate, latency p50/p95 by tier, provider errors, memory.",
+    "operationId": "metrics_v1_metrics_get",
+    "parameters": [
+     {
+      "name": "hours",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "maximum": 720,
+       "exclusiveMinimum": 0,
+       "default": 24,
+       "title": "Hours"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Metrics V1 Metrics Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/export/decisions": {
+   "get": {
+    "tags": [
+     "evidence"
+    ],
+    "summary": "Export",
+    "description": "Decisions as security events for a SIEM, oldest first: JSON Lines (ECS-style fields) or CEF lines.\nContinue with `since` = the last record's `intentseal.ts`. Limited to this key's agents.",
+    "operationId": "export_v1_export_decisions_get",
+    "parameters": [
+     {
+      "name": "since",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Since"
+      }
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Until"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(jsonl|cef)$",
+       "default": "jsonl",
+       "title": "Format"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100000,
+       "minimum": 1,
+       "default": 10000,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/demo/scenarios": {
+   "get": {
+    "tags": [
+     "demo"
+    ],
+    "summary": "Scenarios",
+    "operationId": "scenarios_demo_scenarios_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Scenarios Demo Scenarios Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/demo/run": {
+   "post": {
+    "tags": [
+     "demo"
+    ],
+    "summary": "Demo Run",
+    "operationId": "demo_run_demo_run_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DemoRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Demo Run Demo Run Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/proxy/v1/chat/completions": {
+   "post": {
+    "tags": [
+     "proxy"
+    ],
+    "summary": "Chat Completions",
+    "operationId": "chat_completions_proxy_v1_chat_completions_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Chat Completions Proxy V1 Chat Completions Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/proxy/{agent_id}/v1/chat/completions": {
+   "post": {
+    "tags": [
+     "proxy"
+    ],
+    "summary": "Agent Chat Completions",
+    "operationId": "agent_chat_completions_proxy__agent_id__v1_chat_completions_post",
+    "parameters": [
+     {
+      "name": "agent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Agent Chat Completions Proxy  Agent Id  V1 Chat Completions Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/proxy/{agent_id}/v1/models": {
+   "get": {
+    "tags": [
+     "proxy"
+    ],
+    "summary": "Agent Models",
+    "description": "Model list for clients that discover models first (agent frameworks, chat UIs): the model the policy pins\n(it replaces whatever the client asks for), a placeholder when the gateway's own role answers, and nothing when\nthe client's own model is forwarded.",
+    "operationId": "agent_models_proxy__agent_id__v1_models_get",
+    "parameters": [
+     {
+      "name": "agent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Agent Models Proxy  Agent Id  V1 Models Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/proxy/{agent_id}/anthropic/v1/messages": {
+   "post": {
+    "tags": [
+     "proxy"
+    ],
+    "summary": "Anthropic Messages",
+    "description": "Anthropic Messages API, protected: point the Anthropic SDK's base URL at /proxy/<agent>/anthropic.",
+    "operationId": "anthropic_messages_proxy__agent_id__anthropic_v1_messages_post",
+    "parameters": [
+     {
+      "name": "agent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Anthropic Messages Proxy  Agent Id  Anthropic V1 Messages Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/proxy/{agent_id}/gemini/v1beta/models/{model_action}": {
+   "post": {
+    "tags": [
+     "proxy"
+    ],
+    "summary": "Gemini Generate",
+    "operationId": "gemini_generate_proxy__agent_id__gemini_v1beta_models__model_action__post",
+    "parameters": [
+     {
+      "name": "agent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent Id"
+      }
+     },
+     {
+      "name": "model_action",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Model Action"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Gemini Generate Proxy  Agent Id  Gemini V1Beta Models  Model Action  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/setup/templates": {
+   "get": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Templates",
+    "operationId": "templates_v1_setup_templates_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Templates V1 Setup Templates Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/providers": {
+   "get": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Providers",
+    "operationId": "providers_v1_providers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Providers V1 Providers Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/agents": {
+   "get": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Agents",
+    "operationId": "agents_v1_agents_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Agents V1 Agents Get"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Create Agent",
+    "operationId": "create_agent_v1_agents_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewAgent"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Create Agent V1 Agents Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/agents/{agent}/connect": {
+   "get": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Connect",
+    "description": "Copy-paste integration for this agent. Keys are placeholders: a project key comes from the gateway operator\n(INTENTSEAL_API_KEYS); with `upstream.key: client` the agent also sends its own provider key.",
+    "operationId": "connect_v1_agents__agent__connect_get",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Connect V1 Agents  Agent  Connect Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/agents/{agent}/self-test": {
+   "post": {
+    "tags": [
+     "setup"
+    ],
+    "summary": "Self Test",
+    "operationId": "self_test_v1_agents__agent__self_test_post",
+    "parameters": [
+     {
+      "name": "agent",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Agent"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Self Test V1 Agents  Agent  Self Test Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "ActionRequest": {
+    "properties": {
+     "tool": {
+      "type": "string",
+      "title": "Tool"
+     },
+     "args": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Args"
+     },
+     "agent_id": {
+      "type": "string",
+      "title": "Agent Id"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tool",
+     "agent_id"
+    ],
+    "title": "ActionRequest"
+   },
+   "ApprovalRequest": {
+    "properties": {
+     "approve": {
+      "type": "boolean",
+      "title": "Approve"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "approve"
+    ],
+    "title": "ApprovalRequest"
+   },
+   "DemoRequest": {
+    "properties": {
+     "scenario_id": {
+      "type": "string",
+      "title": "Scenario Id"
+     },
+     "protection": {
+      "type": "string",
+      "pattern": "^(on|off)$",
+      "title": "Protection",
+      "default": "on"
+     }
+    },
+    "type": "object",
+    "required": [
+     "scenario_id"
+    ],
+    "title": "DemoRequest"
+   },
+   "FeedbackRequest": {
+    "properties": {
+     "verdict": {
+      "type": "string",
+      "pattern": "^(attack|false_positive)$",
+      "title": "Verdict"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "content": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Content",
+      "description": "when the event is no longer in recent memory"
+     },
+     "agent_id": {
+      "type": "string",
+      "title": "Agent Id",
+      "default": "*"
+     },
+     "labels": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Labels"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "verdict"
+    ],
+    "title": "FeedbackRequest"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "InspectRequest": {
+    "properties": {
+     "content": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Content"
+     },
+     "content_b64": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Content B64",
+      "description": "binary files (PDF, DOCX, images) as base64"
+     },
+     "filename": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filename"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source",
+      "default": "user"
+     },
+     "agent_id": {
+      "type": "string",
+      "title": "Agent Id"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "agent_id"
+    ],
+    "title": "InspectRequest"
+   },
+   "NewAgent": {
+    "properties": {
+     "agent": {
+      "type": "string",
+      "title": "Agent",
+      "description": "id used in URLs and policies: letters, digits, '.', '_' or '-'"
+     },
+     "template": {
+      "type": "string",
+      "title": "Template",
+      "default": "blank"
+     },
+     "mode": {
+      "type": "string",
+      "pattern": "^(monitor|enforce)$",
+      "title": "Mode",
+      "default": "monitor"
+     },
+     "task_scope": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Task Scope"
+     },
+     "upstream": {
+      "$ref": "#/components/schemas/UpstreamPolicy"
+     }
+    },
+    "type": "object",
+    "required": [
+     "agent"
+    ],
+    "title": "NewAgent"
+   },
+   "OutputRequest": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "agent_id": {
+      "type": "string",
+      "title": "Agent Id"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "agent_id"
+    ],
+    "title": "OutputRequest"
+   },
+   "ReceiptRequest": {
+    "properties": {
+     "executed": {
+      "type": "boolean",
+      "title": "Executed"
+     },
+     "detail": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Detail",
+      "default": ""
+     }
+    },
+    "type": "object",
+    "required": [
+     "executed"
+    ],
+    "title": "ReceiptRequest"
+   },
+   "SessionRequest": {
+    "properties": {
+     "agent_id": {
+      "type": "string",
+      "title": "Agent Id"
+     },
+     "user_ref": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Ref"
+     },
+     "task": {
+      "type": "string",
+      "title": "Task",
+      "default": ""
+     },
+     "trusted": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Trusted"
+     }
+    },
+    "type": "object",
+    "required": [
+     "agent_id"
+    ],
+    "title": "SessionRequest"
+   },
+   "SuggestionRequest": {
+    "properties": {
+     "apply": {
+      "type": "boolean",
+      "title": "Apply"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apply"
+    ],
+    "title": "SuggestionRequest"
+   },
+   "UpstreamPolicy": {
+    "properties": {
+     "provider": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provider"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "key": {
+      "type": "string",
+      "title": "Key",
+      "default": "gateway"
+     }
+    },
+    "type": "object",
+    "title": "UpstreamPolicy",
+    "description": "Where the LLM proxy forwards this agent's model calls (docs/INTEGRATION.md).\n\nprovider: a provider name from config/providers.yaml (openai, anthropic, gemini, groq, azure_openai, ollama, ...).\n          Unset: the gateway's own `proxy_upstream` role (free-tier models; demo and evaluation).\nmodel:    override the model the client asks for (unset: forward the client's model).\nkey:      \"gateway\" - the gateway's configured key for that provider; \"client\" - the agent's own provider key,\n          sent in the X-Upstream-Key header and never stored."
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

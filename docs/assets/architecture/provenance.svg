@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="900" viewBox="0 0 1620 900" font-family="Arial, Helvetica, sans-serif" role="img">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4B5563"/></marker></defs>
+<rect width="1620" height="900" fill="#FAFAF7"/>
+<rect x="40" y="96" width="980" height="150" rx="12" fill="#FFFBF7" stroke="#C2410C" stroke-width="1.6" stroke-dasharray="7 5"/>
+<text x="56" y="118" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#9A3412">WHAT THE AGENT READ</text>
+<rect x="40" y="290" width="520" height="150" rx="12" fill="#FFFFFF" stroke="#9AA3AF" stroke-width="1.2"/>
+<text x="56" y="312" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#4B5563">WHAT THE USER ASKED FOR</text>
+<rect x="620" y="290" width="440" height="470" rx="12" fill="#EEF2F8" stroke="#1F3A5F" stroke-width="2.0"/>
+<text x="636" y="749" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#1F3A5F">ACTION CHECKS · WORST RESULT WINS</text>
+<rect x="1250" y="290" width="340" height="470" rx="12" fill="#FFFFFF" stroke="#9AA3AF" stroke-width="1.2"/>
+<text x="1266" y="312" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#4B5563">OUTCOME</text>
+<rect x="64" y="136" width="260" height="84" rx="8" fill="#FFF4EB" stroke="#C2410C" stroke-width="1.6" stroke-dasharray="5 4"/>
+<rect x="384" y="136" width="280" height="84" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M724,145 a135.0,9 0 0,0 270,0 a135.0,9 0 0,0 -270,0 v66 a135.0,9 0 0,0 270,0 v-66" fill="#F3F4F6" stroke="#4B5563" stroke-width="1.3"/>
+<path d="M324,178.0 L384,178.0" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M664,178.0 L724,178.0" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="64" y="330" width="200" height="84" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<rect x="320" y="330" width="220" height="84" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M264,372.0 L320,372.0" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="64" y="520" width="476" height="76" rx="8" fill="#FFFFFF" stroke="#6B7280" stroke-width="1.3"/>
+<rect x="640" y="306" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="358" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="410" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="462" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="514" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="566" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="618" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<rect x="640" y="670" width="400" height="44" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M859.0,220 L859,290" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M540,346.8 L640,346.8" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M540,558.0 L590,558 L590,506 L620,506" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<polygon points="1150,465 1210,525 1150,585 1090,525" fill="#1F3A5F" stroke="#C2410C" stroke-width="2.6"/>
+<path d="M1060,525 L1090,525.0" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="1272" y="330" width="296" height="96" rx="8" fill="#EAF3EE" stroke="#2F6B4F" stroke-width="1.6"/>
+<rect x="1272" y="477" width="296" height="96" rx="8" fill="#F9E7E5" stroke="#9B1C1C" stroke-width="1.6"/>
+<rect x="1272" y="624" width="296" height="96" rx="8" fill="#FDF3E1" stroke="#B7791F" stroke-width="1.6"/>
+<path d="M1150.0,465 L1150,378 L1272,378" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M1210,525.0 L1272,525" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M1150.0,585 L1150,672 L1272,672" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<rect x="620" y="800" width="400" height="64" rx="8" fill="#F3F4F6" stroke="#4B5563" stroke-width="1.3"/>
+<rect x="1110" y="800" width="470" height="64" rx="8" fill="#E8EDF5" stroke="#1F3A5F" stroke-width="1.4"/>
+<path d="M1568,672.0 L1604,672 L1604,780 L820,780 L820,800" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<path d="M1568,525.0 L1604,525 L1604,672" fill="none" stroke="#4B5563" stroke-width="1.6"/>
+<path d="M1568,378.0 L1604,378 L1604,525" fill="none" stroke="#4B5563" stroke-width="1.6"/>
+<path d="M1020,832.0 L1110,832.0" fill="none" stroke="#4B5563" stroke-width="1.6" marker-end="url(#ah)"/>
+<text x="40" y="44" font-size="22" font-weight="700" fill="#13213C">Security provenance: from untrusted content to an attempted action</text>
+<text x="40" y="68" font-size="13.5" fill="#5B6472">Built from the decision log, the intent contract and execution receipts, not from what a model says.</text>
+<text x="194.0" y="166.0" font-size="15" font-weight="700" fill="#7C2D12" text-anchor="middle">Untrusted source</text>
+<text x="194.0" y="184.0" font-size="12.5" fill="#9A3412" text-anchor="middle">email, web page, file, API, record</text>
+<text x="194.0" y="202.0" font-size="12.5" fill="#9A3412" text-anchor="middle">logged as an event</text>
+<text x="524.0" y="166.0" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Inspection</text>
+<text x="524.0" y="184.0" font-size="12.5" fill="#3B4A63" text-anchor="middle">evidence spans and signals</text>
+<text x="524.0" y="202.0" font-size="12.5" fill="#3B4A63" text-anchor="middle">content decision</text>
+<text x="859.0" y="175.0" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Session record</text>
+<text x="859.0" y="193.0" font-size="12.5" fill="#4B5563" text-anchor="middle">data-flow fingerprints</text>
+<text x="859.0" y="211.0" font-size="12.5" fill="#4B5563" text-anchor="middle">where each target first appeared</text>
+<text x="164.0" y="360.0" font-size="15" font-weight="700" fill="#1F2937" text-anchor="middle">User&#x27;s words</text>
+<text x="164.0" y="378.0" font-size="12.5" fill="#4B5563" text-anchor="middle">task and later turns</text>
+<text x="164.0" y="396.0" font-size="12.5" fill="#4B5563" text-anchor="middle">never third-party text</text>
+<text x="430.0" y="360.0" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Intent contract</text>
+<text x="430.0" y="378.0" font-size="12.5" fill="#3B4A63" text-anchor="middle">versioned · hash-chained</text>
+<text x="430.0" y="396.0" font-size="12.5" fill="#3B4A63" text-anchor="middle">permit · prohibit · ask first</text>
+<text x="302.0" y="554.5" font-size="15" font-weight="700" fill="#1F2937" text-anchor="middle">The agent&#x27;s model proposes a tool call</text>
+<text x="302.0" y="572.5" font-size="12.5" fill="#4B5563" text-anchor="middle">e.g. send_message(to = an address from the email)</text>
+<text x="840.0" y="333.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Intent contract: prohibited or not requested</text>
+<text x="840.0" y="385.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Tool allowed for this agent</text>
+<text x="840.0" y="437.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Pinned fields: rewritten from trusted context</text>
+<text x="840.0" y="489.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Outbound secret scan: also encoded</text>
+<text x="840.0" y="541.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Allow-lists: recipients · domains · paths</text>
+<text x="840.0" y="593.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Provenance: target only in untrusted content</text>
+<text x="840.0" y="645.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Data flow: arguments copy flagged content</text>
+<text x="840.0" y="697.0" font-size="13.5" font-weight="700" fill="#13213C" text-anchor="middle">Session risk: after untrusted content</text>
+<rect x="864.0" y="243.0" width="86.80000000000001" height="16" fill="#FAFAF7" opacity="0.92"/>
+<text x="869.0" y="255.0" font-size="12.5" fill="#374151" text-anchor="start">proven links</text>
+<rect x="565.8" y="326.8" width="48.400000000000006" height="16" fill="#FAFAF7" opacity="0.92"/>
+<text x="590.0" y="338.8" font-size="12.5" fill="#374151" text-anchor="middle">clause</text>
+<text x="1150" y="530" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">Decision</text>
+<text x="1420.0" y="366.0" font-size="15" font-weight="700" fill="#1D4333" text-anchor="middle">Executed</text>
+<text x="1420.0" y="384.0" font-size="12.5" fill="#2F6B4F" text-anchor="middle">with the checked arguments</text>
+<text x="1420.0" y="402.0" font-size="12.5" fill="#2F6B4F" text-anchor="middle">application receipt: ran</text>
+<text x="1420.0" y="513.0" font-size="15" font-weight="700" fill="#7F1D1D" text-anchor="middle">Not executed</text>
+<text x="1420.0" y="531.0" font-size="12.5" fill="#9B1C1C" text-anchor="middle">call withheld · the model is told</text>
+<text x="1420.0" y="549.0" font-size="12.5" fill="#9B1C1C" text-anchor="middle">and continues another way</text>
+<text x="1420.0" y="660.0" font-size="15" font-weight="700" fill="#744210" text-anchor="middle">Held for a reviewer</text>
+<text x="1420.0" y="678.0" font-size="12.5" fill="#975A16" text-anchor="middle">an approval lets this exact</text>
+<text x="1420.0" y="696.0" font-size="12.5" fill="#975A16" text-anchor="middle">call run once; never a BLOCK</text>
+<rect x="1190.0" y="358.0" width="42.0" height="16" fill="#FAFAF7" opacity="0.92"/>
+<text x="1211.0" y="370.0" font-size="12.5" fill="#374151" text-anchor="middle">ALLOW</text>
+<rect x="1220.0" y="505.0" width="42.0" height="16" fill="#FAFAF7" opacity="0.92"/>
+<text x="1241.0" y="517.0" font-size="12.5" fill="#374151" text-anchor="middle">BLOCK</text>
+<rect x="1180.4" y="652.0" width="61.2" height="16" fill="#FAFAF7" opacity="0.92"/>
+<text x="1211.0" y="664.0" font-size="12.5" fill="#374151" text-anchor="middle">ESCALATE</text>
+<text x="820.0" y="828.5" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Decision log and receipts</text>
+<text x="820.0" y="846.5" font-size="12.5" fill="#4B5563" text-anchor="middle">rule · reason · clause · evidence · receipt</text>
+<text x="1345.0" y="828.5" font-size="15" font-weight="700" fill="#13213C" text-anchor="middle">Provenance chain in the Console</text>
+<text x="1345.0" y="846.5" font-size="12.5" fill="#3B4A63" text-anchor="middle">source → evidence → call → rule and clause → outcome</text>
+<text x="40" y="838" font-size="12.5" font-weight="400" fill="#5B6472" text-anchor="start">Proven link: the call&#x27;s arguments copy the content&#x27;s text, or its target</text>
+<text x="40" y="856" font-size="12.5" font-weight="400" fill="#5B6472" text-anchor="start">first appeared there. Otherwise the chain shows earlier flagged content as</text>
+<text x="40" y="874" font-size="12.5" font-weight="400" fill="#5B6472" text-anchor="start">context, not proof. Proxy agents send no receipts: the withheld call is the record.</text>
+</svg>

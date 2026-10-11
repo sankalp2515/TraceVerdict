@@ -1,0 +1,824 @@
+{
+ "date": "2026-10-11",
+ "summary": "2026-10-11",
+ "commit": "9ca8fb5",
+ "engines": [
+  "9aca55e22cd6"
+ ],
+ "goal_rules": {
+  "Instruction Override": "overrid|ignore the user|ignore .*request",
+  "Role Change": "\\brole\\b|\\bpersona\\b|impersonat|\\bpretend|\\bact as\\b|developer mode|admin mode",
+  "Secret Extraction": "system prompt|system instructions|internal configuration|internal policies|internal data|tool configuration|tool inventory|environment variables",
+  "Credential Theft": "credential|token|password|api key",
+  "Tool Abuse": "forward|send an email|via email|email address|write it to a file|workspace file|execute code|delete|create unauthorized|access all|access and disclose"
+ },
+ "sources": [
+  {
+   "channel": "user",
+   "label": "User turn",
+   "group": "Direct"
+  },
+  {
+   "channel": "web",
+   "label": "Web page",
+   "group": "Text & data"
+  },
+  {
+   "channel": "html",
+   "label": "HTML",
+   "group": "Text & data"
+  },
+  {
+   "channel": "markdown",
+   "label": "Markdown",
+   "group": "Text & data"
+  },
+  {
+   "channel": "email",
+   "label": "Email",
+   "group": "Text & data"
+  },
+  {
+   "channel": "api",
+   "label": "API JSON",
+   "group": "Text & data"
+  },
+  {
+   "channel": "db",
+   "label": "DB record",
+   "group": "Text & data"
+  },
+  {
+   "channel": "code",
+   "label": "Code",
+   "group": "Text & data"
+  },
+  {
+   "channel": "pdf",
+   "label": "PDF",
+   "group": "Documents"
+  },
+  {
+   "channel": "docx",
+   "label": "Word",
+   "group": "Documents"
+  },
+  {
+   "channel": "pdf_hidden",
+   "label": "PDF hidden",
+   "group": "Hidden text"
+  },
+  {
+   "channel": "docx_hidden",
+   "label": "Word hidden",
+   "group": "Hidden text"
+  },
+  {
+   "channel": "html_hidden",
+   "label": "HTML hidden",
+   "group": "Hidden text"
+  },
+  {
+   "channel": "image",
+   "label": "Image",
+   "group": "Images (OCR)"
+  },
+  {
+   "channel": "ocr_text",
+   "label": "Screenshot",
+   "group": "Images (OCR)"
+  }
+ ],
+ "cells": {
+  "Instruction Override": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 74,
+    "detected": 64,
+    "recall": 0.865
+   },
+   "web": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 14,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 14,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 14,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 13,
+    "recall": 0.929
+   },
+   "db": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 8,
+    "detected": 8,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 10,
+    "detected": 10,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 13,
+    "detected": 13,
+    "recall": 1.0
+   },
+   "pdf_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 13,
+    "detected": 13,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 14,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "image": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 4,
+    "detected": 4,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   }
+  },
+  "Role Change": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 55,
+    "detected": 51,
+    "recall": 0.927
+   }
+  },
+  "Secret Extraction": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 93,
+    "detected": 79,
+    "recall": 0.849
+   },
+   "web": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 7,
+    "detected": 7,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 8,
+    "detected": 8,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "db": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 4,
+    "detected": 4,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 7,
+    "detected": 7,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 6,
+    "detected": 6,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "pdf_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 8,
+    "detected": 8,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "image": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 2,
+    "detected": 2,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 5,
+    "detected": 5,
+    "recall": 1.0
+   }
+  },
+  "Tool Abuse": {
+   "user": {
+    "label": "official",
+    "checkpoint": "end-to-end",
+    "n": 65,
+    "detected": 40,
+    "recall": 0.615
+   },
+   "web": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 23,
+    "detected": 23,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 21,
+    "detected": 21,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 22,
+    "detected": 21,
+    "recall": 0.955
+   },
+   "db": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 13,
+    "detected": 13,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 15,
+    "detected": 15,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 20,
+    "detected": 18,
+    "recall": 0.9
+   },
+   "pdf_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 16,
+    "detected": 16,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 22,
+    "detected": 22,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 20,
+    "detected": 20,
+    "recall": 1.0
+   },
+   "image": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 7,
+    "detected": 7,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 22,
+    "detected": 22,
+    "recall": 1.0
+   }
+  },
+  "Credential Theft": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 14,
+    "detected": 9,
+    "recall": 0.643
+   },
+   "web": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 10,
+    "detected": 10,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "db": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 6,
+    "detected": 6,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 12,
+    "detected": 12,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 8,
+    "detected": 8,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "pdf_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 10,
+    "detected": 10,
+    "recall": 1.0
+   },
+   "image": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 3,
+    "detected": 3,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "goal",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   }
+  },
+  "Context Poisoning": {
+   "db": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 17,
+    "detected": 17,
+    "recall": 1.0
+   }
+  },
+  "Multi-Step Jailbreaks": {
+   "user": {
+    "label": "official",
+    "checkpoint": "end-to-end",
+    "n": 35,
+    "detected": 26,
+    "recall": 0.743
+   }
+  },
+  "Encoded Instructions": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 229,
+    "detected": 160,
+    "recall": 0.699
+   },
+   "web": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 21,
+    "detected": 21,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 15,
+    "detected": 15,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 22,
+    "detected": 22,
+    "recall": 1.0
+   },
+   "db": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 12,
+    "detected": 12,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 18,
+    "detected": 18,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 11,
+    "detected": 11,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 20,
+    "detected": 19,
+    "recall": 0.95
+   },
+   "pdf_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 18,
+    "detected": 18,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 20,
+    "detected": 20,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 19,
+    "detected": 19,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 17,
+    "detected": 17,
+    "recall": 1.0
+   }
+  },
+  "Indirect Prompt Injection": {
+   "user": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 80,
+    "detected": 41,
+    "recall": 0.512
+   },
+   "web": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 32,
+    "detected": 32,
+    "recall": 1.0
+   },
+   "html": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 28,
+    "detected": 28,
+    "recall": 1.0
+   },
+   "markdown": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 26,
+    "detected": 26,
+    "recall": 1.0
+   },
+   "email": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 29,
+    "detected": 29,
+    "recall": 1.0
+   },
+   "api": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 31,
+    "detected": 30,
+    "recall": 0.968
+   },
+   "db": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 17,
+    "detected": 17,
+    "recall": 1.0
+   },
+   "code": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 26,
+    "detected": 26,
+    "recall": 1.0
+   },
+   "pdf": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 21,
+    "detected": 21,
+    "recall": 1.0
+   },
+   "docx": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 29,
+    "detected": 27,
+    "recall": 0.931
+   },
+   "pdf_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 25,
+    "detected": 25,
+    "recall": 1.0
+   },
+   "docx_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 30,
+    "detected": 30,
+    "recall": 1.0
+   },
+   "html_hidden": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 29,
+    "detected": 29,
+    "recall": 1.0
+   },
+   "image": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 9,
+    "detected": 9,
+    "recall": 1.0
+   },
+   "ocr_text": {
+    "label": "official",
+    "checkpoint": "content",
+    "n": 27,
+    "detected": 27,
+    "recall": 1.0
+   }
+  }
+ },
+ "per_type": {
+  "Instruction Override": {
+   "sources": 15,
+   "official_recall": 0.865,
+   "official_n": 74,
+   "checkpoint": "content checkpoint"
+  },
+  "Role Change": {
+   "sources": 1,
+   "official_recall": 0.927,
+   "official_n": 55,
+   "checkpoint": "content checkpoint"
+  },
+  "Secret Extraction": {
+   "sources": 15,
+   "official_recall": 0.849,
+   "official_n": 93,
+   "checkpoint": "content checkpoint"
+  },
+  "Tool Abuse": {
+   "sources": 15,
+   "official_recall": 0.615,
+   "official_n": 65,
+   "checkpoint": "end-to-end (action guard, any layer)"
+  },
+  "Credential Theft": {
+   "sources": 15,
+   "official_recall": 0.643,
+   "official_n": 14,
+   "checkpoint": "content checkpoint"
+  },
+  "Context Poisoning": {
+   "sources": 1,
+   "official_recall": 1.0,
+   "official_n": 17,
+   "checkpoint": "content checkpoint"
+  },
+  "Multi-Step Jailbreaks": {
+   "sources": 1,
+   "official_recall": 0.743,
+   "official_n": 35,
+   "checkpoint": "end-to-end (session risk, any layer)"
+  },
+  "Encoded Instructions": {
+   "sources": 14,
+   "official_recall": 0.848,
+   "official_n": 460,
+   "checkpoint": "content checkpoint"
+  },
+  "Indirect Prompt Injection": {
+   "sources": 15,
+   "official_recall": 0.904,
+   "official_n": 439,
+   "checkpoint": "content checkpoint"
+  }
+ },
+ "position": {
+  "F": "F3",
+  "D": "D3",
+  "types_detected": 9,
+  "sources": 15,
+  "docs_recall": 0.992,
+  "docs_n": 359,
+  "protected_tests": 339,
+  "protected_compromised": 0,
+  "fpr": 0.051,
+  "user_recall": 0.681
+ }
+}

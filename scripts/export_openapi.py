@@ -1,0 +1,87 @@
+"""Write the gateway's OpenAPI document and a readable endpoint reference, so the API can be read without running it.
+
+    python scripts/export_openapi.py   ->  docs/api/openapi.json, docs/API.md
+
+Built from the FastAPI app itself (services/gateway/intentseal_gateway/app.py), never by hand. A running gateway
+serves the same document at /openapi.json and an interactive version at /docs.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+# One line for routes whose handler has no docstring (wording checked against the handler in app.py / proxy.py).
+DESCRIBE = {
+    ("get", "/healthz"): "Liveness: the process is up (open, no key).",
+    ("post", "/v1/inspect"): "Inspect content before the model sees it: text or base64 file, source, agent, session. Returns the decision, cleaned content, findings and attack types.",
+    ("post", "/v1/actions/check"): "Check a tool call before it runs: tool, arguments, agent, session. Returns the decision, the arguments to run with (pinned fields rewritten), the contract ruling and a notice for the model.",
+    ("post", "/v1/outputs/check"): "Check the model's answer before the user sees it: protected values redacted, or the answer withheld.",
+    ("post", "/v1/sessions"): "Start a session with the user's task and trusted context; returns the session id and its intent contract.",
+    ("get", "/v1/sessions/{session_id}/events"): "Every event of a session in order, with findings, decisions, actions, contract rulings and receipts (replay).",
+    ("get", "/v1/decisions"): "Decisions feed, filterable by decision, attack type, agent and time.",
+    ("get", "/v1/scorecard/{agent}"): "Latest evaluation reports and summary for an agent.",
+    ("get", "/v1/policies/{agent}"): "An agent's policy.",
+    ("get", "/v1/costs"): "Security spend across agents: decisions and judge tokens by tier.",
+    ("post", "/v1/feedback"): "Reviewer feedback: remember an event or content as a confirmed attack or a false alarm (attack memory).",
+    ("get", "/v1/memory"): "Attack memory entries and counts (fingerprints only, never text).",
+    ("delete", "/v1/memory/{memory_id}"): "Forget one attack-memory entry.",
+    ("get", "/v1/approvals"): "Escalated actions waiting for (or resolved by) a reviewer.",
+    ("get", "/v1/sessions/{session_id}/investigations"): "Investigator reports for a session.",
+    ("get", "/v1/investigations"): "Recent Investigator reports.",
+    ("get", "/demo/scenarios"): "Playground scenarios (generated attacks and benign cases).",
+    ("post", "/demo/run"): "Run a Playground scenario on the sandboxed reference agent, protection off or on.",
+    ("post", "/proxy/v1/chat/completions"): "LLM proxy, OpenAI format, agent from the key or header.",
+    ("post", "/proxy/{agent_id}/v1/chat/completions"): "LLM proxy, OpenAI format: messages and tool results inspected, returned tool calls and answers checked, then forwarded to the agent's provider.",
+    ("post", "/proxy/{agent_id}/gemini/v1beta/models/{model_action}"): "LLM proxy, native Gemini format (generateContent, streamGenerateContent).",
+    ("get", "/v1/setup/templates"): "Policy templates for registering an agent.",
+    ("get", "/v1/providers"): "Configured model providers and whether each has a key.",
+    ("get", "/v1/agents"): "Registered agents and their modes.",
+    ("post", "/v1/agents"): "Register an agent from a template (starts in monitor mode).",
+    ("post", "/v1/agents/{agent}/self-test"): "Self-test an agent's policy with structural probes.",
+}
+
+
+def main() -> None:
+    os.environ.setdefault("INTENTSEAL_API_KEYS", "docs:docs-export-only:admin")
+    os.environ.setdefault("INTENTSEAL_PUBLIC_KEY", "docs-export-public")
+    from intentseal_core.decision_model import StaticDecisionModel
+    from intentseal_core.engine import Engine
+    from intentseal_core.store import Store
+    from intentseal_gateway.app import create_app
+
+    class _NoScore:
+        def score(self, text):
+            return [0.0 for _ in text] if isinstance(text, list) else 0.0
+
+    app = create_app(engine=Engine(decision_model=StaticDecisionModel(0.0), classifiers=[_NoScore()], store=Store(":memory:")))
+    spec = app.openapi()
+    out = ROOT / "docs" / "api"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "openapi.json").write_text(json.dumps(spec, indent=1, ensure_ascii=False), encoding="utf-8")
+
+    groups: dict[str, list[str]] = {}
+    for path, ops in sorted(spec["paths"].items()):
+        for method, op in ops.items():
+            tag = (op.get("tags") or ["other"])[0]
+            summary = (op.get("description") or DESCRIBE.get((method, path)) or op.get("summary") or "").strip().split("\n")[0]
+            groups.setdefault(tag, []).append(f"| `{method.upper()}` | `{path}` | {summary} |")
+    order = ["engine", "sessions", "evidence", "review", "policy", "proxy", "onboarding", "ops", "demo", "other"]
+    lines = ["# API reference", "",
+             f"Generated by `python scripts/export_openapi.py` from the gateway app ({spec['info'].get('title', '')} "
+             f"{spec['info'].get('version', '')}). The full schema, with every request and response body, is "
+             "[api/openapi.json](api/openapi.json); a running gateway serves it interactively at `http://localhost:8000/docs`.", "",
+             "**Authentication**: `Authorization: Bearer <key>`. Keys have a scope: *public* (read-only, the Console), *project* "
+             "(an application: inspect, check, sessions, proxy) or *admin* (reviewers: approvals, policy, memory). Keys and "
+             "organisations: [DEPLOY.md](DEPLOY.md). An application needs the *Engine* and *Sessions* calls; "
+             "[INTEGRATION.md](INTEGRATION.md) shows them in context.", ""]
+    for tag in sorted(groups, key=lambda t: order.index(t) if t in order else len(order)):
+        lines += [f"## {tag.capitalize()}", "", "| Method | Path | What it does |", "|---|---|---|", *groups[tag], ""]
+    (ROOT / "docs" / "API.md").write_text("\n".join(lines), encoding="utf-8")
+    print("wrote docs/api/openapi.json and docs/API.md:", sum(len(v) for v in groups.values()), "operations")
+
+
+if __name__ == "__main__":
+    main()

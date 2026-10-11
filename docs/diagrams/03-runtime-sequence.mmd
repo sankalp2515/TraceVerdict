@@ -1,0 +1,50 @@
+%% 3. Runtime sequence: one session, one poisoned document, one hijacked action. Audience: engineers, security reviewers.
+%% Rendered asset: docs/assets/architecture/runtime-sequence.svg (layout in docs/diagrams/build.py, same steps).
+%% Verified: packages/core/intentseal_core/engine.py (start_session, _inspect, check_action, check_output),
+%% action_guard.py, contract.py, packages/sdk/intentseal/guard.py (tool), services/gateway/intentseal_gateway/app.py
+%% (POST /v1/actions/{id}/receipt). Through the LLM proxy, the inspection and the action check happen inside the proxy (proxy.py).
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant A as Agent
+    participant E as IntentSeal engine
+    participant J as AI judge (advises)
+    participant T as Tool
+    participant L as Decision log
+
+    U->>A: task: summarise the partner email, do not reply to anyone
+    A->>E: start session (task)
+    E->>L: intent contract v1 (permit read, prohibit send)
+
+    rect rgb(255, 244, 235)
+    note over A,T: The agent reads untrusted content
+    A->>T: read_email()
+    T-->>A: raw email (third-party content)
+    A->>E: inspect(content, source = email)
+    E->>E: extract, normalise, decode, Tier 0 rules and memory, Tier 1 score
+    E->>J: assess flagged chunks against the user's task
+    J-->>E: risk, attack types, evidence spans
+    E->>E: deterministic policy: ALLOW / NEUTRALISE / ESCALATE / BLOCK
+    E->>L: content decision, findings, data-flow fingerprint
+    E-->>A: cleaned content or a held notice (never the original attack)
+    end
+
+    rect rgb(232, 237, 245)
+    note over A,T: The model proposes an action
+    A->>E: check_action(send_message, to = partner@vendor.example)
+    E->>E: contract, allow-lists, pinned fields, secret scan, provenance, data flow, session risk (worst wins)
+    E->>L: action decision with the contract clause and the links to its source
+    alt ALLOW
+        E-->>A: allowed, with checked arguments
+        A->>T: run the tool
+        A->>E: execution receipt (ran)
+        E->>L: receipt
+    else BLOCK or ESCALATE
+        E-->>A: notice: not performed (reason)
+        note right of T: the tool is never called. An ESCALATE waits for a reviewer's approval of this exact call
+    end
+    end
+
+    A->>E: check_output(answer)
+    E-->>A: answer, secrets redacted or withheld
+    A-->>U: answer

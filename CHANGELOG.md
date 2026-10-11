@@ -21,6 +21,10 @@ All notable changes to IntentSeal. Versions follow [Semantic Versioning](https:/
   (`intentseal_eval.contract_eval`); the red-team and repair loop (`intentseal_eval.redteam`); `docs/ASSURANCE.md`.
 - `examples/node-rest/agent.mjs`: IntentSeal from Node over REST, with the check at the tool-execution boundary.
 - Playground scenario S10: detectors off, the intent contract stops the send.
+- Documentation: five architecture diagrams verified against the code (`docs/diagrams/`, SVGs in
+  `docs/assets/architecture/`, built deterministically by `docs/diagrams/build.py`); a generated API reference
+  (`docs/API.md`, `docs/api/openapi.json`); the attack-type × input-source coverage grid and the F3 · D3 grid
+  (`python -m intentseal_eval.grid` → `docs/COVERAGE.md`); README requirements, configuration and API sections.
 
 ### Fixed
 - Empty key placeholders written by `intentseal init` no longer hide a key set in the project's own `.env`.

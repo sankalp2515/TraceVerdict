@@ -1,0 +1,44 @@
+%% 5. Evaluation architecture. Audience: judges, researchers.
+%% Rendered asset: docs/assets/architecture/evaluation.svg (layout in docs/diagrams/build.py, same boxes and arrows).
+%% Verified: eval/promptfoo/build_suites.py, eval/targets/agent_target.py, agents/research_agent/, eval/intentseal_eval/
+%% (report.py, summary.py, paired.py, contract_eval.py, redteam.py, grid.py, readme.py, assurance.py), .github/workflows/ci.yml
+flowchart LR
+    subgraph GEN["Generators (attack text never hand-written)"]
+        PF["promptfoo"]
+        GK["NVIDIA garak"]
+    end
+    subgraph CORP["Corpora"]
+        ATT["Attack suites: v3, headline, v2e, broad, mt3, out-of-distribution"]
+        BEN["Benign sets: hb3 development, ho1 held-out (+ 20 utility tasks run by benign.py on the same agent)"]
+    end
+    DEL["Delivery: each payload through 14 channels"]
+    subgraph TGT["Agent target: protection arm"]
+        OFF["off: unprotected"]
+        ON["on: full protection"]
+        ACT["actions: detectors off"]
+        DET["detect: content checkpoint, no agent"]
+    end
+    AGENT["Reference agent and sandbox world"]
+    SC["Deterministic scoring, engine fingerprint per result"]
+    subgraph AN["Analysis: eval/intentseal_eval"]
+        SUM["summary"]
+        PAIR["paired"]
+        CE["contract_eval"]
+        RTM["redteam"]
+        GR["grid"]
+    end
+    subgraph REP["Reports (generated)"]
+        EV["EVALUATION.md"]
+        AS["ASSURANCE.md"]
+        CO["COVERAGE.md"]
+        RD["README, deck"]
+    end
+    CI["CI on every push: pytest, lint, secret scan, fixtures"]
+
+    PF --> ATT
+    GK --> ATT
+    ATT --> DEL --> TGT
+    BEN -->|false-alarm runs| TGT
+    TGT -->|off, on, actions| AGENT --> SC
+    SC -->|raw results| AN
+    AN --> REP

@@ -1,0 +1,50 @@
+%% 2. Component architecture. Audience: engineers, architects.
+%% Rendered asset: docs/assets/architecture/components.svg (layout in docs/diagrams/build.py, same boxes and arrows).
+%% Verified: services/gateway/intentseal_gateway/proxy.py, proxy_gemini.py, app.py; packages/sdk/intentseal/guard.py,
+%% remote.py, langchain.py; packages/core/intentseal_core/engine.py, extract.py, normalise.py, decode.py, memory.py,
+%% classifier.py, decision_model.py, policy.py, action_guard.py, contract.py, session.py, taint.py, outbound.py,
+%% logger.py, store.py, siem.py, llm/router.py; services/gateway/intentseal_gateway/investigator.py, provenance.py
+flowchart TB
+    subgraph APPS["Agents and applications (unchanged code)"]
+        OA["OpenAI-compatible agent"]
+        AN["Anthropic SDK agent"]
+        GE["Gemini agent (Google Gen AI SDK)"]
+        ANY["Any language (HTTP)"]
+        PY["Python application: Guard, @guard.tool()"]
+        LC["LangChain / LangGraph: guard.protect_tools()"]
+    end
+    subgraph GW["Gateway: services/gateway"]
+        PROXY["LLM proxy: OpenAI, Anthropic, Gemini formats"]
+        REST["REST API: /v1/inspect, /v1/actions/check, /v1/outputs/check, /v1/sessions"]
+    end
+    subgraph SDK["Python SDK: packages/sdk"]
+        GUARD["Guard: embedded engine, or remote client"]
+    end
+    subgraph CORE["Core engine: packages/core/intentseal_core"]
+        ENGINE["Engine: inspect, check_action, check_output, sessions"]
+        EX["Extract"] --> ND["Normalise, decode"] --> T0["Tier 0 rules and attack memory"] --> T1["Tier 1 classifier (AI, advises)"] --> T2["Tier 2 judge (AI, advises)"] --> PD["Policy decision"]
+        CT["Intent contract"] --> AG["Action guard"]
+        AC["Answer check"]
+        SS["Sessions: risk, contract, data-flow origins"]
+        POL[("Policies: policies/agent.yaml")]
+        LG["Decision logger"]
+        RT["LLM router: provider failover"]
+    end
+    DB[("Store: SQLite or PostgreSQL")]
+    RD["Gateway readers: Console, Investigator, provenance, approvals, metrics, SIEM"]
+    MP["Model providers"]
+
+    OA --> PROXY
+    AN --> PROXY
+    GE --> PROXY
+    ANY --> REST
+    PY --> GUARD
+    LC --> GUARD
+    GUARD -->|remote mode| REST
+    PROXY --> ENGINE
+    REST --> ENGINE
+    GUARD -->|embedded| ENGINE
+    T2 -->|judge calls| RT
+    RT -->|model calls| MP
+    PROXY -->|forwards the checked model call| MP
+    LG --> DB --> RD

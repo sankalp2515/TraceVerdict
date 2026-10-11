@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+<rect width="1200" height="640" fill="#FAFAF7"/>
+<text x="40" y="44" font-size="22" font-weight="600" fill="#13213C">Solution grid: declared position F3 · D3</text>
+<text x="40" y="68" font-size="13" fill="#5B6472">Feature level (attack types detected) × depth level (input heterogeneity and reliability)</text>
+<text x="370.0" y="96" font-size="13" fill="#13213C" text-anchor="middle"><tspan font-weight="700">F1</tspan>  Detect ≥ 2 attack types</text>
+<text x="690.0" y="96" font-size="13" fill="#13213C" text-anchor="middle"><tspan font-weight="700">F2</tspan>  Detect ≥ 5 attack types</text>
+<text x="1010.0" y="96" font-size="13" fill="#13213C" text-anchor="middle"><tspan font-weight="700">F3</tspan>  Detect ≥ 7 attack types</text>
+<text x="40" y="160" font-size="18" font-weight="700" fill="#13213C">D3</text>
+<text x="40" y="182" font-size="11.5" fill="#5B6472">Highly heterogeneous</text>
+<text x="40" y="197" font-size="11.5" fill="#5B6472">multimodal input; high,</text>
+<text x="40" y="212" font-size="11.5" fill="#5B6472">demonstrable reliability</text>
+<rect x="214" y="114" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="370.0" y="185.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F1 · D3</text>
+<rect x="534" y="114" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="690.0" y="185.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F2 · D3</text>
+<rect x="854" y="114" width="312" height="132" rx="8" fill="#1F3A5F" stroke="#C2410C" stroke-width="3"/>
+<text x="872" y="142" font-size="17" font-weight="700" fill="#FFFFFF">IntentSeal</text>
+<text x="872" y="164" font-size="13" font-weight="500" fill="#FFFFFF">9 of 9 types detected · 15 input sources</text>
+<text x="872" y="185" font-size="12.5" font-weight="400" fill="#FFFFFF">99.2% recall on 359 attacks in documents and data</text>
+<text x="872" y="206" font-size="12.5" font-weight="400" fill="#FFFFFF">0% attack success in 339 protected agent tests</text>
+<text x="872" y="227" font-size="12" font-weight="400" fill="#FFFFFF">PDF, Word, HTML, email, images, API, code, RAG</text>
+<text x="40" y="300" font-size="18" font-weight="700" fill="#13213C">D2</text>
+<text x="40" y="322" font-size="11.5" fill="#5B6472">Mostly structured and</text>
+<text x="40" y="337" font-size="11.5" fill="#5B6472">textual input; high,</text>
+<text x="40" y="352" font-size="11.5" fill="#5B6472">demonstrable reliability</text>
+<rect x="214" y="254" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="370.0" y="325.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F1 · D2</text>
+<rect x="534" y="254" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="690.0" y="325.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F2 · D2</text>
+<rect x="854" y="254" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="1010.0" y="325.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F3 · D2</text>
+<text x="40" y="440" font-size="18" font-weight="700" fill="#13213C">D1</text>
+<text x="40" y="462" font-size="11.5" fill="#5B6472">Mostly structured and</text>
+<text x="40" y="477" font-size="11.5" fill="#5B6472">textual input; acceptable</text>
+<text x="40" y="492" font-size="11.5" fill="#5B6472">in most situations</text>
+<rect x="214" y="394" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="370.0" y="465.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F1 · D1</text>
+<rect x="534" y="394" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="690.0" y="465.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F2 · D1</text>
+<rect x="854" y="394" width="312" height="132" rx="8" fill="#FFFFFF" stroke="#D5D9E0"/>
+<text x="1010.0" y="465.0" font-size="13" fill="#A3A9B3" text-anchor="middle">F3 · D1</text>
+<text x="40" y="588" font-size="12" fill="#5B6472">Limits stated with the claim: typed user-turn attacks 68% detected (the action layer still stops the harm); held-out hard-benign false alarms 5.1%.</text>
+<text x="40" y="608" font-size="12" fill="#5B6472">Evidence: docs/EVALUATION.md, docs/ASSURANCE.md, docs/COVERAGE.md · summary 2026-10-11, commit 9ca8fb5</text>
+</svg>

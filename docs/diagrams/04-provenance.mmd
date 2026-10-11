@@ -1,0 +1,33 @@
+%% 4. Security provenance: from untrusted content to an attempted action. Audience: security teams, auditors.
+%% Rendered asset: docs/assets/architecture/provenance.svg (layout in docs/diagrams/build.py, same boxes and arrows).
+%% Verified: packages/core/intentseal_core/taint.py, session.py (entity_origin, untrusted_origin), action_guard.py,
+%% contract.py, logger.py (contracts, receipts); services/gateway/intentseal_gateway/provenance.py
+flowchart LR
+    subgraph READ["What the agent read"]
+        SRC["Untrusted source, logged as an event"] --> INS["Inspection: evidence spans, content decision"] --> REC[("Session record: data-flow fingerprints, where each target first appeared")]
+    end
+    subgraph ASKED["What the user asked for"]
+        TASK["User's words: task and later turns"] --> CT["Intent contract: versioned, hash-chained"]
+    end
+    CALL["The agent's model proposes a tool call"]
+    subgraph CHECKS["Action checks: worst result wins"]
+        C0["Intent contract: prohibited or not requested"]
+        C1["Tool allowed for this agent"]
+        C2["Pinned fields"]
+        C3["Outbound secret scan"]
+        C4["Allow-lists: recipients, domains, paths"]
+        C5["Provenance: target only in untrusted content"]
+        C6["Data flow: arguments copy flagged content"]
+        C7["Session risk"]
+    end
+    REC -->|proven links| CHECKS
+    CT -->|clause| C0
+    CALL --> CHECKS
+    CHECKS --> DEC{"Decision"}
+    DEC -->|ALLOW| RUN["Executed: application receipt"]
+    DEC -->|BLOCK| NO["Not executed: call withheld, the model is told"]
+    DEC -->|ESCALATE| HOLD["Held for a reviewer"]
+    RUN --> LOG[("Decision log and receipts")]
+    NO --> LOG
+    HOLD --> LOG
+    LOG --> CHAIN["Provenance chain in the Console"]

@@ -56,6 +56,21 @@ what a hijacked agent can do, and proves what happened.
 
 ## Quick start
 
+### Requirements
+
+| For | You need |
+|---|---|
+| Option 1 (whole system) | [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose v2), about 2 GB of free memory (the gateway uses about 1.3 GB), about 3 GB of disk for the image, Git |
+| Option 2 (Python package) | Python 3.11 or 3.12 |
+| Both | One free model key: [Groq](https://console.groq.com/keys) or [Google AI Studio (Gemini)](https://aistudio.google.com/apikey) |
+| Optional | Node.js 18+ (the REST example and Console development), more provider keys for failover (`.env.example`) |
+
+Python dependencies are declared in each package's `pyproject.toml` (`packages/core`, `packages/sdk`,
+`services/gateway`) and pinned for reproducible builds in [requirements.lock](requirements.lock); the Console's in
+[apps/console/package.json](apps/console/package.json). The engine uses FastAPI, Pydantic, ONNX Runtime with a
+DeBERTa-v3 prompt-injection classifier, RapidOCR, pdfplumber and pypdf, python-docx, BeautifulSoup, ftfy and
+detect-secrets; nothing else needs installing by hand.
+
 Both options need **one free model key** for IntentSeal's AI judge: [Groq](https://console.groq.com/keys) or
 [Google AI Studio (Gemini)](https://aistudio.google.com/apikey), about a minute to create. Without a key IntentSeal
 fails closed: content that needs the judge is held, not passed.
@@ -131,23 +146,30 @@ dependency-free Node example: `node examples/node-rest/agent.mjs` (with Docker r
 In the Console, **Set up** registers an agent from a template, gives the snippet for your stack and runs a self-test.
 Step-by-step for teams, RAG apps included: [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
+### Configuration
+
+Everything is set by environment variables in `.env` (copied from [.env.example](.env.example), which documents each
+one) and by one policy file per agent in [policies/](policies). The ones that matter first:
+
+| Variable | What it does |
+|---|---|
+| `GROQ_API_KEY`, `GEMINI_API_KEY` (and `NVIDIA_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`) | Model providers for the AI judge; with several, the router fails over between them |
+| `INTENTSEAL_API_KEYS` | Gateway keys, `name:key:scope` with scope `project` or `admin` (Docker sets local-only defaults) |
+| `INTENTSEAL_PUBLIC_KEY` | Read-only key the Console uses |
+| `INTENTSEAL_CANARIES` | Planted fake secrets that must never leave in a tool call or an answer |
+| `INTENTSEAL_DATABASE_URL` | PostgreSQL instead of the default SQLite file |
+| `INTENTSEAL_SIEM_SINKS` | Push decisions to a JSON Lines file, a webhook or syslog (CEF) |
+
+Every setting, production deployment and operations: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+### API
+
+REST API reference (generated from the app): [docs/API.md](docs/API.md), full OpenAPI schema
+[docs/api/openapi.json](docs/api/openapi.json), interactive at http://localhost:8000/docs when the gateway runs.
+
 ## How it works
 
-```mermaid
-flowchart LR
-    U[User] --> A[Your agent]
-    A <-->|model calls| M[Any LLM provider]
-    subgraph IntentSeal
-      I[Inspect inbound content] --> P{Policy}
-      G[Check every action] --> P
-      P --> L[(Decision log)]
-    end
-    W[Web, files, email, APIs, RAG] --> I
-    I -->|clean content| A
-    A -->|tool call| G
-    G -->|allowed, pinned| T[Tools]
-    L --> C[Console, SIEM, replay]
-```
+![IntentSeal in context: untrusted content, your environment, IntentSeal, model provider, security operations](docs/assets/architecture/system-context.svg)
 
 1. **Extract** what the model will actually read: hidden PDF/Word/HTML text, email parts, metadata, OCR.
 2. **Normalise and decode**: Unicode repair, look-alike letters, base64, hex, %-encoding, Unicode tags.
@@ -161,7 +183,13 @@ flowchart LR
 7. **Investigate**: the Investigator agent plans, reads the log, evidence, decoders, attack memory and policy with
    read-only tools, and reports with proposals a reviewer applies.
 
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ENGINE.md](docs/ENGINE.md).
+### Architecture overview
+
+![Component architecture: every integration reaches one core engine](docs/assets/architecture/components.svg)
+
+Five diagrams, each verified against the code, with the files that support every claim:
+[docs/diagrams](docs/diagrams/README.md) (system context, components, runtime sequence, security provenance,
+evaluation). Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ENGINE.md](docs/ENGINE.md).
 
 ## Results
 
@@ -235,6 +263,9 @@ The SDK and REST API inspect content and check tools rather than the model call,
 | [Deployment](docs/DEPLOY.md) | Docker, Hugging Face Spaces, settings, operations |
 | [Evaluation](docs/EVALUATION.md) | Method, per-type and per-channel results, false alarms (generated) |
 | [Assurance](docs/ASSURANCE.md) | Intent contracts with detectors bypassed, paired and repeated runs, red-team loop (generated) |
+| [Coverage](docs/COVERAGE.md) | The nine attack types across every input source; the F3 · D3 grid (generated) |
+| [Architecture diagrams](docs/diagrams/README.md) | Five verified diagrams: context, components, runtime, provenance, evaluation |
+| [API reference](docs/API.md) | Every endpoint, generated from the app; OpenAPI schema |
 | [Design decisions](docs/DECISIONS.md) | Why the system works the way it does |
 | [Test assistant](examples/assistant/README.md) | A real tool-calling assistant to try IntentSeal on your own files |
 

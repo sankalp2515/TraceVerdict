@@ -1,0 +1,40 @@
+%% 1. System context: where IntentSeal sits. Audience: executives, judges, buyers.
+%% Rendered asset: docs/assets/architecture/system-context.svg (layout in docs/diagrams/build.py, same boxes and arrows).
+%% Verified: services/gateway/intentseal_gateway/proxy.py (docstring), packages/sdk/intentseal/guard.py,
+%% services/gateway/intentseal_gateway/app.py (routes), packages/core/intentseal_core/logger.py, siem.py
+flowchart LR
+    subgraph UNTRUSTED["Untrusted content"]
+        WEB["Web pages"]
+        DOCS["Files and documents"]
+        IMG["Images (OCR)"]
+        MAIL["Email"]
+        DATA["APIs and databases"]
+        RAG["Retrieved passages (RAG)"]
+    end
+    subgraph ENV["Your environment"]
+        USER(["User"])
+        AGENT["Your AI agent"]
+        TOOLS["Tools and side effects"]
+    end
+    subgraph SEAL["IntentSeal"]
+        INSPECT["Inspect content"]
+        CHECK["Check actions"]
+        LOG[("Decision log")]
+    end
+    MODEL["Model provider"]
+    subgraph OPS["Security operations"]
+        CONSOLE["Console: replay, approvals, review"]
+        SIEM["SIEM: JSON Lines, CEF"]
+    end
+
+    USER -->|task| AGENT
+    UNTRUSTED -->|read| AGENT
+    AGENT -->|what it read| INSPECT
+    INSPECT -->|cleaned content| AGENT
+    AGENT -->|proposed tool call| CHECK
+    CHECK -->|allowed calls only| TOOLS
+    AGENT -->|"model calls: through the IntentSeal proxy, or direct with the SDK / REST API"| MODEL
+    INSPECT --> LOG
+    CHECK --> LOG
+    LOG --> CONSOLE
+    LOG --> SIEM

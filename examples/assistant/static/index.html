@@ -192,7 +192,7 @@ $("#send").onsubmit = async (e) => {
   try {
     const r = await api("/api/chat", { message: text, conversation_id: conversation });
     conversation = r.conversation_id;
-    pending.innerHTML = (r.error ? `<span>${esc(r.error)}</span>` : esc(r.answer || "(no answer)")) + traceHtml(r.trace, r.session_id);
+    pending.innerHTML = (r.error ? `<span>${esc(r.error)}</span>` : esc(r.answer || "(no answer)").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")) + traceHtml(r.trace, r.session_id);
     if (r.error) pending.classList.add("err");
   } catch (err) { pending.textContent = err.message; pending.classList.add("err"); }
   $("#go").disabled = false;

@@ -35,7 +35,9 @@ function Lane({ mode, result, loading, error, proxy }: { mode: Mode; result: Dem
           </p>
           <div className="mt-6">
             <p className="section-label mb-2">Agent answer</p>
-            <p className="m-0 whitespace-pre-wrap text-[13px] leading-6">{result.answer || <span className="subtle">(no answer{result.error ? `: ${result.error}` : ""})</span>}</p>
+            <p className="m-0 whitespace-pre-wrap text-[13px] leading-6">{result.answer ? result.answer.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+              part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part)
+              : <span className="subtle">(no answer{result.error ? `: ${result.error}` : ""})</span>}</p>
           </div>
           {!proxy && (
             <div className="mt-6">

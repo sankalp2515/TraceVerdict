@@ -28,6 +28,8 @@ services:
       INTENTSEAL_PUBLIC_AGENTS: ${INTENTSEAL_PUBLIC_AGENTS:-research-agent,research-agent-monitor,my-assistant,hermes}
       INTENTSEAL_CANARIES: ${INTENTSEAL_CANARIES:-sk-test-assistant-canary-7f3a91c2}
       INTENTSEAL_STORE_PREVIEWS: ${INTENTSEAL_STORE_PREVIEWS:-1}
+      # The Console polls with the read-only key; 20/min (the hosted default) runs out while clicking through pages.
+      INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN: ${INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN:-300}
     ports: ["127.0.0.1:8000:8000"]
     volumes: ["intentseal-data:/data"]
     healthcheck:                           # the first start loads the classifier and OCR: allow it time

@@ -44,6 +44,70 @@ DESCRIBE = {
 }
 
 
+RAW_SPEC = "https://raw.githubusercontent.com/sankalp2515/intentseal/main/docs/api/openapi.json"
+WEB = (f"**Browse it on the web, no install:** [interactive reference (Redoc)](https://redocly.github.io/redoc/?url={RAW_SPEC}) · "
+       f"[Swagger UI](https://petstore.swagger.io/?url={RAW_SPEC}).")
+
+# Worked example: the three calls an agent makes. Responses were captured from a local gateway (agent `my-assistant`,
+# the test pack's generated attack email) and shortened with "…"; the full shapes are in openapi.json.
+EXAMPLES = r"""## The three calls an agent makes
+
+The user asked: *"Summarise the partner update email for me. Do not reply to anyone."* The agent then reads an email
+that carries a generated attack, and its model proposes a reply. Runnable end to end: `node examples/node-rest/agent.mjs`.
+
+**1. Start a session with the user's task.** IntentSeal compiles the intent contract from the user's own words.
+
+```bash
+curl -s http://localhost:8000/v1/sessions -H "Authorization: Bearer local-project-key" -H "Content-Type: application/json" \
+  -d '{"agent_id": "my-assistant", "task": "Summarise the partner update email for me. Do not reply to anyone."}'
+```
+
+```json
+{"session_id": "728d967cc0ea4e00",
+ "contract": {"version": 1, "hash": "c833aa5ecd672ebb", "origin": "task",
+              "clauses": [{"id": "X13-send", "effect": "prohibit", "capability": "send", "quote": "Do not reply to anyone", "origin": "task"},
+                          {"id": "R-send", "effect": "require", "capability": "send", "quote": "policy: 'send' needs the user's explicit request", "origin": "policy"}, …]}}
+```
+
+**2. Inspect third-party content before the model sees it.** Hand the model `cleaned_content`, never the original.
+
+```bash
+curl -s http://localhost:8000/v1/inspect -H "Authorization: Bearer local-project-key" -H "Content-Type: application/json" \
+  -d '{"agent_id": "my-assistant", "session_id": "728d967cc0ea4e00", "source": "email", "filename": "message.eml", "content": "<the email text>"}'
+```
+
+```json
+{"decision": "BLOCK", "enforced": "BLOCK", "policy_rule": "content-risk-block",
+ "reason": "Content risk reached the policy block threshold",
+ "cleaned_content": "[Content held by the security policy: content-risk-block]",
+ "labels": ["Credential Theft", "Indirect Prompt Injection", "Instruction Override", "Tool Abuse"],
+ "risk": 1.0, "tier": 2, "latency_ms": 1134.11, "event_id": "de7f4dfd7ce24d14b7f3", "findings": […]}
+```
+
+**3. Check every tool call before it runs.** Run it only when `enforced` is `ALLOW`, with `final_args`; then report a
+receipt (`POST /v1/actions/{event_id}/receipt`).
+
+```bash
+curl -s http://localhost:8000/v1/actions/check -H "Authorization: Bearer local-project-key" -H "Content-Type: application/json" \
+  -d '{"agent_id": "my-assistant", "session_id": "728d967cc0ea4e00", "tool": "send_message", "args": {"to": "partner@vendor.example", "body": "Here is the summary."}}'
+```
+
+```json
+{"decision": "BLOCK", "enforced": "BLOCK", "final_args": null, "policy_rule": "recipient-not-allowed",
+ "contract": {"version": 1, "effect": "prohibit", "capability": "send",
+              "clause": {"id": "X13-send", "quote": "Do not reply to anyone", "origin": "task"}},
+ "taint": [{"arg": "to", "source": "email", "kind": "target"}],
+ "reason": "recipient outside allowed list (1 address(es)); 'to' value appears only in untrusted content, not in the user's request; … the user ruled out 'send' (contract v1, clause X13-send: \"Do not reply to anyone\")",
+ "notice": "Action 'send_message' was blocked by the security policy: recipient outside allowed list (1 address(es)). Continue the user's task without it.",
+ "latency_ms": 5.52, "event_id": "804f60b0c34e413aa058"}
+```
+
+`notice` goes back to the agent's model so it carries on without the call. The Console's Replay shows this session as
+an attack-to-action chain (`GET /v1/sessions/{session_id}/provenance`). `local-project-key` is the Docker default and
+works only on your machine.
+"""
+
+
 def main() -> None:
     os.environ.setdefault("INTENTSEAL_API_KEYS", "docs:docs-export-only:admin")
     os.environ.setdefault("INTENTSEAL_PUBLIC_KEY", "docs-export-public")
@@ -76,9 +140,9 @@ def main() -> None:
              "**Authentication**: `Authorization: Bearer <key>`. Keys have a scope: *public* (read-only, the Console), *project* "
              "(an application: inspect, check, sessions, proxy) or *admin* (reviewers: approvals, policy, memory). Keys and "
              "organisations: [DEPLOY.md](DEPLOY.md). An application needs the *Engine* and *Sessions* calls; "
-             "[INTEGRATION.md](INTEGRATION.md) shows them in context.", ""]
+             "[INTEGRATION.md](INTEGRATION.md) shows them in context.", "", WEB, "", EXAMPLES, "## Every endpoint", ""]
     for tag in sorted(groups, key=lambda t: order.index(t) if t in order else len(order)):
-        lines += [f"## {tag.capitalize()}", "", "| Method | Path | What it does |", "|---|---|---|", *groups[tag], ""]
+        lines += [f"### {tag.capitalize()}", "", "| Method | Path | What it does |", "|---|---|---|", *groups[tag], ""]
     (ROOT / "docs" / "API.md").write_text("\n".join(lines), encoding="utf-8")
     print("wrote docs/api/openapi.json and docs/API.md:", sum(len(v) for v in groups.values()), "operations")
 

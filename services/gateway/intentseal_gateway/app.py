@@ -430,9 +430,10 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         return {"ok": e.record_execution(event_id, body.executed, body.detail)}
 
     @app.post("/v1/sessions/{session_id}/investigate", tags=["review"])
-    async def investigate(session_id: str, request: Request, p: Principal = require("admin")) -> dict[str, Any]:
+    async def investigate(session_id: str, request: Request, p: Principal = require("public")) -> dict[str, Any]:
         """Run the Investigator on one session: it plans, uses read-only tools on the log, evidence, decoders, memory
-        and policy, and returns a report with recommendations and proposals that wait for a reviewer."""
+        and policy, and returns a report with recommendations and proposals that wait for a reviewer. Any key that can
+        see the session may run it (read-only, rate-limited per key); applying a proposal stays reviewer-only."""
         _session_owner(request, p, session_id)
         try:
             return await request.app.state.investigator.investigate(session_id, trigger=f"requested by {p.name}")

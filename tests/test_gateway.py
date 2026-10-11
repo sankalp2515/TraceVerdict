@@ -623,8 +623,8 @@ def test_investigator_plans_uses_tools_proposes_and_reports(env):
                    ("", [tc("submit_report", {"verdict": "attack", "severity": "high", "summary": "Injected web page.",
                                               "objective": "steer the agent", "outcome": "blocked before the model",
                                               "next_steps": ["Remember the page as an attack."]})])]
-        assert c.post(f"/v1/sessions/{sid}/investigate", headers=H(PROJECT)).status_code == 403   # reviewers only
-        inv = c.post(f"/v1/sessions/{sid}/investigate", headers=H(ADMIN)).json()
+        # Read-only: any key that sees the session may run it; applying a proposal stays reviewer-only (below).
+        inv = c.post(f"/v1/sessions/{sid}/investigate", headers=H(PROJECT)).json()
         assert inv["status"] == "done" and inv["report"]["severity"] == "high"
         assert inv["report"]["facts"]["flagged"] >= 1
         tools = [s.get("tool") for s in inv["steps"] if s["step"] == "tool"]

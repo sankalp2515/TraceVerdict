@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { admin, api, PRODUCT_NAME, type Approval } from "../api";
 import { useReviewer } from "../reviewer";
+import { ReviewerSignIn } from "../components/ReviewerSignIn";
 import { ago, Card, CardTitle, Empty, ErrorNote, Loading, PageHeader, Stat, Tag, useAsync } from "../components/ui";
 
 /** The Investigator's recommendation for a pending approval (sessions waiting for a human are triaged automatically). */
@@ -92,9 +93,9 @@ function Approvals() {
         </ul>
       )}
       {!reviewer && (
-        <p className="subtle mt-5 text-xs leading-6">
-          Approving or denying needs a reviewer key: use <b>Reviewer sign-in</b> at the top. Without it this page is read-only.
-        </p>
+        <div className="subtle mt-5 flex flex-wrap items-center gap-3 text-xs leading-6">
+          <span>Approving or denying needs a reviewer key. Without it this page is read-only.</span><ReviewerSignIn />
+        </div>
       )}
     </Card>
   );

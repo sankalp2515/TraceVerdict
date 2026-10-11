@@ -6,6 +6,15 @@ export const PRODUCT_NAME: string = (import.meta.env.VITE_PRODUCT_NAME as string
 export const TAGLINE = "Keep AI agents inside the user’s intent.";
 export const AGENT = "research-agent";
 
+/** Display names for the agents this deployment ships with; any other agent shows its id. */
+const AGENT_NAMES: Record<string, string> = {
+  hermes: "Hermes Agent",
+  "my-assistant": "Test assistant",
+  "research-agent": "Reference agent (Playground)",
+  "research-agent-monitor": "Reference agent · monitor mode",
+};
+export const agentName = (id: string) => AGENT_NAMES[id] ?? id;
+
 export type Decision = "ALLOW" | "NEUTRALISE" | "BLOCK" | "ESCALATE";
 
 export interface Scenario {
@@ -194,7 +203,7 @@ export interface Metrics {
     fast_path: { n: number; p50: number | null; p95: number | null };
     judge_path: { n: number; p50: number | null; p95: number | null };
   };
-  memory: Record<string, number>;
+  memory: Record<string, number> | null;
   approvals_pending: number;
   providers: { provider: string; status: string; n: number }[];
 }
@@ -286,6 +295,9 @@ export const api = {
   investigations: (sessionId: string) => call<Investigation[]>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations`),
   recentInvestigations: (limit = 50) => call<Investigation[]>(`/v1/investigations?limit=${limit}`),
   provenance: (sessionId: string) => call<Provenance>(`/v1/sessions/${encodeURIComponent(sessionId)}/provenance`),
+  /** Read-only triage of one session; any proposal it makes still waits for a reviewer. */
+  investigate: (sessionId: string) =>
+    call<Investigation>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigate`, { method: "POST" }),
 };
 
 /** Reviewer (admin-key) actions. The key is the reviewer's own, typed at sign-in; it is never part of the build. */
@@ -300,8 +312,6 @@ export const admin = {
     call<{ agent: string; mode: string; version: string; tools: string[] }>("/v1/agents", { method: "POST", body: JSON.stringify(body) }, key),
   selfTest: (key: string, agent: string) =>
     call<SelfTest>(`/v1/agents/${encodeURIComponent(agent)}/self-test`, { method: "POST" }, key),
-  investigate: (key: string, sessionId: string) =>
-    call<Investigation>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigate`, { method: "POST" }, key),
   resolveSuggestion: (key: string, id: string, apply: boolean) =>
     call<{ status: string; memory_id?: string }>(`/v1/suggestions/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ apply }) }, key),
   putPolicy: (key: string, agent: string, body: unknown) =>

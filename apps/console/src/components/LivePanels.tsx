@@ -42,8 +42,10 @@ export function LiveOperations() {
               <p className="section-label mb-3 mt-5">Review</p>
               <div className="flex flex-wrap gap-1.5">
                 <Tag>Approvals pending · {m.approvals_pending}</Tag>
-                <Tag>Confirmed attacks · {m.memory.attack ?? 0}</Tag>
-                <Tag>Reviewed false alarms · {m.memory.benign ?? 0}</Tag>
+                {m.memory ? <>
+                  <Tag>Confirmed attacks · {m.memory.attack ?? 0}</Tag>
+                  <Tag>Reviewed false alarms · {m.memory.benign ?? 0}</Tag>
+                </> : <span className="subtle text-xs">Memory counts are restricted in this public view.</span>}
               </div>
             </div>
             <div>

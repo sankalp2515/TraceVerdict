@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { admin, api, type NewAgent, type SelfTest } from "../api";
+import { admin, agentName, api, type AgentSummary, type DecisionRow, type NewAgent, type SelfTest } from "../api";
 import { useReviewer } from "../reviewer";
-import { Card, CardTitle, DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Tag, useAsync } from "../components/ui";
+import { ReviewerSignIn } from "../components/ReviewerSignIn";
+import { ago, Card, CardTitle, DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Tag, useAsync } from "../components/ui";
 
 const PATHS = [
   {
@@ -53,7 +54,7 @@ function Register({ onCreated }: { onCreated: (agent: string) => void }) {
     <Card>
       <CardTitle meta="Starts in monitor mode: decisions are recorded, nothing is blocked yet.">2. Register the agent</CardTitle>
       {!reviewer && (
-        <p className="subtle mb-5 text-xs">Registering needs a reviewer key (<b>Reviewer sign-in</b> at the top). Anyone can read the connection steps below.</p>
+        <div className="subtle mb-5 flex flex-wrap items-center gap-3 text-xs"><span>Registering needs a reviewer key. Anyone can read the connection steps below.</span><ReviewerSignIn /></div>
       )}
       <form className="grid gap-5 md:grid-cols-2" onSubmit={submit}>
         <label className="flex flex-col gap-2 text-xs"><span className="section-label">Agent name</span>
@@ -175,7 +176,7 @@ function Verify({ agent }: { agent: string }) {
     <div className="space-y-4">
       <p className="subtle m-0 text-xs">Three harmless probes go through <span className="mono">{agent}</span>'s real policy: text a human cannot see, a forged role marker, and a tool the policy does not list.</p>
       <button className="pill pill-primary pill-sm" disabled={!reviewer || busy} onClick={run}>{busy ? "Running…" : "Run self-test"}</button>
-      {!reviewer && <p className="subtle m-0 text-xs">Needs a reviewer key (top of the page).</p>}
+      {!reviewer && <p className="subtle m-0 text-xs">Needs a reviewer key (step 2).</p>}
       {err && <ErrorNote>{err}</ErrorNote>}
       {res && (
         <div className="space-y-3">
@@ -197,16 +198,72 @@ function Verify({ agent }: { agent: string }) {
   );
 }
 
+const DAY = 86400;
+
+interface Activity { last: number | null; day: number; stopped: number }
+
+function activity(rows: DecisionRow[], agent: string): Activity {
+  const mine = rows.filter((r) => r.agent_id === agent);
+  const since = Date.now() / 1000 - DAY;
+  const today = mine.filter((r) => r.created_at >= since);
+  return { last: mine.length ? mine[0].created_at : null, day: today.length, stopped: today.filter((r) => r.decision !== "ALLOW").length };
+}
+
+/** Every registered agent, whether it is sending traffic, and its last 24 hours. */
+function ConnectedAgents({ agents, rows }: { agents: AgentSummary[]; rows: DecisionRow[] }) {
+  const now = Date.now() / 1000;
+  const list = agents.map((a) => ({ a, act: activity(rows, a.agent) }))
+    .sort((x, y) => (y.act.last ?? 0) - (x.act.last ?? 0));
+  return (
+    <Card>
+      <CardTitle meta="An agent counts as connected once its traffic reaches the gateway. Activity from the last 7 days.">Your agents</CardTitle>
+      <div className="overflow-x-auto">
+        <table className="table min-w-[860px]">
+          <thead><tr><th>Agent</th><th>Status</th><th>Mode</th><th>Last decision</th><th>Decisions · 24 h</th><th>Stopped · 24 h</th><th></th></tr></thead>
+          <tbody>
+            {list.map(({ a, act }) => {
+              const live = act.last !== null && now - act.last < DAY;
+              const status = live ? "Active" : act.last !== null ? "Connected · idle" : "Registered · no traffic yet";
+              const tone = live ? "var(--allow)" : act.last !== null ? "var(--neutralise)" : "var(--subtle)";
+              return (
+                <tr key={a.agent}>
+                  <td><span className="block text-[14px]">{agentName(a.agent)}</span><span className="mono subtle text-[11px]">{a.agent}</span></td>
+                  <td><span className="flex items-center gap-2 text-xs" style={{ color: tone }}><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: tone }} />{status}</span></td>
+                  <td><Tag tone={a.mode === "enforce" ? "var(--allow)" : "var(--neutralise)"}>{a.mode}</Tag></td>
+                  <td className="subtle text-xs">{act.last ? ago(act.last) : "—"}</td>
+                  <td className="num">{act.day}</td>
+                  <td className="num" style={{ color: act.stopped ? "var(--block)" : undefined }}>{act.stopped}</td>
+                  <td className="whitespace-nowrap text-xs"><Link className="text-link" to={`/decisions?agent=${encodeURIComponent(a.agent)}`}>Decisions</Link> · <Link className="text-link" to={`/policy?agent=${encodeURIComponent(a.agent)}`}>Policy</Link></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 export function Setup() {
   const agents = useAsync(() => api.agents(), []);
+  const recent = useAsync(() => api.decisions({ limit: "200", since: String(Date.now() / 1000 - 7 * DAY) }), []);
   const [agent, setAgent] = useState<string>("");
+  const [adding, setAdding] = useState<boolean | null>(null);
   useEffect(() => {
     if (!agent && agents.data && agents.data.length) setAgent(agents.data[0].agent);
   }, [agents.data, agent]);
+  const anyTraffic = (recent.data ?? []).length > 0;
+  const open = adding ?? !anyTraffic;
   return (
     <div className="space-y-8">
-      <PageHeader index="00" label="Set up" title={<>Protect an agent<br />in four steps.</>}
-        lede="Register the agent, connect it with one setting or a few lines, prove the checkpoints fire, then enforce." />
+      <PageHeader index="00" label="Agents" title={<>Every agent,<br />one boundary.</>}
+        lede="The agents protected by this gateway and what each did today. Adding another takes four steps: register, connect with one setting or a few lines, verify, enforce." />
+      {agents.data && recent.data && agents.data.length > 0 && <ConnectedAgents agents={agents.data} rows={recent.data} />}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="h3 m-0">Connect another agent</h2>
+        <button className="pill pill-sm" aria-expanded={open} onClick={() => setAdding(!open)}>{open ? "Hide the steps" : "Show the four steps"}</button>
+      </div>
+      {open && <>
       <Card>
         <CardTitle meta="All three use the same engine, policies and evidence.">1. Choose how your agent connects</CardTitle>
         <div className="grid gap-5 md:grid-cols-3">
@@ -244,6 +301,7 @@ export function Setup() {
           </ol>
         </Card>
       )}
+      </>}
     </div>
   );
 }

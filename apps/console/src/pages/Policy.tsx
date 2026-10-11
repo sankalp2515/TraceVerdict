@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { admin, AGENT, api, type Policy as PolicyT } from "../api";
 import { useReviewer } from "../reviewer";
+import { ReviewerSignIn } from "../components/ReviewerSignIn";
 import { Card, CardTitle, ErrorNote, Loading, PageHeader, Stat, Tag, useAsync } from "../components/ui";
 
 const RISK_TONE: Record<string, string> = { low: "var(--allow)", medium: "var(--neutralise)", high: "var(--block)" };
@@ -11,7 +13,7 @@ function Editor({ policy, onSaved }: { policy: PolicyT; onSaved: () => void }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   if (!reviewer) {
-    return <p className="subtle text-xs">Editing needs a reviewer key (<b>Reviewer sign-in</b> at the top). Saves are validated, versioned and written atomically.</p>;
+    return <div className="subtle flex flex-wrap items-center gap-3 text-xs"><span>Editing needs a reviewer key. Saves are validated, versioned and written atomically.</span><ReviewerSignIn /></div>;
   }
   async function save(body: unknown) {
     setBusy(true);
@@ -57,8 +59,9 @@ function Editor({ policy, onSaved }: { policy: PolicyT; onSaved: () => void }) {
 }
 
 export function Policy() {
-  const [agent, setAgent] = useState(AGENT);
-  const [input, setInput] = useState(AGENT);
+  const [params] = useSearchParams();
+  const [agent, setAgent] = useState(params.get("agent") || AGENT);
+  const [input, setInput] = useState(params.get("agent") || AGENT);
   const { data: p, error, loading, reload } = useAsync(() => api.policy(agent), [agent]);
   return (
     <div className="space-y-8">

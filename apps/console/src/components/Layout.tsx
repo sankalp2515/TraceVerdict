@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { api, PRODUCT_NAME } from "../api";
+import { agentName, api, PRODUCT_NAME } from "../api";
+import { useReviewer } from "../reviewer";
 import { ReviewerSignIn } from "./ReviewerSignIn";
 import { SealMark } from "./ui";
 import { LandingFooter, LandingHeader } from "./LandingNav";
@@ -84,7 +85,7 @@ function ThemeToggle({ dark, toggle }: { dark: boolean; toggle: () => void }) {
 
 const NAV = [
   { to: "/", label: "Overview" },
-  { to: "/setup", label: "Set up" },
+  { to: "/setup", label: "Agents" },
   { to: "/playground", label: "Playground" },
   { to: "/replay", label: "Replay" },
   { to: "/results", label: "Results" },
@@ -93,9 +94,44 @@ const NAV = [
   { to: "/policy", label: "Policy" },
 ];
 
+/** Header indicator: which agents sent traffic through the gateway in the last 24 hours. */
+function AgentsIndicator() {
+  const [active, setActive] = useState<string[] | null>(null);
+  const [total, setTotal] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const [agents, rows] = await Promise.all([api.agents(), api.decisions({ limit: "200", since: String(Date.now() / 1000 - 86400) })]);
+        if (!alive) return;
+        const seen = new Set(rows.map((r) => r.agent_id));
+        setTotal(agents.length);
+        setActive(agents.map((a) => a.agent).filter((a) => seen.has(a)));
+      } catch {
+        if (alive) setActive(null);
+      }
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  if (active === null) return null;
+  const names = active.map(agentName);
+  return (
+    <Link to="/setup" className="subtle hidden items-center gap-2 whitespace-nowrap text-xs md:flex" title={names.length ? `Active in the last 24 hours: ${names.join(", ")}` : "No agent traffic in the last 24 hours"}>
+      <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: active.length ? "var(--allow)" : "var(--subtle)" }} />
+      {active.length ? <>
+        <span className="2xl:hidden">{active.length} of {total} agents active</span>
+        <span className="hidden 2xl:inline">{names.slice(0, 2).join(" · ")}{names.length > 2 ? ` +${names.length - 2}` : ""} active</span>
+      </> : `${total} agents · no traffic today`}
+    </Link>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const theme = useTheme();
   const status = useBackendStatus();
+  const reviewer = useReviewer();
   const { pathname, search } = useLocation();
   const landing = pathname === "/";
   useEffect(() => {
@@ -128,8 +164,9 @@ export function Layout({ children }: { children: ReactNode }) {
                 style={{ background: status === "ok" ? "var(--allow)" : status === "checking" ? "var(--subtle)" : "var(--block)" }} />
               {status === "ok" ? "Backend online" : status === "checking" ? "Checking" : status === "waking" ? "Waking" : "Offline"}
             </span>
+            <AgentsIndicator />
             <ThemeToggle {...theme} />
-            <ReviewerSignIn />
+            {reviewer && <ReviewerSignIn />}
             <Link to="/playground" className="pill pill-primary pill-sm hidden xl:inline-flex">Run the demo</Link>
           </div>
         </div>

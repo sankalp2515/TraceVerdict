@@ -1088,7 +1088,7 @@
      "review"
     ],
     "summary": "Investigate",
-    "description": "Run the Investigator on one session: it plans, uses read-only tools on the log, evidence, decoders, memory\nand policy, and returns a report with recommendations and proposals that wait for a reviewer.",
+    "description": "Run the Investigator on one session: it plans, uses read-only tools on the log, evidence, decoders, memory\nand policy, and returns a report with recommendations and proposals that wait for a reviewer. Any key that can\nsee the session may run it (read-only, rate-limited per key); applying a proposal stays reviewer-only.",
     "operationId": "investigate_v1_sessions__session_id__investigate_post",
     "parameters": [
      {

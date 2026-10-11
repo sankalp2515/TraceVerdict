@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { admin, api, type DecisionRow } from "../api";
+import { Link, useSearchParams } from "react-router-dom";
+import { admin, agentName, api, type DecisionRow } from "../api";
 import { useReviewer } from "../reviewer";
-import { Card, DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Tag } from "../components/ui";
+import { Card, DecisionBadge, Empty, ErrorNote, Loading, PageHeader, Tag, useAsync } from "../components/ui";
 
 const LABELS = [
   "", "Instruction Override", "Role Change", "Secret Extraction", "Tool Abuse", "Credential Theft",
@@ -39,12 +39,14 @@ const PAGE = 50;
 const WINDOWS = [{ v: "", l: "Any time" }, { v: "3600", l: "Last hour" }, { v: "86400", l: "Last 24 hours" }, { v: "604800", l: "Last 7 days" }];
 
 export function Decisions() {
-  const [filters, setFilters] = useState({ decision: "", label: "", agent: "", window: "" });
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState({ decision: "", label: "", agent: params.get("agent") ?? "", window: "" });
   const [rows, setRows] = useState<DecisionRow[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const reviewer = useReviewer();
+  const agents = useAsync(() => api.agents(), []);
 
   async function load(older = false) {
     setLoading(true);
@@ -72,7 +74,7 @@ export function Decisions() {
   return (
     <div className="space-y-8">
       <PageHeader index="04" label="Decisions" title={<>Every boundary<br />has a reason.</>}
-        lede="Every inspection and tool-call decision, newest first. Content appears only as a redacted preview." />
+        lede="Every inspection and tool-call decision from every connected agent, newest first. Content appears only as a redacted preview." />
       <Card>
         <div className="flex flex-col gap-4 md:flex-row md:items-end">
           <label className="flex flex-col gap-2"><span className="section-label">Decision</span>
@@ -88,7 +90,10 @@ export function Decisions() {
               {WINDOWS.map((w) => <option key={w.v} value={w.v}>{w.l}</option>)}
             </select></label>
           <label className="flex flex-1 flex-col gap-2"><span className="section-label">Agent</span>
-            <input className="input" placeholder="research-agent" value={filters.agent} onChange={(e) => setFilters((f) => ({ ...f, agent: e.target.value }))} /></label>
+            <select className="input" value={filters.agent} onChange={(e) => setFilters((f) => ({ ...f, agent: e.target.value }))}>
+              <option value="">All agents</option>
+              {(agents.data ?? []).map((a) => <option key={a.agent} value={a.agent}>{agentName(a.agent)}</option>)}
+            </select></label>
           <button className="pill" onClick={() => load()}>Refresh</button>
         </div>
       </Card>
@@ -98,12 +103,13 @@ export function Decisions() {
       {rows && rows.length > 0 && (
         <Card>
           <div className="overflow-x-auto">
-            <table className="table min-w-[980px]">
-              <thead><tr><th>Time</th><th>Decision</th><th>Source</th><th>Rule · reason</th><th>Attack types</th><th>Session</th>{reviewer && <th>Review</th>}</tr></thead>
+            <table className="table min-w-[1080px]">
+              <thead><tr><th>Time</th><th>Agent</th><th>Decision</th><th>Source</th><th>Rule · reason</th><th>Attack types</th><th>Session</th>{reviewer && <th>Review</th>}</tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.event_id}>
                     <td className="subtle whitespace-nowrap text-xs">{new Date(r.created_at * 1000).toLocaleTimeString()}</td>
+                    <td className="whitespace-nowrap text-xs"><span className="block">{agentName(r.agent_id)}</span>{agentName(r.agent_id) !== r.agent_id && <span className="mono subtle text-[11px]">{r.agent_id}</span>}</td>
                     <td><DecisionBadge decision={r.decision} />{r.enforced !== r.decision && <span className="subtle mt-1 block text-[11px]">monitor mode</span>}</td>
                     <td className="text-xs">{r.source.replace("tool:", "tool · ")}</td>
                     <td><span className="mono" style={{ color: "var(--accent-soft)" }}>{r.policy_rule}</span><span className="subtle mt-1 block text-xs">{r.reason}</span></td>

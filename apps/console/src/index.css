@@ -2,6 +2,26 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Replay evidence uses a continuous trace and a separate authorization boundary. */
+.provenance-heading { display: grid; gap: 12px; max-width: 760px; margin-bottom: 24px; }
+.provenance-summary { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 20px; padding: 20px 0; margin-bottom: 28px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.provenance-layout { display: grid; gap: 32px; align-items: start; }
+.provenance-layout > *, .trace-step, .contract-clause > div { min-width: 0; }
+.trace-step { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; background: var(--surface); overflow-wrap: anywhere; text-align: left; }
+.trace-connector { width: 1px; height: 20px; background: var(--line-strong); margin-left: 28px; }
+.evidence-chain { margin-top: 18px; }
+.contract-panel .space-y-6 { margin-top: 20px; }
+.trace-outcome { background: var(--surface-2); border-left: 3px solid var(--line-strong); }
+.contract-panel { border: 1px solid var(--line); border-radius: 14px; padding: 22px; background: var(--surface-2); overflow-wrap: anywhere; }
+.contract-group + .contract-group { padding-top: 20px; border-top: 1px solid var(--line); }
+.contract-clause { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 10px; align-items: start; }
+.contract-clause .tag { justify-self: start; margin-top: 3px; }
+.contract-details { padding-top: 16px; border-top: 1px solid var(--line); }
+.investigator-panel > div:first-child { align-items: start; }
+.investigator-panel > div:first-child > div { max-width: 420px; line-height: 1.7; }
+@media (min-width: 640px) { .provenance-summary { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media (min-width: 1100px) { .provenance-layout { grid-template-columns: minmax(0,1.2fr) minmax(0,1fr); gap: 32px; } }
+
 @theme {
   --font-sans: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, Roboto, Arial, sans-serif;
   --font-mono: Consolas, "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, monospace;

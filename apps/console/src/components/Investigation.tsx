@@ -102,9 +102,8 @@ export function InvestigationReportView({ inv, onChange }: { inv: Investigation;
   );
 }
 
-/** The Investigator for one session: its latest report, and a button for a reviewer to run it. */
+/** The Investigator for one session: its latest report, and a button to run it (read-only; proposals wait for a reviewer). */
 export function InvestigationPanel({ sessionId }: { sessionId: string }) {
-  const reviewer = useReviewer();
   const { data, error, loading, reload } = useAsync(() => api.investigations(sessionId), [sessionId]);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -112,7 +111,7 @@ export function InvestigationPanel({ sessionId }: { sessionId: string }) {
     setRunning(true);
     setErr(null);
     try {
-      await admin.investigate(reviewer!.key, sessionId);
+      await api.investigate(sessionId);
       reload();
     } catch (e) {
       setErr((e as Error).message);
@@ -122,17 +121,18 @@ export function InvestigationPanel({ sessionId }: { sessionId: string }) {
   }
   const latest = data?.[0];
   return (
-    <Card>
-      <CardTitle meta="An agent that triages this session: it plans, reads the log, evidence and policy with read-only tools, and proposes; a reviewer decides.">
+    <Card className="investigator-panel">
+      <CardTitle meta="Read-only analysis. Recommendations remain subject to human review.">
         Investigator
       </CardTitle>
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        {reviewer ? <button className="pill pill-primary pill-sm" disabled={running} onClick={run}>{running ? "Investigating… (up to a minute)" : latest ? "Investigate again" : "Investigate this session"}</button>
-          : <span className="subtle text-xs">Running an investigation needs a reviewer key (Reviewer sign-in). Sessions waiting for an approval are investigated automatically.</span>}
+        <button className="pill pill-primary pill-sm" disabled={running} onClick={run}>{running ? "Investigating… (up to a minute)" : latest ? "Investigate again" : "Investigate this session"}</button>
+        <span className="subtle text-xs">Reads the log, evidence and policy with read-only tools. Any proposal it makes waits for a reviewer.</span>
       </div>
       {loading && <Loading />}
       {(error || err) && <ErrorNote>{error ?? err}</ErrorNote>}
-      {data && !latest && !running && <Empty>No investigation yet.</Empty>}
+      {running && <Loading>Reading session evidence and checking policy…</Loading>}
+      {data && !latest && !running && <Empty>No report for this session yet. Select Investigate this session to analyse its evidence.</Empty>}
       {latest && <InvestigationReportView inv={latest} onChange={reload} />}
     </Card>
   );

@@ -3,7 +3,7 @@ import { signIn, signOut, useReviewer } from "../reviewer";
 import { ErrorNote } from "./ui";
 
 /** Header control: sign in with a reviewer (admin) key to approve, label decisions and edit policy. */
-export function ReviewerSignIn() {
+export function ReviewerSignIn({ label = "Reviewer sign-in" }: { label?: string }) {
   const reviewer = useReviewer();
   const dialog = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState("");
@@ -36,13 +36,13 @@ export function ReviewerSignIn() {
 
   return (
     <>
-      <button className="pill pill-sm" onClick={() => { setError(null); dialog.current?.showModal(); }}>Reviewer sign-in</button>
-      <dialog ref={dialog} aria-labelledby="reviewer-title" className="card m-auto w-[min(92vw,440px)] p-7 backdrop:backdrop-blur-sm"
+      <button className="pill pill-sm" onClick={() => { setError(null); dialog.current?.showModal(); }}>{label}</button>
+      <dialog ref={dialog} aria-label="Reviewer sign-in" className="card m-auto w-[min(92vw,440px)] p-7 backdrop:backdrop-blur-sm"
         style={{ color: "var(--text)" }}>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <h2 id="reviewer-title" className="h3">Reviewer sign-in</h2>
+          <h2 className="h3">Reviewer sign-in</h2>
           <p className="subtle m-0 text-xs leading-6">
-            Paste your reviewer (admin) key to approve escalated actions, confirm attacks or false alarms, and edit policy.
+            Paste your reviewer (admin) key to run investigations, approve escalated actions, confirm attacks or false alarms, and edit policy.
             It stays in this browser tab only and is cleared when the tab closes.
           </p>
           <label className="flex flex-col gap-2 text-xs">

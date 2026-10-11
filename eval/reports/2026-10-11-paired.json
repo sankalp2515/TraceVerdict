@@ -1,0 +1,344 @@
+{
+ "date": "2026-10-11",
+ "note": "The suite summaries report each arm over its own scored runs (an agent-model error leaves a run unscored, so the two arms can have different counts: headline 27 vs 30, v2e 144 vs 121). This report pairs runs by attack identity (channel + the generated test's variables, hashed) and keeps every outcome apart instead of folding it into a rate:",
+ "suites": {
+  "headline": {
+   "arms": {
+    "off": {
+     "n": 30,
+     "scored": 27,
+     "compromised": 7,
+     "stopped-content": 0,
+     "stopped-action": 0,
+     "resisted": 20,
+     "unscored": 3,
+     "asr": 0.259,
+     "asr_ci95": [
+      0.132,
+      0.447
+     ],
+     "engines": [],
+     "models": [
+      "groq/openai/gpt-oss-120b"
+     ]
+    },
+    "on": {
+     "n": 30,
+     "scored": 30,
+     "compromised": 0,
+     "stopped-content": 15,
+     "stopped-action": 2,
+     "resisted": 13,
+     "unscored": 0,
+     "asr": 0.0,
+     "asr_ci95": [
+      0.0,
+      0.114
+     ],
+     "engines": [
+      "9aca55e22cd6"
+     ],
+     "models": [
+      "groq/openai/gpt-oss-120b"
+     ]
+    },
+    "actions": {
+     "n": 30,
+     "scored": 28,
+     "compromised": 0,
+     "stopped-content": 0,
+     "stopped-action": 7,
+     "resisted": 21,
+     "unscored": 2,
+     "asr": 0.0,
+     "asr_ci95": [
+      0.0,
+      0.121
+     ],
+     "engines": [
+      "8c2b401a4425"
+     ],
+     "models": [
+      "groq/openai/gpt-oss-120b"
+     ]
+    }
+   },
+   "paired_off_vs_on": {
+    "pairs": 27,
+    "compromised_unprotected": 7,
+    "prevented": 7,
+    "prevented_by": {
+     "stopped-content": 1,
+     "resisted": 5,
+     "stopped-action": 1
+    },
+    "still_compromised": 0,
+    "new_compromise": 0,
+    "asr_unprotected": 0.259,
+    "asr_unprotected_ci95": [
+     0.132,
+     0.447
+    ],
+    "asr_protected": 0.0,
+    "asr_protected_ci95": [
+     0.0,
+     0.125
+    ],
+    "prevention_rate": 1.0,
+    "prevention_rate_ci95": [
+     0.646,
+     1.0
+    ],
+    "by_channel": {
+     "email": 2,
+     "pdf": 2,
+     "user": 22,
+     "web": 1
+    }
+   },
+   "paired_off_vs_actions": {
+    "pairs": 27,
+    "compromised_unprotected": 7,
+    "prevented": 7,
+    "prevented_by": {
+     "stopped-action": 6,
+     "resisted": 1
+    },
+    "still_compromised": 0,
+    "new_compromise": 0,
+    "asr_unprotected": 0.259,
+    "asr_unprotected_ci95": [
+     0.132,
+     0.447
+    ],
+    "asr_protected": 0.0,
+    "asr_protected_ci95": [
+     0.0,
+     0.125
+    ],
+    "prevention_rate": 1.0,
+    "prevention_rate_ci95": [
+     0.646,
+     1.0
+    ],
+    "by_channel": {
+     "email": 2,
+     "pdf": 2,
+     "user": 22,
+     "web": 1
+    }
+   }
+  },
+  "v2e": {
+   "arms": {
+    "off": {
+     "n": 144,
+     "scored": 144,
+     "compromised": 1,
+     "stopped-content": 0,
+     "stopped-action": 0,
+     "resisted": 143,
+     "unscored": 0,
+     "asr": 0.007,
+     "asr_ci95": [
+      0.001,
+      0.038
+     ],
+     "engines": [],
+     "models": [
+      "nvidia/nvidia/nemotron-3-super-120b-a12b"
+     ]
+    },
+    "on": {
+     "n": 144,
+     "scored": 121,
+     "compromised": 0,
+     "stopped-content": 84,
+     "stopped-action": 5,
+     "resisted": 32,
+     "unscored": 23,
+     "asr": 0.0,
+     "asr_ci95": [
+      0.0,
+      0.031
+     ],
+     "engines": [
+      "9aca55e22cd6"
+     ],
+     "models": [
+      "gemini/gemini-3.1-flash-lite",
+      "nvidia/nvidia/nemotron-3-super-120b-a12b"
+     ]
+    }
+   },
+   "paired_off_vs_on": {
+    "pairs": 121,
+    "compromised_unprotected": 1,
+    "prevented": 1,
+    "prevented_by": {
+     "resisted": 1
+    },
+    "still_compromised": 0,
+    "new_compromise": 0,
+    "asr_unprotected": 0.008,
+    "asr_unprotected_ci95": [
+     0.001,
+     0.045
+    ],
+    "asr_protected": 0.0,
+    "asr_protected_ci95": [
+     0.0,
+     0.031
+    ],
+    "prevention_rate": 1.0,
+    "prevention_rate_ci95": [
+     0.207,
+     1.0
+    ],
+    "by_channel": {
+     "api": 6,
+     "code": 6,
+     "db": 6,
+     "docx": 6,
+     "docx_hidden": 6,
+     "email": 6,
+     "html": 6,
+     "html_hidden": 6,
+     "image": 3,
+     "markdown": 3,
+     "ocr_text": 6,
+     "pdf": 3,
+     "pdf_hidden": 3,
+     "user": 50,
+     "web": 5
+    }
+   }
+  },
+  "mt3": {
+   "arms": {
+    "off": {
+     "n": 40,
+     "scored": 40,
+     "compromised": 5,
+     "stopped-content": 0,
+     "stopped-action": 0,
+     "resisted": 35,
+     "unscored": 0,
+     "asr": 0.125,
+     "asr_ci95": [
+      0.055,
+      0.261
+     ],
+     "engines": [],
+     "models": [
+      "nvidia/nvidia/nemotron-3-super-120b-a12b"
+     ]
+    },
+    "on": {
+     "n": 40,
+     "scored": 31,
+     "compromised": 0,
+     "stopped-content": 20,
+     "stopped-action": 4,
+     "resisted": 7,
+     "unscored": 9,
+     "asr": 0.0,
+     "asr_ci95": [
+      0.0,
+      0.11
+     ],
+     "engines": [
+      "9aca55e22cd6"
+     ],
+     "models": [
+      "gemini/gemini-3.1-flash-lite",
+      "nvidia/nvidia/nemotron-3-super-120b-a12b"
+     ]
+    }
+   },
+   "paired_off_vs_on": {
+    "pairs": 31,
+    "compromised_unprotected": 5,
+    "prevented": 5,
+    "prevented_by": {
+     "stopped-content": 4,
+     "resisted": 1
+    },
+    "still_compromised": 0,
+    "new_compromise": 0,
+    "asr_unprotected": 0.161,
+    "asr_unprotected_ci95": [
+     0.071,
+     0.326
+    ],
+    "asr_protected": 0.0,
+    "asr_protected_ci95": [
+     0.0,
+     0.11
+    ],
+    "prevention_rate": 1.0,
+    "prevention_rate_ci95": [
+     0.566,
+     1.0
+    ],
+    "by_channel": {
+     "user": 31
+    }
+   }
+  }
+ },
+ "repeated": {
+  "attacks": 13,
+  "arms": {
+   "off": {
+    "trials": 39,
+    "scored": 34,
+    "compromised_trials": 15,
+    "trial_asr": 0.441,
+    "trial_asr_ci95": [
+     0.289,
+     0.605
+    ],
+    "attacks_ever_compromised": 9,
+    "outcomes": {
+     "resisted": 19,
+     "compromised": 15,
+     "unscored": 5
+    }
+   },
+   "on": {
+    "trials": 39,
+    "scored": 37,
+    "compromised_trials": 0,
+    "trial_asr": 0.0,
+    "trial_asr_ci95": [
+     0.0,
+     0.094
+    ],
+    "attacks_ever_compromised": 0,
+    "outcomes": {
+     "stopped-content": 32,
+     "stopped-action": 2,
+     "resisted": 3,
+     "unscored": 2
+    }
+   },
+   "actions": {
+    "trials": 39,
+    "scored": 28,
+    "compromised_trials": 0,
+    "trial_asr": 0.0,
+    "trial_asr_ci95": [
+     0.0,
+     0.121
+    ],
+    "attacks_ever_compromised": 0,
+    "outcomes": {
+     "resisted": 19,
+     "unscored": 11,
+     "stopped-action": 9
+    }
+   }
+  }
+ }
+}

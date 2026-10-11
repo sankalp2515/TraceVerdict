@@ -93,5 +93,7 @@ benign documents. They require no model downloads or network access.
 | `known-attack-match` | `memory.py` | content containing ≥ `memory.match_threshold` of a confirmed attack fingerprint → BLOCK at Tier 0, no AI call |
 | False-positive mark | `memory.py` | exact content, per agent: skips Tier 1/2; structural rules (`drop-non-visible`) and the action guard still apply |
 | `human-approved` | `Engine.check_action` | an approved ESCALATE for the same session + tool + arguments allows the call once; never overrides BLOCK |
+| `contract-prohibited` / `contract-out-of-scope` | `contract.py`, `action_guard` | D-064: a capability the user prohibited is blocked; a high-impact capability (`contract.require_mention`) the user never asked for is escalated (or blocked by `contract.out_of_scope`); the decision carries the contract version, hash and clause |
+| `content-checks-off` | `Engine._observe` | policy `content_checks: observe` (evaluation): content is recorded for provenance and the contract, never scored or judged |
 | Raw-text fallback | `extract.py` | a structured parse that yields nothing for non-empty text input falls back to the raw text |
 | `INTENTSEAL_BUDGET_TIER2_DAILY_TOKENS` | `policy.load_policy` | operational override of the daily Tier 2 cap (`none` lifts it); used by evaluation runs and recorded in the summary |

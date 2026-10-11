@@ -9,6 +9,18 @@ All notable changes to IntentSeal. Versions follow [Semantic Versioning](https:/
   the gateway at `/`) and the test assistant with sample files and a labelled attack test pack.
 - LLM proxy: `GET /proxy/<agent>/v1/models` for clients that discover models first (agent frameworks, chat UIs).
 - Policies for the test assistant (`my-assistant`) and for Hermes Agent connected through the proxy (`hermes`).
+- **Intent contracts** (D-064): a versioned, hash-chained contract per session, compiled from the user's own words and
+  the policy; tool calls the user prohibited are blocked and unrequested high-impact calls held. `POST /v1/sessions`
+  returns it, `GET /v1/sessions/{id}/contract` lists its versions, and every action decision records the deciding
+  clause. Policy: `contract: {mode: enforce}`; tool `capability`.
+- **Attack-to-action provenance and execution receipts** (D-065): `GET /v1/sessions/{id}/provenance`,
+  `POST /v1/actions/{id}/receipt`, `Guard.record_execution` (automatic in `@guard.tool`); Console Replay shows the chain
+  and the contract.
+- Evaluation: `content_checks: observe` (detectors bypassed) and the `actions` protection arm; paired comparisons with
+  Wilson intervals and repeated trials (`intentseal_eval.paired`); deterministic contract evaluation
+  (`intentseal_eval.contract_eval`); the red-team and repair loop (`intentseal_eval.redteam`); `docs/ASSURANCE.md`.
+- `examples/node-rest/agent.mjs`: IntentSeal from Node over REST, with the check at the tool-execution boundary.
+- Playground scenario S10: detectors off, the intent contract stops the send.
 
 ### Fixed
 - Empty key placeholders written by `intentseal init` no longer hide a key set in the project's own `.env`.

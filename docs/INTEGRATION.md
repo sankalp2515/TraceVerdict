@@ -26,6 +26,21 @@ own organisation with its own keys (D-043).
 | **Python SDK** (`intentseal`) | About 5 lines: a session, `guard.inspect(...)` on content, `@guard.tool()` on tools | The same, plus content the agent reads outside model messages (files, pages, emails) at the moment it reads them, and trusted context (pinned fields) | Python agents; any model provider; embedded or against the gateway |
 | **REST API** | Calls to `/v1/inspect` and `/v1/actions/check` from your hooks | Whatever you route through it | Other languages, or frameworks with their own middleware |
 
+**What each path can and cannot see.** A model proxy sees what passes through model calls: user messages, tool
+results the agent sends back, and the tool calls the model proposes. It cannot see a file the agent reads without
+returning it to the model, or a side effect the agent performs without a tool call. The SDK and REST paths put the
+check at the **tool-execution boundary**: the tool runs only after `check` returns ALLOW, with the checked arguments,
+and the application reports what happened (`POST /v1/actions/{event_id}/receipt`; `@guard.tool()` does this
+automatically). That record is the evidence the Console's provenance view shows ("not executed", "executed").
+Worked example without Python: `node examples/node-rest/agent.mjs` (no dependencies; a session with an intent
+contract, an inspected email, a blocked reply, an allowed read with a receipt).
+
+**Intent contract (D-064).** `POST /v1/sessions` with the user's task returns the session's contract (what the user
+permitted and prohibited, what needs an explicit request, the policy's bounds). Pass the user's later turns through
+`/v1/inspect` with `source: "user"` (the proxy does this itself): only those can amend it. Every action decision
+carries `contract` (version, hash, the clause that ruled). Turn it on per agent in the policy:
+`contract: {mode: enforce, require_mention: [send, submit, purchase, delete]}`.
+
 ### Provider compatibility (proxy)
 
 | The agent uses | Point it at | Notes |
@@ -110,6 +125,9 @@ tools:
   issue_refund:    { risk: high, failure: closed, pinned: [customer_id], escalate_if_uncertain: true,
                      intent_terms: [refund, money, reimburse, return] }
 ```
+
+With `contract: {mode: enforce}` in the policy, the session's intent contract (D-064) replaces `intent_terms` for tools whose
+capability it governs (send, submit, purchase, delete by default; set a tool's `capability` when its name does not say it).
 
 SDK (any provider), deepest protection:
 

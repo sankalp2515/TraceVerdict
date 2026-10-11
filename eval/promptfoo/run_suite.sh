@@ -4,7 +4,7 @@
 set -u
 cd "$(dirname "$0")"
 SUITE=$1; PROT=$2; J=${3:-2}; shift 3 2>/dev/null || shift $#
-export PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1
+export PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_DISABLE_SHARING=true   # results stay local
 CHANNELS=${*:-$(ls output/*."$PROT"."$SUITE".plain.yaml 2>/dev/null | sed "s#output/##; s#\.$PROT\.$SUITE\.plain\.yaml##")}
 for ch in $CHANNELS; do
   base="output/$ch.$PROT.$SUITE"

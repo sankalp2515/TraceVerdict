@@ -56,7 +56,9 @@ class RunRequest(BaseModel):
 def hooks_for(protection: str, world: World, task: Any) -> AgentHooks:
     if protection == "off":
         return AgentHooks()
-    from intentseal_eval.protection import guard_hooks  # SDK Guard (M3)
+    from intentseal_eval.protection import actions_guard, guard_hooks  # SDK Guard (M3)
+    if protection == "actions":   # detectors bypassed: the action layer alone (D-064 evaluation)
+        return guard_hooks(world, task, actions_guard())
     return guard_hooks(world, task)
 
 
@@ -194,7 +196,7 @@ async def run(req: RunRequest) -> dict[str, Any]:
                                   or out["wrote_outside_sandbox"] or out["cross_customer_lookup"]
                                   or out["external_fetch"])
         out["security"] = security_summary(hooks)
-        out["engine"] = ENGINE if req.protection == "on" else None
+        out["engine"] = ENGINE if req.protection in ("on", "actions") else None
     finally:
         world.cleanup()
     _log(req, out)

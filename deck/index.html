@@ -176,16 +176,17 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
     <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">02 · REMOVE</div><h3 style="margin-top:10px">Removes only the attack</h3>
       <p>Offending spans are quarantined in place; the rest keeps working: <b style="color:var(--text)" data-m="utility" data-f="pct0"></b> of normal tasks still completed.</p></div>
     <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">03 · GUARD</div><h3 style="margin-top:10px">Checks every action</h3>
-      <p>Allow-lists, fields pinned to the signed-in user, secret-leak scan, "did the user ask for this?", data-flow tracing, answer check.</p></div>
+      <p>An intent contract from the user's own words, plus allow-lists, fields pinned to the signed-in user, secret-leak scan, data-flow tracing, answer check.</p></div>
     <div class="card"><div class="mono" style="color:var(--accent2);font-size:13px">04 · PROVE</div><h3 style="margin-top:10px">Proves, triages, learns</h3>
-      <p>Every decision logged with rule and attack type; replay, human approvals, an Investigator agent, a memory of confirmed attacks.</p></div>
+      <p>Attack-to-action provenance with execution receipts; replay, approvals, an Investigator agent, a red-team loop that repairs on evidence.</p></div>
   </div>
   <div class="card" style="margin-top:20px;padding:14px 26px">
     <table class="t cmp"><tr><th style="width:40%">What is new</th><th>Typical prompt filter</th><th>IntentSeal</th></tr>
       <tr><td>Reads hidden text, images (OCR) and encodings the model will read</td><td>text only</td><td class="yes">yes, 11 sources</td></tr>
-      <tr><td>Stops the harmful action when detection misses</td><td>no</td><td class="yes">intent-bound action guard</td></tr>
+      <tr><td>Enforces what the user authorised, even with every detector bypassed</td><td>no</td><td class="yes">intent contract, versioned</td></tr>
+      <tr><td>Shows the attack path and proves the action never ran</td><td>no</td><td class="yes">provenance + execution receipts</td></tr>
       <tr><td>Keeps the user's request apart from pasted or retrieved text</td><td>no</td><td class="yes">yes, per span</td></tr>
-      <tr><td>Investigates its own alerts and learns from reviewers</td><td>no</td><td class="yes">Investigator agent + memory</td></tr>
+      <tr><td>Investigates, attacks and repairs itself, on evidence only</td><td>no</td><td class="yes">Investigator + red-team loop</td></tr>
     </table>
   </div>
 </section>
@@ -206,14 +207,14 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
     </div>
     <div class="lane"><div class="lab">Actions &amp;<br>answers</div>
       <div class="node ext" style="flex:.8"><b>Tool call / answer</b><span>proposed by the agent's model</span></div><div class="arrow">→</div>
-      <div class="node rule" style="flex:2.6"><span class="num">6</span><b>Action guard</b><span>allow-lists for tools, recipients, domains, paths · pinned fields · outbound secret scan (also encoded) · "did the user ask?" · provenance &amp; data-flow taint · session risk</span></div><div class="arrow">→</div>
+      <div class="node rule" style="flex:2.6"><span class="num">6</span><b>Intent contract + action guard</b><span>contract compiled from the user's own words (permit · prohibit · ask first; versioned, hash-chained) · allow-lists · pinned fields · secret scan (also encoded) · provenance &amp; data-flow taint · session risk</span></div><div class="arrow">→</div>
       <div class="node rule" style="flex:1.3"><span class="num">7</span><b>Answer check</b><span>secrets redacted or withheld, also mid-stream</span></div><div class="arrow">→</div>
       <div class="node ext" style="flex:1.3"><b>Tools / user</b><span>stopped calls are explained to the model, which continues another way</span></div>
     </div>
     <div class="lane"><div class="lab">Session</div>
       <div class="node rule" style="flex:2"><b>Session risk</b><span>user risk (user's own turns: multi-step jailbreaks) kept apart from third-party risk (gates actions); the same poisoned content counts once</span></div><div class="arrow">↔</div>
-      <div class="node rule" style="flex:2"><span class="num">8</span><b>Decision log &amp; evidence</b><span>rule, reason, attack types, redacted previews; replay, approvals, SIEM export (JSON Lines, CEF)</span></div><div class="arrow">→</div>
-      <div class="node ai" style="flex:2.2"><span class="num">9 · AGENT</span><b>Investigator</b><span>plans, uses read-only tools, self-checks, reports; proposes memory/policy changes a reviewer applies, which feed back into step 2</span></div>
+      <div class="node rule" style="flex:2"><span class="num">8</span><b>Decision log, provenance &amp; receipts</b><span>source → evidence → call → rule &amp; clause → executed or not; replay, approvals, SIEM export</span></div><div class="arrow">→</div>
+      <div class="node ai" style="flex:2.2"><span class="num">9 · AGENT</span><b>Investigator</b><span>plans, uses read-only tools, self-checks, reports; with the red-team loop, proposes repairs a reviewer applies (back into step 2)</span></div>
     </div>
     <div class="legend" style="margin-top:12px">
       <span><span class="sw" style="background:rgba(139,227,185,.5)"></span>Deterministic (rules)</span>
@@ -271,7 +272,8 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
         <tr><td>Reason</td><td>Judge weighs content against the user's task; long-context judge for whole pages</td></tr>
         <tr><td>Plan</td><td>Investigator follows and adapts a triage playbook</td></tr>
         <tr><td>Use tools</td><td>Investigator queries log, evidence, decoders, memory, policy</td></tr>
-        <tr><td>Take actions</td><td>Quarantines spans, blocks, escalates to a human, pins fields; triages pending approvals automatically</td></tr>
+        <tr><td>Take actions</td><td>Quarantines spans, blocks, escalates, pins fields, enforces the user's intent contract; triages pending approvals</td></tr>
+        <tr><td>Learn</td><td>Red-team loop: clusters failures, mutates them, proposes a repair, promotes only on held-out evidence</td></tr>
         <tr><td>Recover</td><td>Provider failover; fail-closed holds; self-check; protected agents continue after a stopped call</td></tr>
         <tr><td>Autonomy</td><td>Rules decide; humans approve state changes; monitor before enforce</td></tr>
       </table>
@@ -300,8 +302,8 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
 
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
-      <div class="shot" style="flex:1;min-height:0"><img src="assets/investigator.png" alt="Investigator report for a blocked PDF" style="width:100%;height:100%;object-fit:cover;object-position:left top"></div>
-      <p style="font-size:16px">Replay + Investigator: a PDF with white, base64-encoded text is blocked; the Investigator decodes it, names the goal and proposes remembering it.</p>
+      <div class="shot" style="flex:1;min-height:0"><img src="assets/provenance.png" alt="Replay: attack-to-action chain and the session's intent contract" style="width:100%;height:100%;object-fit:contain;object-position:center top"></div>
+      <p style="font-size:16px">Replay → Attack to action: the email that supplied the target, the rule that fired, the clause the user wrote (“Do not reply to anyone”) and the proof the reply never ran. The contract on the right came from the user's words only.</p>
     </div>
   </div>
 </section>
@@ -313,7 +315,7 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
   <div class="grid4" style="margin-top:22px">
     <div class="card metric"><div class="big grad" data-m="docs_recall" data-f="pct1"></div><p>attacks caught in documents and data, <span data-m="docs_n"></span> generated attacks, <span data-m="channels"></span> channels</p></div>
     <div class="card metric"><div class="big grad"><span data-m="head_off" data-f="pct0"></span>→<span data-m="head_on" data-f="pct0"></span></div><p>attack success on the agent, protection off → on (<span data-m="e2e_compromised_on"></span> of <span data-m="e2e_scored_on"></span> protected tests compromised)</p></div>
-    <div class="card metric"><div class="big grad"><span data-m="adaptive_compromised"></span> / <span data-m="adaptive_scored"></span></div><p>adaptive multi-turn attacker conversations that succeeded (promptfoo crescendo, tree search)</p></div>
+    <div class="card metric"><div class="big grad"><span data-m="act_compromised"></span> / <span data-m="act_scored"></span></div><p>attacks that succeeded with <b style="color:var(--text)">every detector switched off</b>: the action layer and intent contract alone</p></div>
     <div class="card metric"><div class="big grad"><span data-m="p95_ms" data-f="int"></span> ms</div><p>fast-path latency p95 on CPU; <span data-m="utility" data-f="pct0"></span> of normal tasks completed with protection on</p></div>
   </div>
   <div class="grid2" style="grid-template-columns: 1.1fr 1fr; gap: 24px; margin-top: 20px; flex:1; min-height:0">
@@ -323,12 +325,12 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
       <table class="t gridt" style="margin-top:6px">
         <tr><td style="width:24%">F3: ≥ 7 types</td><td>All 9 types detected (chart); each labelled per decision</td></tr>
         <tr><td>D3: multimodal</td><td>PDF, Word, HTML, email, images (OCR), API, code, RAG, hidden text and encodings: <span data-m="docs_recall" data-f="pct1"></span> recall</td></tr>
-        <tr><td>Reliability</td><td>0% attack success in <span data-m="e2e_scored_on"></span> protected tests; held-out benign set; one engine fingerprint for every result</td></tr>
+        <tr><td>Reliability</td><td>0% attack success in <span data-m="e2e_scored_on"></span> protected tests (paired, 95% CI ≤ <span data-m="pair_on_ci_hi" data-f="pct1"></span>); attacks that worked, repeated 3×: unprotected <span data-m="rep_off_c"></span>/<span data-m="rep_off_n"></span>, protected <span data-m="rep_on_c"></span>/<span data-m="rep_on_n"></span>, detectors off <span data-m="rep_actions_c"></span>/<span data-m="rep_actions_n"></span>; adaptive attackers <span data-m="adaptive_compromised"></span>/<span data-m="adaptive_scored"></span></td></tr>
         <tr><td>Stated limits</td><td>Attacks typed by the user: <span data-m="user_recall" data-f="pct0"></span> caught (the action guard still stops the harm); false alarms on hard held-out benign: <span data-m="fpr" data-f="pct1"></span></td></tr>
       </table>
     </div>
   </div>
-  <div class="src">Evaluation <span data-m="date"></span>, commit <span data-m="commit"></span>, engine <span data-m="engine"></span>. Attacks from promptfoo and NVIDIA garak. Method and per-channel results: docs/EVALUATION.md.</div>
+  <div class="src">Evaluation <span data-m="date"></span>, commit <span data-m="commit"></span>, engine <span data-m="engine"></span>; detectors-off arm and intent contracts: engine <span data-m="act_engine"></span>. Attacks from promptfoo and NVIDIA garak. Method: docs/EVALUATION.md.</div>
 </section>
 
 <!-- 9. Business impact -->
@@ -370,15 +372,15 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
         <li><b style="color:var(--text)">Rules decide, AI advises:</b> a deterministic policy sits over every model output</li>
         <li><b style="color:var(--text)">Fail closed:</b> content that needs the judge is held, never passed, if models are down</li>
         <li><b style="color:var(--text)">Human oversight:</b> approvals, monitor mode, reviewer feedback, proposals a human applies</li>
-        <li><b style="color:var(--text)">Privacy:</b> redacted previews or hashes only; memory keeps fingerprints, not text</li>
-        <li><b style="color:var(--text)">Transparency:</b> every decision has a rule, reason, attack type and replay</li>
-        <li><b style="color:var(--text)">Honest metrics:</b> held-out benign set, third-party attack generators, published limits</li>
+        <li><b style="color:var(--text)">Private and transparent:</b> hashes or redacted previews only; every decision has a rule, reason, replay and provenance</li>
+        <li><b style="color:var(--text)">The user decides scope:</b> an intent contract from the user's words; no model or document can widen it</li>
+        <li><b style="color:var(--text)">Honest metrics:</b> paired runs with 95% intervals, a detectors-off arm, held-out benign set, published limits</li>
       </ul></div>
   </div>
   <div class="grid4" style="margin-top:20px">
     <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="adaptive_compromised"></span> / <span data-m="adaptive_scored"></span></div><p>adaptive attacker conversations that succeeded</p></div>
-    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px">250+</div><p>automated tests in CI, incl. fault injection: models down, timeouts</p></div>
-    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px">2–5</div><p>providers behind every AI role, with automatic failover</p></div>
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="ct_named_contract"></span> vs <span data-m="ct_named_previous"></span></div><p>of <span data-m="ct_named_n"></span> hijacked sends to a party the user named stopped: intent contract vs the previous rules</p></div>
+    <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="rt_fp"></span> / <span data-m="rt_benign_n"></span></div><p>new false alarms from the red-team loop's repair; <span data-m="rt_hold"></span>/<span data-m="rt_hold_n"></span> held-out misses now caught</p></div>
     <div class="card metric" style="padding:16px 20px"><div class="big grad" style="font-size:40px"><span data-m="fpr_dev" data-f="pct0"></span> · <span data-m="fpr" data-f="pct1"></span></div><p>false alarms: development · held-out hard benign sets</p></div>
   </div>
 </section>
@@ -389,7 +391,7 @@ table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
   <h2>From prompt-injection firewall to <span class="grad">the control plane for enterprise agents.</span></h2>
   <div class="grid3 fill" style="margin-top:28px">
     <div class="card horizon"><div class="mono" style="color:var(--allow);font-size:13px">NOW · SHIPPED OCT 2026</div><h3 style="margin-top:8px">Firewall + evidence</h3>
-      <ul class="clean" style="margin-top:8px"><li>v0.1 on PyPI; gateway, Console, Docker</li><li>OpenAI, Anthropic, Gemini proxy formats</li><li>Investigator agent; attack memory</li><li>Evaluation harness with promptfoo + garak</li></ul><div class="target">Today: <span data-m="docs_recall" data-f="pct1"></span> document recall · 0% attack success</div></div>
+      <ul class="clean" style="margin-top:8px"><li>v0.1 on PyPI; gateway, Console, Docker</li><li>OpenAI, Anthropic, Gemini proxy formats</li><li>Investigator agent; attack memory</li><li>Intent contracts · provenance · red-team loop</li></ul><div class="target">Today: <span data-m="docs_recall" data-f="pct1"></span> document recall · 0% attack success</div></div>
     <div class="card horizon"><div class="mono" style="color:var(--neutral);font-size:13px">NEXT · Q1 2027</div><h3 style="margin-top:8px">Close the measured gaps</h3>
       <ul class="clean" style="margin-top:8px"><li>Small judge distilled from judge decisions: on-prem, faster, cheaper</li><li>Indian languages and code-mixed text (Hindi, Hinglish)</li><li>MCP tool-description and server vetting (OWASP agentic top 10)</li><li>Shared session store for multi-replica; Bedrock and Vertex native</li></ul><div class="target">Targets: typed attacks ≥ 85% · false alarms ≤ 5% · judge p95 &lt; 1 s</div></div>
     <div class="card horizon"><div class="mono" style="color:var(--accent2);font-size:13px">LATER · 2027</div><h3 style="margin-top:8px">Agent security platform</h3>

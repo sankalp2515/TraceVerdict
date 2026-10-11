@@ -74,8 +74,8 @@ refused (`content-too-large`). Measured on CPU: 25 KB of HTML fully inspected in
 Deterministic checks, worst result wins: tool allowed → pinned fields rewritten from trusted session context →
 outbound scan (canaries, registered secrets, detect-secrets patterns) → recipient allow-list → URL domain
 allow-list → sandbox paths → provenance (a high-risk target that appears only in untrusted content) → session risk
-→ explicit intent (`intent_terms`: a high-risk action the user's own words never ask for is escalated; the
-confused-deputy lesson, D-047) → data flow (CORE-17, below). The outbound scan also reads decoded views of every
+→ intent contract (D-064, below; without a contract, the older word-list rule `intent_terms`, D-047) → data flow
+(CORE-17, below). The outbound scan also reads decoded views of every
 argument (base64, hex, %-encoding, reversed, tag characters). Allow-lists use the host and addresses a real client would use (`urlsplit`,
 `email.utils.getaddresses`): fragment, user-part, backslash and display-name tricks fail (audit F1/F2, D-039).
 `ESCALATE` creates a pending approval (CON-9). A reviewer approval lets the *same* call in the *same* session run
@@ -86,6 +86,28 @@ a fingerprint (hashed word 5-shingles, no text) with its origin (source channel,
 user's own words are recorded as trusted and never count as taint. Each string argument of a tool call is traced
 to its origins; text copied from flagged content into a high-risk tool is escalated (policy `taint.flagged_to_high_risk`:
 escalate | block | record), and every traced flow is returned with the decision and stored for replay.
+
+**Intent contract (D-064).** `contract.py` compiles, per session, what the user authorised: from the task and each
+user turn that was not held (only the request part of a turn with pasted material), never from third-party content,
+and never by a model. Capabilities (send, submit, purchase, delete, execute, write, read) come from the tool's
+policy `capability` or its name (verb first: `read_email` reads). Permission needs the capability used as a verb
+("email the summary to …"); prohibition is a negation cue followed in the same clause by a capability ("do not
+contact them", "no emails", "without paying"); a later user word on the same capability replaces an earlier one, and
+within one message a prohibition wins. A call whose capability the user prohibited is blocked
+(`contract-prohibited`); a call to a high-impact capability (`contract.require_mention`, default send, submit,
+purchase, delete) the user never asked for is held for approval (`contract-out-of-scope`, or blocked by policy).
+Each version is immutable, hashed and chained to its parent (`contracts` table, `GET /v1/sessions/{id}/contract`),
+and every action decision stores the version, hash and deciding clause. Policy bounds (allow-lists, pinned fields,
+sandbox, data rules) are listed in the contract as clauses so one record shows the whole authorisation.
+
+**Content checks off (`content_checks: observe`).** An evaluation switch: content is recorded for provenance and the
+contract but never scored or judged, so the action layer can be measured alone (`policies/research-agent-actions.yaml`).
+
+**Provenance and receipts (D-065).** `services/gateway/intentseal_gateway/provenance.py` builds, from the log, a
+chain per attempted action: untrusted source (proven by data-flow fingerprints or by the target's first appearance;
+otherwise earlier flagged content, marked as context), evidence, proposed call, deciding rule and contract clause,
+outcome. Applications report execution (`POST /v1/actions/{id}/receipt`, automatic in the SDK's `@guard.tool`); a
+blocked call reported as run is a contradiction. Console: Replay → Intent contract and Attack to action.
 
 ## 4. Session risk (CORE-6)
 
@@ -173,6 +195,8 @@ API: `POST /v1/sessions/{id}/investigate` (reviewer), `GET /v1/sessions/{id}/inv
 | `POST /v1/agents` (create from a template) | admin | D-049 |
 | `POST /v1/agents/{agent}/self-test` | project | D-049 |
 | `POST /proxy/{agent}/anthropic/v1/messages` (Anthropic Messages, streaming) | project | D-048 |
+| `GET /v1/sessions/{id}/contract` (every contract version), `GET /v1/sessions/{id}/provenance` (attack-to-action chains) | public | D-064, D-065 |
+| `POST /v1/actions/{event_id}/receipt` (execution receipt) | project | D-065 |
 | `GET /healthz` (liveness), `GET /readyz` (database, policies, Tier 1 classifier; LLM providers reported) | open | API-10, B1 |
 
 Gateway self-security: API keys hashed at rest, scopes (public < project < admin), per-key rate limits (the
@@ -197,8 +221,12 @@ content or arguments.
 ```
 promptfoo (MIT) / garak (Apache-2.0)  ->  attack cases (we never author attack text: D-005, D-014)
 eval/promptfoo/build_suites.py        ->  each indirect payload delivered through every channel (incl. hidden text)
-eval/targets/agent_target.py          ->  protection off | on (reference agent) | detect (content checkpoint only)
+eval/targets/agent_target.py          ->  protection off | on (reference agent) | actions (content checks off: the
+                                          action layer and contract alone) | detect (content checkpoint only)
 python -m intentseal_eval.summary            ->  eval/reports/<date>-summary.json + docs/EVALUATION.md (coverage claim)
+python -m intentseal_eval.paired             ->  same attacks across arms, separate outcomes, Wilson intervals (D-067)
+python -m intentseal_eval.contract_eval      ->  demanded actions of every generated attack, three layer arms (D-064)
+python -m intentseal_eval.redteam            ->  failures -> clusters -> variants -> candidate -> regression -> gate (D-066)
 ```
 
 Outcomes are deterministic (EVAL-5): canary checks, sandbox outbox, executed tool calls. False positives are
@@ -206,7 +234,8 @@ measured on a development benign set and on a held-out benign set written before
 
 ## 11. Data (SQLite or PostgreSQL)
 
-`sessions`, `events`, `findings`, `decisions`, `actions` (incl. data-flow taint), `approvals`, `memory`,
+`sessions`, `events`, `findings`, `decisions`, `actions` (incl. data-flow taint and the contract ruling), `approvals`,
+`contracts` (every contract version), `receipts` (execution reports), `memory`,
 `llm_usage`, `llm_cache`. SQLite by default; PostgreSQL with `INTENTSEAL_DATABASE_URL` (psycopg 3, optional extra
 `intentseal-core[postgres]`). Application SQL is written once in a portable subset; the PostgreSQL store adapts
 placeholders and table definitions in one place, and the storage contract tests run on both (CI starts PostgreSQL).

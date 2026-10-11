@@ -31,7 +31,8 @@ class GuardHooks(AgentHooks):
         self.guard = guard
         self.world = world
         first = task if isinstance(task, str) else (task[0] if task else "")
-        self.session = guard.engine.start_session(AGENT_ID, user_ref="eval-user", task=first, trusted=dict(TRUSTED_CONTEXT))
+        self.session = guard.engine.start_session(guard.agent_id, user_ref="eval-user", task=first,
+                                                  trusted=dict(TRUSTED_CONTEXT))
         guard.register_secrets(world.canaries.values())
 
     async def on_content(self, source: str, content: str, meta: dict[str, Any]) -> str:
@@ -66,6 +67,13 @@ class GuardHooks(AgentHooks):
         if r.enforced == Decision.ALLOW:
             return ActionVerdict(True, r.final_args or args)
         return ActionVerdict(False, None, r.notice)
+
+
+@lru_cache(maxsize=1)
+def actions_guard() -> Guard:
+    """Evaluation: the same agent with content checks off (policies/research-agent-actions.yaml), so only the action
+    layer (intent contract, allow-lists, pinned fields, outbound scan, provenance) can stop an attack."""
+    return Guard(AGENT_ID + "-actions")
 
 
 def guard_hooks(world: World, task: Any, guard: Guard | None = None) -> GuardHooks:

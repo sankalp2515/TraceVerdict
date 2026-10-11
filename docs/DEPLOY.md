@@ -57,6 +57,10 @@ With PostgreSQL on the same host: set `POSTGRES_PASSWORD` and
 `INTENTSEAL_DATABASE_URL=postgresql://intentseal:<password>@postgres:5432/intentseal` in `.env`, then
 `docker compose --profile postgres up --build -d`.
 
+### Capacity (measured)
+
+One gateway process on a laptop CPU, 16 concurrent clients across 4 agents, unique content (no cache): 63 action checks per second (p95 320 ms) and 20 user-message inspections per second (p95 820 ms; local classifier, no AI call), 0 errors (`python -m intentseal_eval.load`, `eval/reports/2026-10-11-load.json`; per-key rate limit lifted for the test). Decisions for one agent are serialised so its session risk stays ordered: a single agent reaches about 42 and 14 per second. Content that needs the AI judge adds the judge's latency. Scale out with more containers behind sticky sessions and a shared PostgreSQL store.
+
 ### Hugging Face Spaces (Docker)
 
 Docker Spaces may need a paid Hugging Face plan for new accounts; check the hardware your account offers. The

@@ -98,6 +98,7 @@ table.t td:first-child { color: var(--text); font-weight: 600; }
 .flow .b { border: 1px solid var(--line2); border-radius: 10px; padding: 8px 12px; color: var(--text); background: rgba(255,255,255,.04); white-space: nowrap; }
 .flow .x { color: var(--subtle); }
 table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.yes { color: var(--allow); font-weight: 600; }
+table.t.gridt td { padding: 9px 10px; font-size: 16px; line-height: 1.4; }
 .target { margin-top: auto; padding-top: 14px; border-top: 1px dashed var(--line2); font: 600 15px/1.45 var(--m); color: var(--accent2); }
 .metric .big { margin-bottom: 8px; }
 .metric p { font-size: 17px; line-height: 1.4; }
@@ -319,7 +320,7 @@ table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.y
     <div class="card" style="padding:18px 22px"><h3 style="font-size:18px">Recall by attack type: all <span data-m="types_detected"></span> of 9 detected</h3><div style="height:300px;margin-top:8px"><canvas id="types"></canvas></div></div>
     <div class="card" style="padding:18px 22px">
       <h3 style="font-size:18px">Declared position: <span class="grad">F3 · D3</span></h3>
-      <table class="t" style="margin-top:6px">
+      <table class="t gridt" style="margin-top:6px">
         <tr><td style="width:24%">F3: ≥ 7 types</td><td>All 9 types detected (chart); each labelled per decision</td></tr>
         <tr><td>D3: multimodal</td><td>PDF, Word, HTML, email, images (OCR), API, code, RAG, hidden text and encodings: <span data-m="docs_recall" data-f="pct1"></span> recall</td></tr>
         <tr><td>Reliability</td><td>0% attack success in <span data-m="e2e_scored_on"></span> protected tests; held-out benign set; one engine fingerprint for every result</td></tr>
@@ -338,7 +339,7 @@ table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.y
     <div class="card"><div class="mono" style="color:var(--block);font-size:13px">RISK REDUCTION</div><h3 style="margin-top:8px">Attacks stop succeeding</h3>
       <p>Attack success on a protected agent <b style="color:var(--text)"><span data-m="head_off" data-f="pct0"></span> → <span data-m="head_on" data-f="pct0"></span></b>. A breach in India averages <b style="color:var(--text)">₹22 crore</b>; avoiding one pays for years of operation.</p></div>
     <div class="card"><div class="mono" style="color:var(--allow);font-size:13px">COST</div><h3 style="margin-top:8px">Security for a fraction of the AI bill</h3>
-      <p>Security model calls cost <b style="color:var(--text)"><span data-m="cost_ratio" data-f="pct0"></span></b> of the agent's own model cost at list prices; most checks run locally on CPU; self-hosted, open source, no per-seat fee.</p></div>
+      <p>About <b style="color:var(--text)"><span data-m="token_ratio"></span></b> security tokens per agent token, mostly on free or small models; most checks run locally on CPU; self-hosted, open source, no per-seat fee.</p></div>
     <div class="card"><div class="mono" style="color:var(--escalate);font-size:13px">PRODUCTIVITY</div><h3 style="margin-top:8px">Analysts get answers, not logs</h3>
       <p>Each flagged session gets a triage report in under a minute. One-line integration; monitor mode lets teams roll out without disruption.</p></div>
     <div class="card"><div class="mono" style="color:var(--neutral);font-size:13px">CUSTOMER EXPERIENCE</div><h3 style="margin-top:8px">Agents keep working</h3>
@@ -348,7 +349,7 @@ table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.y
     <div class="card" style="border-color:var(--line2);background:rgba(120,87,255,.10)"><div class="mono" style="color:var(--accent2);font-size:13px">WHO PAYS · HOW WE WIN</div><h3 style="margin-top:8px">Open core</h3>
       <p>Free SDK + gateway; paid enterprise console (SSO, roles, managed judges, compliance packs). Buyers: CISOs at banks, insurers, IT services, SaaS. Market for securing AI ≈ $4.8B by 2027 (Gartner).</p></div>
   </div>
-  <div class="src">IBM Cost of a Data Breach 2025 (India); Gartner, securing-AI market forecast (Aug 2026); Palo Alto Networks paid $634.5M for Protect AI (FY25 10-K), Check Point acquired Lakera (2025): the category is real. Cost ratio from the evaluation's headline suite.</div>
+  <div class="src">IBM Cost of a Data Breach 2025 (India); Gartner, securing-AI market forecast (Aug 2026); Palo Alto Networks paid $634.5M for Protect AI (FY25 10-K), Check Point acquired Lakera (2025): the category is real. Token ratio from the evaluation's headline suite.</div>
 </section>
 
 <!-- 10. Scalability & responsible AI -->
@@ -359,7 +360,7 @@ table.t.cmp td, table.t.cmp th { padding: 9px 12px; font-size: 17px; } .cmp td.y
     <div class="card"><h3>Scale and operations</h3>
       <ul class="clean" style="margin-top:10px">
         <li>Fast path on CPU, p95 <b style="color:var(--text)"><span data-m="p95_ms" data-f="int"></span> ms</b>; AI judge only where needed, cached</li>
-        <li>Stateless inspection API; Docker image; PostgreSQL shared store; horizontal scaling with sticky sessions</li>
+        <li>Measured on one CPU process: <b style="color:var(--text)">63 action checks/s, 20 message inspections/s</b> (16 concurrent clients, 4 agents, 0 errors); scale out by adding containers with a shared PostgreSQL store</li>
         <li>Multi-tenant: organisations, scoped keys, per-key rate limits, request size limits</li>
         <li>15+ model providers with key failover; local models for air-gapped sites</li>
         <li>SIEM export (JSON Lines, CEF), metrics, health and readiness probes, graceful shutdown</li>

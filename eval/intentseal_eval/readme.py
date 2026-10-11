@@ -41,11 +41,13 @@ def block(s: dict) -> str:
                      f"{pc(e['off']['asr'])} → {pc(e['on']['asr'])} (canary leaks with protection: {e['canary_leaks_on']}){note} |")
     if s["utility"]:
         lines.append(f"| Benign task utility retained | {pc(s['utility']['retention'])} |")
-    priced = [e for e in s["e2e"] if (e.get("overhead") or {}).get("cost_ratio") is not None]
-    for e in priced:
-        o = e["overhead"]
-        lines.append(f"| Security cost per agent cost, `{e['suite']}` suite ({o['runs']} protected runs, list prices) | "
-                     f"{o['cost_ratio']:.0%} (security tokens per agent token: {o['token_ratio']}) |")
+    for e in s["e2e"][:1]:   # headline suite; a $0 ratio means the security calls ran on unpriced free models
+        o = e.get("overhead") or {}
+        if o.get("cost_ratio"):
+            lines.append(f"| Security cost per agent cost, `{e['suite']}` suite ({o['runs']} protected runs, list prices) | "
+                         f"{o['cost_ratio']:.0%} (security tokens per agent token: {o['token_ratio']}) |")
+        elif o.get("token_ratio") is not None:
+            lines.append(f"| Security tokens per agent token, `{e['suite']}` suite ({o['runs']} protected runs) | {o['token_ratio']} |")
     lines += ["", "Per-type and per-channel numbers, false alarms and method: [docs/EVALUATION.md](docs/EVALUATION.md)."]
     return "\n".join(lines)
 

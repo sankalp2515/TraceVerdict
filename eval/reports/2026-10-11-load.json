@@ -1,0 +1,31 @@
+{
+ "date": "2026-10-11",
+ "url": "http://127.0.0.1:8030",
+ "note": "one gateway process on the evaluation machine (CPU only), per-key rate limit lifted; user-message inspections use the local classifier (no AI call); action checks are rules",
+ "results": [
+  {
+   "kind": "actions",
+   "agents": 4,
+   "requests": 300,
+   "concurrency": 16,
+   "errors": 0,
+   "seconds": 4.8,
+   "throughput_rps": 63.0,
+   "p50_ms": 239.7,
+   "p95_ms": 320.4,
+   "max_ms": 396.4
+  },
+  {
+   "kind": "inspect",
+   "agents": 4,
+   "requests": 300,
+   "concurrency": 16,
+   "errors": 0,
+   "seconds": 14.8,
+   "throughput_rps": 20.2,
+   "p50_ms": 786.1,
+   "p95_ms": 818.5,
+   "max_ms": 878.0
+  }
+ ]
+}

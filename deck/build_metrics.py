@@ -34,6 +34,7 @@ def main() -> None:
         "p95_ms": iso.get("p95_ms"),
         "utility": (s.get("utility") or {}).get("retention"),
         "cost_ratio": (head.get("overhead") or {}).get("cost_ratio"),
+        "token_ratio": (head.get("overhead") or {}).get("token_ratio"),
         "types": [{"type": t["type"], "recall": t["recall"], "n": t["n"]} for t in c["types"]],
         "types_detected": sum(1 for t in c["types"] if (t["recall"] or 0) > 0),
         "e2e": [{"suite": e["suite"], "off": e["off"]["asr"], "on": e["on"]["asr"], "scored_on": e["on"]["scored"],

@@ -9,7 +9,9 @@
 [![Python](https://img.shields.io/pypi/pyversions/intentseal.svg)](https://pypi.org/project/intentseal/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Results](#results) · [Docs](#documentation) · [Contributing](CONTRIBUTING.md)
+**[▶ Watch the demo video (3:41)](https://drive.google.com/file/d/1o5QA6S0ZicrkToq-H9SjGHx3dmqcIWkO/view)**
+
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Results](#results) · [API](docs/API.md) · [Docs](#documentation) · [Contributing](CONTRIBUTING.md)
 
 </div>
 

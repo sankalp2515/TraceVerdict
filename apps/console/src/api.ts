@@ -54,7 +54,32 @@ export interface EventRow {
   degraded: number | null;
   session_risk: number | null;
   findings: FindingRow[];
-  action: { tool: string; args_redacted: string; final_args_redacted: string | null; pinned_overrides: string | null } | null;
+  action: { tool: string; args_redacted: string; final_args_redacted: string | null; pinned_overrides: string | null;
+            contract?: ContractRuling | null; receipt?: { executed: boolean; detail: string; at: number } | null } | null;
+}
+
+export interface ContractClause { id: string; effect: "permit" | "prohibit" | "require" | "policy"; capability: string; quote: string; origin: string }
+export interface Contract {
+  agent_id: string; session_id: string; version: number; hash: string; parent: string; origin: string; created_at: number;
+  clauses: ContractClause[]; targets: string[];
+}
+export interface ContractRuling { version: number; hash: string; effect: string; capability: string | null; clause: ContractClause | null; rule: string }
+
+export interface ChainSource {
+  event_id: string; seq: number; source: string; decision: Decision | null; rule: string | null; reason: string | null;
+  labels: string[]; preview: string; evidence: { signal: string; origin: string; span: string; score: number | null }[];
+  link: string; proven: boolean; arg?: string;
+}
+export interface ProvenanceChain {
+  kind: "action" | "content";
+  sources: ChainSource[];
+  action: { event_id: string; seq: number; tool: string; args: string; final_args: string | null; pinned: string | null } | null;
+  control: { decision: Decision | null; rule: string | null; reason: string | null; labels: string[]; layer: string; contract: ContractRuling | null };
+  outcome: { state: "executed" | "not-executed" | "allowed" | "quarantined" | "held" | "contradiction"; enforced: Decision | null; evidence: string[] };
+}
+export interface Provenance {
+  chains: ProvenanceChain[]; contracts: Contract[];
+  summary: { actions_stopped: number; content_stopped: number; executed_with_untrusted_link: number; contradictions: number };
 }
 
 export interface DemoResult {
@@ -260,6 +285,7 @@ export const api = {
   connect: (agent: string) => call<Connect>(`/v1/agents/${encodeURIComponent(agent)}/connect`),
   investigations: (sessionId: string) => call<Investigation[]>(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations`),
   recentInvestigations: (limit = 50) => call<Investigation[]>(`/v1/investigations?limit=${limit}`),
+  provenance: (sessionId: string) => call<Provenance>(`/v1/sessions/${encodeURIComponent(sessionId)}/provenance`),
 };
 
 /** Reviewer (admin-key) actions. The key is the reviewer's own, typed at sign-in; it is never part of the build. */

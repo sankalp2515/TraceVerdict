@@ -32,7 +32,7 @@ from research_agent.guarded import AGENT_ID, guard_hooks
 
 SCENARIO_DIR = Path(os.environ.get("INTENTSEAL_SCENARIO_DIR", repo_root() / "eval" / "scenarios"))
 DEMO_ROLE = os.environ.get("INTENTSEAL_DEMO_AGENT_ROLE", "agent")
-_guards: dict[int, Guard] = {}
+_guards: dict[tuple[int, str], Guard] = {}
 
 
 def _load() -> dict[str, dict[str, Any]]:
@@ -58,10 +58,10 @@ def _content(s: dict[str, Any]) -> str | bytes | None:
     return s.get("content")
 
 
-def _guard(engine: Engine) -> Guard:
-    g = _guards.get(id(engine))
+def _guard(engine: Engine, agent_id: str = AGENT_ID) -> Guard:
+    g = _guards.get((id(engine), agent_id))
     if g is None:
-        g = _guards[id(engine)] = Guard(AGENT_ID, engine=engine, warm_up=False)
+        g = _guards[(id(engine), agent_id)] = Guard(agent_id, engine=engine, warm_up=False)
     return g
 
 
@@ -122,7 +122,9 @@ async def run_scenario(engine: Engine, scenario_id: str, protection: str, app: A
         turns = s["turns"]
     world = World(overrides=overrides)
     router: Router = engine.router or Router(store=engine.store)
-    hooks = guard_hooks(world, turns, _guard(engine)) if protection == "on" else AgentHooks()
+    # detectors: off - the same agent with content checks off: only the action layer and the intent contract decide
+    agent_id = AGENT_ID + "-actions" if s.get("detectors") == "off" else AGENT_ID
+    hooks = guard_hooks(world, turns, _guard(engine, agent_id)) if protection == "on" else AgentHooks()
     try:
         t = await ResearchAgent(router, world, hooks=hooks, role=DEMO_ROLE).run(turns)
         session_id = hooks.session.session_id if protection == "on" else None

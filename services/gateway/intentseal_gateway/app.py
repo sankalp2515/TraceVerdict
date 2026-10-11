@@ -27,7 +27,7 @@ from intentseal_core.engine import Engine
 from intentseal_core.llm.router import Router
 from intentseal_core.policy import AgentPolicy, load_policy, save_policy
 
-from . import tenancy
+from . import provenance, tenancy
 from .security import ALL_ORGS, BodySizeLimit, KeyRing, Principal, require
 from .tenancy import agent_filter, require_agent, visible_agents
 
@@ -52,6 +52,11 @@ class ActionRequest(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
     agent_id: str
     session_id: str | None = None
+
+
+class ReceiptRequest(BaseModel):
+    executed: bool
+    detail: str = Field("", max_length=500)
 
 
 class SessionRequest(BaseModel):
@@ -212,10 +217,13 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
 
     # ---- API-3 sessions -----------------------------------------------------------------------
     @app.post("/v1/sessions", tags=["sessions"])
-    async def new_session(body: SessionRequest, request: Request, p: Principal = require("project")) -> dict[str, str]:
+    async def new_session(body: SessionRequest, request: Request, p: Principal = require("project")) -> dict[str, Any]:
         require_agent(request, p, body.agent_id)
         s = request.app.state.engine.start_session(body.agent_id, user_ref=body.user_ref, task=body.task, trusted=body.trusted)
-        return {"session_id": s.session_id}
+        out: dict[str, Any] = {"session_id": s.session_id}
+        if s.contract is not None:   # D-064: what this session is authorised to do, from the task's own words
+            out["contract"] = s.contract.as_dict()
+        return out
 
     @app.get("/v1/sessions/{session_id}/events", tags=["sessions"])
     async def session_events(session_id: str, request: Request, p: Principal = require("public")) -> list[dict[str, Any]]:
@@ -392,6 +400,34 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         if agent is None or not tenancy.can_see(request, p, agent):
             raise HTTPException(404, "unknown session")
         return agent
+
+    @app.get("/v1/sessions/{session_id}/contract", tags=["sessions"])
+    async def session_contract(session_id: str, request: Request, p: Principal = require("public")) -> dict[str, Any]:
+        """D-064: every version of the session's intent contract (immutable, hash-chained), newest last."""
+        _session_owner(request, p, session_id)
+        versions = request.app.state.engine.logger.contracts(session_id)
+        return {"session_id": session_id, "current": versions[-1] if versions else None, "versions": versions}
+
+    @app.get("/v1/sessions/{session_id}/provenance", tags=["sessions"])
+    async def session_provenance(session_id: str, request: Request, p: Principal = require("public")) -> dict[str, Any]:
+        """D-065: attack-to-action chains (untrusted source -> content -> proposed call -> control -> outcome), built
+        from the decision log, contracts and execution receipts."""
+        _session_owner(request, p, session_id)
+        e = request.app.state.engine
+        approvals = {a["event_id"]: a for a in e.store.query(
+            "SELECT event_id, status, reviewer FROM approvals WHERE session_id = ?", (session_id,))}
+        return provenance.build(e.logger.session_events(session_id), approvals, e.logger.contracts(session_id))
+
+    @app.post("/v1/actions/{event_id}/receipt", tags=["engine"])
+    async def action_receipt(event_id: str, body: ReceiptRequest, request: Request,
+                             p: Principal = require("project")) -> dict[str, Any]:
+        """Execution receipt: the application reports whether an allowed (or blocked) call actually ran."""
+        e = request.app.state.engine
+        owner = e.store.query("SELECT agent_id FROM events WHERE id = ? AND kind = 'action'", (event_id,))
+        if not owner or not tenancy.can_see(request, p, owner[0]["agent_id"]):
+            raise HTTPException(404, "unknown action")
+        require_agent(request, p, owner[0]["agent_id"])
+        return {"ok": e.record_execution(event_id, body.executed, body.detail)}
 
     @app.post("/v1/sessions/{session_id}/investigate", tags=["review"])
     async def investigate(session_id: str, request: Request, p: Principal = require("admin")) -> dict[str, Any]:

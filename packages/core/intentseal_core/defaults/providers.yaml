@@ -103,6 +103,14 @@ providers:
     priority: 12
     timeout_s: 60
 
+  bedrock:                         # Amazon Bedrock's OpenAI-compatible Chat Completions API (bedrock-runtime /openai/v1)
+    type: openai_compatible        # with a Bedrock API key as the bearer token; change the region in the URL to yours
+    enabled: true
+    base_url: https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
+    keys: { env_prefix: BEDROCK_API_KEY }
+    priority: 13
+    timeout_s: 60
+
   deepseek:
     type: openai_compatible
     enabled: true

@@ -4,6 +4,7 @@ import type { CaseData } from "./types";
 const stages = [
   {
     tab: "Overview",
+    seconds: 40,
     question: "What happened?",
     explanation:
       "Compare what the user authorized with what the agent attempted and what the application reports executing.",
@@ -13,6 +14,7 @@ const stages = [
   },
   {
     tab: "Evidence",
+    seconds: 40,
     question: "What supports the finding?",
     explanation:
       "The task, document, attempted action, policy and receipt are connected source records, not just a generated summary.",
@@ -22,24 +24,27 @@ const stages = [
   },
   {
     tab: "Explanation",
+    seconds: 40,
     question: "What can we actually conclude?",
     explanation:
-      "The critic challenged the claim that the document caused the action. The revised claim keeps that uncertainty visible.",
+      "Review the critic's checks and any disputed claims. A sequence of events alone does not prove that the document caused the action.",
     action:
       "Read the cited claims and critic review below. A sequence of events alone does not prove causation.",
     next: "Compare the repairs",
   },
   {
     tab: "Repairs & validation",
+    seconds: 60,
     question: "Which repair preserves useful work?",
     explanation:
       "Stopping an unsafe action is only half the job. A repair must also preserve tasks the user actually authorized.",
     action:
-      "Select Candidate A and filter Failed results to inspect the broken tasks. Then select Candidate B to compare its exact change and results.",
+      "Select Restrict recipients and filter Failed results to inspect the broken tasks. Then select Enforce user intent to compare its exact change and results.",
     next: "See the human decision",
   },
   {
     tab: "Review",
+    seconds: 30,
     question: "What does a human approve?",
     explanation:
       "A reviewer approves the exact policy change and test report. Approval produces a recommendation; it does not change production.",
@@ -68,8 +73,10 @@ export function CaseGuide({
   );
   const stage = stages[index]!;
   const targeted = data.candidates.find((c) => c.diff.some((d) => d.path === "contract.mode"));
-  const broad = data.candidates.find((c) =>
-    c.diff.some((d) => d.path.includes("allowed_recipients")),
+  const broad = data.candidates.find(
+    (c) =>
+      c.candidate_id !== targeted?.candidate_id &&
+      c.diff.some((d) => d.path.includes("allowed_recipients")),
   );
   const broadReport = broad && data.validations[broad.candidate_id];
   const report = targeted && data.validations[targeted.candidate_id];
@@ -87,6 +94,8 @@ export function CaseGuide({
           Guided sample{" "}
           <span>
             Step {index + 1} of {stages.length}
+            {" · "}
+            {stage.seconds}s suggested pace
           </span>
         </span>
         <button className="text-link" onClick={onHide}>
@@ -107,6 +116,12 @@ export function CaseGuide({
         <div>
           <h2 id="guide-question">{stage.question}</h2>
           <p>{stage.explanation}</p>
+          {index === 0 && (
+            <p>
+              Follow five steps to a downloadable report. Suggested total: 3½ minutes. No account
+              required.
+            </p>
+          )}
           <p className="guide-instruction">{stage.action}</p>
           {tab === "Repairs & validation" && report && broadReport && (
             <div className="guide-result">
@@ -130,6 +145,21 @@ export function CaseGuide({
               <ArrowLeft size={13} />
               Previous step
             </button>
+          )}
+          {index === stages.length - 1 && (
+            <a className="text-link" href="/workspace?mode=recorded&case=nemotron-live">
+              Inspect the recorded Nemotron run <ArrowRight size={13} />
+            </a>
+          )}
+          {index === stages.length - 1 && (
+            <a
+              className="text-link"
+              href="https://github.com/sankalp2515/TraceVerdict/blob/main/docs/CUSTOM_INTEGRATIONS.md"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Investigate your own agent or data <ArrowRight size={13} />
+            </a>
           )}
         </div>
       </div>

@@ -1,0 +1,13 @@
+# Recorded product journey only: no .env, database, provider or sponsor account.
+name: traceverdict-demo
+services:
+  demo:
+    network_mode: bridge
+    image: traceverdict-web:demo
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports: ["127.0.0.1:${TRACEVERDICT_DEMO_PORT:-5174}:3001"]
+    mem_limit: 384m
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped

@@ -1,0 +1,81 @@
+# IntentSeal on your machine: gateway + Security Console + test assistant (README, Quick start).
+#
+#   cp .env.example .env        # put one free model key in it (GROQ_API_KEY or GEMINI_API_KEY)
+#   docker compose up --build   # Console http://localhost:8000 · test assistant http://localhost:8040
+#
+#   docker compose --profile postgres up --build   # plus PostgreSQL; set INTENTSEAL_DATABASE_URL (below) in .env
+#
+# Keys: without INTENTSEAL_API_KEYS / INTENTSEAL_PUBLIC_KEY in .env, the well-known local keys below are used and the
+# ports are bound to this machine only (127.0.0.1). For a shared or public host, set your own long random keys in
+# .env and publish the ports as you need (docs/DEPLOY.md). Nothing secret is written here.
+x-local-keys:
+  project: &project-key ${INTENTSEAL_PROJECT_KEY:-local-project-key}
+  public: &public-key ${INTENTSEAL_PUBLIC_KEY:-local-public-key}
+
+services:
+  gateway:
+    build:
+      context: .
+      args:
+        VITE_API_KEY: *public-key          # the Console's read-only key; must equal INTENTSEAL_PUBLIC_KEY
+    image: intentseal-gateway
+    env_file: [{ path: .env, required: false }]
+    environment:
+      # INTENTSEAL_DATABASE_URL: postgresql://intentseal:${POSTGRES_PASSWORD}@postgres:5432/intentseal
+      PORT: "8000"
+      INTENTSEAL_API_KEYS: ${INTENTSEAL_API_KEYS:-local:local-project-key:project,localadmin:local-admin-key:admin}
+      INTENTSEAL_PUBLIC_KEY: *public-key
+      INTENTSEAL_PUBLIC_AGENTS: ${INTENTSEAL_PUBLIC_AGENTS:-research-agent,research-agent-monitor,my-assistant,hermes}
+      INTENTSEAL_CANARIES: ${INTENTSEAL_CANARIES:-sk-test-assistant-canary-7f3a91c2}
+      INTENTSEAL_STORE_PREVIEWS: ${INTENTSEAL_STORE_PREVIEWS:-1}
+      # The Console polls with the read-only key; 20/min (the hosted default) runs out while clicking through pages.
+      INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN: ${INTENTSEAL_PUBLIC_RATE_LIMIT_PER_MIN:-300}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["intentseal-data:/data"]
+    healthcheck:                           # the first start loads the classifier and OCR: allow it time
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      start_period: 15m
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  # A real tool-calling assistant protected by IntentSeal (examples/assistant): knowledge base, files, email, web, APIs,
+  # OCR; writes notes and sends (simulated) email. Sample files and a labelled attack test pack are created on start.
+  assistant:
+    image: intentseal-gateway
+    depends_on:
+      gateway: { condition: service_healthy }
+    env_file: [{ path: .env, required: false }]
+    environment:
+      INTENTSEAL_URL: http://gateway:8000
+      INTENTSEAL_KEY: *project-key
+      INTENTSEAL_CONSOLE_URL: http://localhost:8000
+      ASSISTANT_AGENT_ID: my-assistant
+      ASSISTANT_HOST: 0.0.0.0
+      ASSISTANT_WORKSPACE: /data/workspace
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-groq}
+    command: ["sh", "-c", "python examples/assistant/make_workspace.py --workspace /data/workspace --test-pack && exec python examples/assistant/server.py"]
+    ports: ["127.0.0.1:8040:8040"]
+    volumes: ["assistant-data:/data"]
+    restart: unless-stopped
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: intentseal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}        # required for this profile: set it in .env
+      POSTGRES_DB: intentseal
+    volumes: ["intentseal-pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intentseal"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  intentseal-data:
+  assistant-data:
+  intentseal-pg:

@@ -1,6 +1,6 @@
 # Historical foundation documentation
 
-This documents pre-existing IntentSeal capabilities, not new TraceVerdict claims. Start with the repository root README for the submitted product. Links below retain their historical form.
+This documents pre-existing IntentSeal capabilities, not new TraceVerdict claims. Start with the repository root README for the submitted product. The default Compose entry now runs the TraceVerdict reviewer demo; use `docker compose -f compose.foundation.yml` for the historical runtime commands below. Links below retain their historical form.
 
 
 

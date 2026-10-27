@@ -6,6 +6,26 @@
     "version": "0.2.0"
   },
   "paths": {
+    "/v1/operations": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Operations",
+        "description": "Scoped queue signals for operators; no prompts, credentials or case payloads.",
+        "operationId": "operations_v1_operations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/replay-snapshots": {
       "post": {
         "tags": [

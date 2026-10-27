@@ -1,0 +1,6 @@
+{
+  "case_id": "case_242688de3dc4e21304b0ca31eaec",
+  "source": "examples/traceverdict/live/docker-restart/case.json",
+  "description": "Recorded synthetic invoice incident investigated using actual Zetaris and Nightshift services. Lightning reasoning and Ultra replay receipts are retained. Viewing this recording does not execute inference or customer tools.",
+  "source_changes": "None. The case JSON is copied byte-for-byte from the published evidence."
+}

@@ -52,6 +52,10 @@ flowchart LR
 
 ### Try a recorded sample
 
+For the shortest reviewer path, see the [3½-minute judge route](docs/JUDGE_QUICKSTART.md). With Docker installed, `docker compose up -d --build --wait` serves the complete recorded journey at **http://localhost:5174/workspace?mode=recorded&case=supplier-contact** without `.env`, account creation, keys or sponsor services. The separate demo uses the existing Docker bridge and does not join the live data network. A recording of actual Nemotron/Zetaris execution is also available at `?mode=recorded&case=nemotron-live`; its original response IDs and replay receipts remain inspectable.
+
+For frontend development instead:
+
 ```powershell
 npm run frontend:install
 npm run frontend:dev
@@ -98,8 +102,8 @@ Use the [capture example](examples/traceverdict/capture/incident.json) and [inte
 | Restrictive comparison, fixed-action replay | **18 / 20** | Rejected |
 | Restrictive comparison, live model utility | **6 / 8** | Two legitimate tasks broken |
 | Nonfixture capture through live sponsors | **20 / 20**, awaiting review | Imported synthetic original; one repair |
-| Backend regression | **328 passed, 1 skipped** | [CI](https://github.com/sankalp2515/TraceVerdict/actions/workflows/ci.yml) |
-| Frontend component tests | **12 passed** | [CI](https://github.com/sankalp2515/TraceVerdict/actions/workflows/frontend.yml) |
+| Backend regression | **329 passed, 1 skipped** | [CI](https://github.com/sankalp2515/TraceVerdict/actions/workflows/ci.yml) |
+| Frontend component tests | **16 passed** | [CI](https://github.com/sankalp2515/TraceVerdict/actions/workflows/frontend.yml) |
 | World Model upstream conformance | **8 / 8** | Actual Python implementation via bridge |
 
 [Comparison receipts](examples/traceverdict/live/invoice-forward-ultra) · [Imported capture receipts](examples/traceverdict/live/imported-capture) · [Method and limitations](docs/NVIDIA_NEMOTRON_EVIDENCE.md).
@@ -148,8 +152,8 @@ Public HTTPS deployment, self-service identities/connectors, SSO, monitoring, re
 
 **Docs:** [Setup](docs/GETTING_STARTED.md) · [Integrate](docs/CUSTOM_INTEGRATIONS.md) · [Frontend API](docs/FRONTEND_INTEGRATION.md) · [Operations](docs/TRACEVERDICT_OPERATIONS.md) · [Final checklist](docs/SUBMISSION_FINAL_CHECKLIST.md)
 
-## Foundation and new work
+## Engineering provenance
 
-TraceVerdict extends our pre-existing IntentSeal action guard, compiler, policy models, SDK and foundational gateway. The case investigation product, sponsor integrations, World Model graph, critic revision and repair-validation workflow are the new work. [Baseline and disclosure](docs/NEW_WORK.md) · [Historical foundation documentation](docs/INTENTSEAL_FOUNDATION_README.md).
+TraceVerdict builds on our IntentSeal runtime. The investigation product, sponsor integrations, World Model graph, critic revision and repair-validation workflow are documented in [engineering provenance](docs/NEW_WORK.md).
 
-Apache-2.0 · Helios · Open Agent Hackathon 2026. Track 2 eligibility for prior-work extensions remains subject to organizer confirmation.
+Apache-2.0 · Helios · Open Agent Hackathon 2026 · Track 2: The Agent That Can Explain Why.

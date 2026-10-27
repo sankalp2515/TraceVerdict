@@ -13,6 +13,36 @@ from .snapshots import ReplayCapture
 router = APIRouter(tags=["TraceVerdict"])
 
 
+@router.get("/v1/operations")
+async def operations(request: Request, p: Principal = require("admin")):
+    """Scoped queue signals for operators; no prompts, credentials or case payloads."""
+    import json
+    import time
+    scoped, params = agent_filter("w.agent_id", visible_agents(request, p))
+    where, values = ("1=1", []) if p.all_orgs else ("w.tenant_id=?", [p.org])
+    store = service(request).engine.store
+    counts = store.query(
+        f"SELECT j.status,COUNT(*) AS records FROM tv_job_index j JOIN tv_worlds w ON j.case_id=w.id "
+        f"WHERE {where}{scoped} GROUP BY j.status", (*values, *params))
+    active = store.query(
+        f"SELECT DISTINCT w.body FROM tv_worlds w JOIN tv_job_index j ON j.case_id=w.id "
+        f"WHERE {where}{scoped} AND j.status IN ('queued','running') LIMIT 32", (*values, *params))
+    now = time.time()
+    jobs = [j for row in active for j in json.loads(row["body"])["jobs"].values()
+            if j["status"] in ("queued", "running")]
+    queued_ages = [max(0, now - j["created_at"]) for j in jobs if j["status"] == "queued"]
+    expired = sum(j["status"] == "running" and j["lease_until"] < now for j in jobs)
+    limits = store.query("SELECT max_running FROM tv_scheduler WHERE id=1")
+    return {"scope": "authorized tenant and agents", "database_online": store.ping(),
+            "jobs_by_status": {row["status"]: row["records"] for row in counts},
+            "oldest_queued_age_s": round(max(queued_ages, default=0), 3),
+            "expired_running_leases": expired, "queue_attention": max(queued_ages, default=0) > 180 or expired > 0,
+            "configured_global_running_limit": limits[0]["max_running"],
+            "configured_global_active_limit": 32,
+            "limitations": ["Queue signals are not a throughput or latency SLO.",
+                            "Provider and whole-platform health require the connections probe."]}
+
+
 @router.post("/v1/replay-snapshots", status_code=201)
 async def capture_snapshot(body: ReplayCapture, request: Request, p: Principal = require("admin")):
     require_agent(request, p, body.agent_id)

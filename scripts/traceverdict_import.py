@@ -16,17 +16,32 @@ from intentseal_core.config import load_env  # noqa: E402
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("capture", type=Path)
+    parser.add_argument("--check", action="store_true", help="Validate capture schema locally, without credentials or network")
     parser.add_argument("--gateway", default="http://localhost:8000")
     parser.add_argument("--register-policy", type=Path, help="Current policy JSON for a new agent; preserves existing policies")
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--investigate", action="store_true")
     args = parser.parse_args()
+    original = args.capture.read_bytes()
+    capture = json.loads(original)
+    if args.check:
+        sys.path.insert(0, str(ROOT / "services/gateway"))
+        from pydantic import ValidationError
+        from intentseal_gateway.cases.snapshots import ReplayCapture
+        try:
+            ReplayCapture.model_validate(capture)
+        except ValidationError as exc:
+            print(json.dumps({"valid": False, "errors": [{"field": list(e["loc"]), "type": e["type"]}
+                                                         for e in exc.errors(include_input=False)]}))
+            raise SystemExit(1) from None
+        print(json.dumps({"valid": True, "agent_id": capture["agent_id"],
+                          "scope": "Capture schema only; source authenticity is not established.",
+                          "next": "Register the agent policy and import into a configured live workspace."}))
+        return
     load_env()
     token = os.environ.get("TRACEVERDICT_ADMIN_KEY")
     if not token:
         parser.error("Set TRACEVERDICT_ADMIN_KEY privately")
-    original = args.capture.read_bytes()
-    capture = json.loads(original)
     agent = capture["agent_id"]
     with httpx.Client(base_url=args.gateway.rstrip("/"), headers={"Authorization": "Bearer " + token}, timeout=40) as client:
         def request(path, body):

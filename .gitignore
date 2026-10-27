@@ -44,6 +44,6 @@ docs/media/*.png
 artifacts/traceverdict/
 .submission-build/
 submission/TraceVerdict_Submission_Deck.pptx
-submission/TraceVerdict_Submission_Deck_v[123].pptx
+submission/TraceVerdict_Submission_Deck_v[1-5].pptx
 # Local browser verification state; never part of the submission.
 .playwright-cli/

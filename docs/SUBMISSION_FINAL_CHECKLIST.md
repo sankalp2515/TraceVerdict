@@ -7,14 +7,15 @@
 - Genuine nonfixture capture → governed evidence → investigation → repair → replay path.
 - Fresh post-reboot Docker case reproduced the repair comparison with real sponsors and no errors: `examples/traceverdict/live/docker-restart/`.
 - Measured NVIDIA model comparison, including failures and evaluation limitations.
-- Pitch deck, submission text and local JSON draft in `submission/`.
+- Final visual pitch deck v6, submission text and local JSON draft in `submission/`.
+- Default one-command, account-free reviewer demo and original-capture schema check.
 - Independent Docker API, web, local proxy and source services; separate Zetaris stack and native Nightshift runtime.
 - Pre-existing foundation declaration: `docs/NEW_WORK.md`.
 
 ## Required final actions
 
 1. Confirm registration/profile and final team details on the portal. No saved submission has been verified.
-2. Resolve Track 2 eligibility for extending prior work with the organizer; the FAQ explicitly describes extensions under Wildcard. Keep the foundation disclosure. Team ownership does not establish track eligibility.
+2. Select Track 2, The Agent That Can Explain Why. The team confirmed eligibility on 28 October 2026. Keep factual engineering provenance accurate.
 3. Record and upload the required 1–4 minute video, with a real Nightshift request and keys hidden. Use `submission/DEMO_SCRIPT.md`.
 4. Put the accessible video URL and final deck URL into `submission/submission-draft.json` and the portal. Review every submission field and submit before the official deadline. A local draft or GitHub push is not a portal submission.
 5. Verify the portal's submitted status and access to all final links while signed out.

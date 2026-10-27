@@ -1,0 +1,13 @@
+{
+  "check": "local-authenticated-case-list-read-smoke",
+  "requests": 32,
+  "concurrency": 4,
+  "statuses": {
+    "200": 32
+  },
+  "p50_ms": 492.0,
+  "p95_ms": 1172.0,
+  "elapsed_s": 5.2,
+  "all_passed": true,
+  "scope": "Local operator deployment only; excludes inference, source ingestion, writes and browser rendering. Not a production capacity SLO."
+}

@@ -149,7 +149,9 @@ export function Workspace() {
       let data: CaseData;
       let nextGraph: Graph;
       if (mode === "recorded") {
-        const match = fixture || fixtures.find((f) => id === f.id)?.id || "supplier-contact";
+        const match = fixture || id;
+        if (![...fixtures.map((f) => f.id), "nemotron-live"].includes(match))
+          throw new Error("Choose one of the available recorded cases.");
         const response = await fetch(`/samples/${match}-world.json`);
         if (!response.ok)
           throw new Error("The recorded case could not be loaded. Refresh and try again.");
@@ -175,13 +177,13 @@ export function Workspace() {
       setShowGuide(mode === "recorded");
       sessionStorage.setItem(
         "traceverdict.case",
-        mode === "recorded" ? data.fixture_id || fixture || id : data.case_id,
+        mode === "recorded" ? fixture || id : data.case_id,
       );
       sessionStorage.setItem("traceverdict.mode", mode);
       history.replaceState(
         null,
         "",
-        `/workspace?mode=${mode}&case=${encodeURIComponent(mode === "recorded" ? data.fixture_id || fixture || id : data.case_id)}`,
+        `/workspace?mode=${mode}&case=${encodeURIComponent(mode === "recorded" ? fixture || id : data.case_id)}`,
       );
     } catch (e) {
       if (version === requestVersion.current)
@@ -830,6 +832,13 @@ export function Workspace() {
                   </div>
                 </div>
               </div>
+              {source === "recorded" && current.execution_mode === "live" && (
+                <Notice>
+                  Recorded live execution. Explanation contains the actual model response IDs;
+                  Repairs contains model-driven replay receipts. Viewing this case runs no new
+                  inference.
+                </Notice>
+              )}
               {source === "recorded" &&
                 (showGuide ? (
                   <CaseGuide

@@ -50,3 +50,9 @@ Encrypt and protect off-machine backups and apply retention. Zetaris platform me
 Use HTTPS, TRACEVERDICT_COOKIE_SECURE=true, explicit allowed origins, private source/platform ports, restricted service roles, credential rotation, monitored queue age/error rates/provider latency and retention. Capacity limits are two global running workers and 32 active jobs, not a measured performance guarantee. Preserve local-only executors unless a separately isolated restricted executor is implemented.
 
 Reviewer approval binds the base policy, patch and validation report hashes. It exports the recommendation and rollback policy hash; it never edits the active policy. A production integration needs its own controlled deployment and rollback.
+
+## Scoped operational monitoring
+
+Reviewer-authenticated `GET /v1/operations` returns durable job counts, oldest queued age, expired running leases and configured global admission limits. Counts are restricted to the caller's tenant and allowed agents. It returns no prompts, credentials or raw case records. `queue_attention=true` signals a queued job older than 180 seconds or an expired running lease; it is an operator signal, not a latency SLO or external alerting service. Connect these signals to the deployment's monitoring system and combine them with `/readyz` and authenticated `/v1/connections`.
+
+Retention must distinguish immutable investigation evidence from expiring access sessions. Set the customer's retention/legal-hold policy before implementing deletion, encrypt off-machine backups and verify restoration under that policy. No blanket evidence deletion is enabled. Self-service identity/SSO, measured capacity targets and whole-platform disaster recovery remain explicit release gates.

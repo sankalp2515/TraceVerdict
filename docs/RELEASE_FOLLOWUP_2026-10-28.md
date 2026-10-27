@@ -1,64 +1,41 @@
-# Release follow-up - 28 October 2026 IST
+# Release verification — 28 October 2026 IST
 
-## Latest restart and submission packaging
+## Product and access
 
-The device reboot was followed by a fresh build/start of independent API, Node web, Caddy proxy and three PostgreSQL source services. Zetaris runs in its installed separate Compose stack; Nightshift resumed as its native desktop runtime. The full product is at http://localhost:5173, with API docs on port 8000. Session sign-in, HttpOnly/SameSite cookies, case listing and real authenticated database/Zetaris/Nightshift probes passed through the proxy. Source data and prior cases survived the reboot.
+The live product runs at http://localhost:5173. API, Node web, Caddy proxy and three PostgreSQL source services run independently in Docker with resource limits and persistent volumes. Zetaris runs in its installed Compose stack and Nightshift in its supported native runtime. The source data and cases survived a device reboot. Start/stop scripts preserve named volumes and perform a governed-query warm-up plus authenticated dependency checks.
 
-The final restart command completed successfully with every live dependency online. Proxy logout without CSRF returned 403, valid logout returned 200 and subsequent case access returned 401. A fresh Nightshift NVIDIA completion returned the actual Lightning route (22 input tokens, 3 output tokens; HTTP 200). Five packaging checks and Ruff passed. Existing backend, frontend and conformance CI evidence remains the full regression record; these packaging changes do not claim a new full-suite run.
+The independent recorded demo runs at http://localhost:5174/workspace?mode=recorded&case=supplier-contact. `compose.demo.yml` requires no populated environment file, database, account, key or sponsor runtime. The default `docker compose up -d --build --wait` starts this demo; the historical runtime Compose file is retained as `compose.foundation.yml`. The demo uses the existing Docker bridge rather than allocating another subnet. The five-step route targets 3½ minutes from opening the application to report export. This is a suggested pace, not a measured usability result; installation and fresh provider execution are excluded. A byte-identical recording of the actual Nemotron run is accessible with `case=nemotron-live`. Viewing it runs no inference.
 
-Fresh Docker-runtime case `case_242688de3dc4e21304b0ca31eaec` completed from collection through replay with zero errors and status AWAITING_REVIEW. The model candidate passed 20/20 fixed-action tasks and 8/8 live utility tasks; the restrictive API comparison was rejected at 18/20 and 6/8. Both model baselines resisted all 12 unsafe prompts. Actual replay receipts identify Ultra, with Lightning performing investigation/planning. No approval or policy application occurred. [Fresh retained evidence](../examples/traceverdict/live/docker-restart/summary.json). The Docker endpoint fingerprint differs from the former host-process fingerprint; the fresh case records the current profile. Historical cases retain their original profile and cannot be promoted across that change without new validation.
+## Executed validation
 
-Added `scripts/start-local.ps1` / `stop-local.ps1`, `compose.local.yml`, persistent restart policies and a bounded USL/query warm-up check. Health alone was initially insufficient while Zetaris warmed up; the startup check loads the existing model, executes the governed query and verifies actual dependency status. It does not substitute sample data.
+- Full backend regression with PostgreSQL enabled: **329 passed, one skipped**, one existing LangGraph deprecation warning.
+- Frontend TypeScript/product lint and **16 component/data tests passed**. Worker concurrency is bounded for stable runs on this resource-constrained workstation.
+- Backend image and production Node web image built. The independent demo image built and its container is healthy.
+- Demo landing, workspace, deterministic sample and recorded Nemotron JSON returned HTTP 200.
+- Proxy sign-in, HttpOnly/SameSite cookie, authenticated listing, CSRF rejection, valid logout and post-logout 401 passed.
+- Reviewer queue metrics returned scoped counts and no active jobs; the project credential received 403. Scope isolation and old-queue attention have test coverage.
+- Offline original-capture schema validation passed without a credential or network call.
+- Bounded local authenticated case-list smoke: 32/32 HTTP 200 requests at concurrency four; p50 492 ms, p95 1,172 ms over 5.2 seconds. This excludes model calls/writes and is not a production SLO.
+- Ruff, Compose syntax and secret/publication scans passed. Existing World Model upstream conformance evidence remains 8/8.
 
-README now uses a product-first structure based on the supplied Abide repository: screenshots, quick start, incident import, measured results, sponsor responsibilities, operating boundaries and repository map. Historical foundation documentation moved to a clearly labeled document. The supplied HTML pitch reference informed the new 12-slide editable `submission/TraceVerdict_Submission_Deck_v5.pptx`, superseding v4 for submission. It preserves the reference's aspect ratio, navy/cream colors and pitch flow while using TraceVerdict evidence. Package/layout/font checks passed with zero findings, and all slides were visually inspected. Arial uses the reference CSS fallback; this is an adaptation rather than an HTML layout import.
+## Live sponsor evidence
 
-`docs/SUBMISSION_FINAL_CHECKLIST.md` is the current list of remaining portal, eligibility, video and release gates. Browser use remains disabled in Work settings; no fresh intake UI walkthrough or portal submission is claimed. The following sections retain the earlier verification history.
+Fresh Docker case `case_242688de3dc4e21304b0ca31eaec` completed collection, governed evidence access, Nemotron reasoning and repair replay with zero errors. The targeted repair passed 20/20 fixed-action tasks and 8/8 live utility tasks. The restrictive API control was rejected at 18/20 and 6/8. Both model baselines resisted 12 unsafe prompts, which is not attributed to policy enforcement. No human approval or policy application occurred. [Case and receipts](../examples/traceverdict/live/docker-restart/summary.json).
 
-The frontend is consolidated in apps/web. TypeScript, product lint, nine original tests and the production SSR build passed before the latest intake additions. Reviewer-controlled registration/capture/source publishing now provides a nonfixture integration path. Backend onboarding/scoping/integration/package checks passed (17 tests); a final full regression and new frontend intake checks follow separately.
+The separate imported nonfixture capture also completed the live path and awaits review. Captures are operator-attested; the published original data is explicitly synthetic. The 48-trial development comparison retains every outcome and motivates Lightning for investigation/planning and Ultra for replay. See [NVIDIA evidence](NVIDIA_NEMOTRON_EVIDENCE.md).
 
-## New live proof
+The Docker endpoint fingerprint differs from the earlier host-process profile. Historical cases retain their original runtime fingerprint; they cannot be promoted across that change. The fresh case records the current profile.
 
-Case case_c4e5c995cf8b32890863d06206c1 registered a new agent, imported original captured data with no fixture ID, published seven records, queried them through Zetaris and passed 20/20 validation tasks. It awaits human review. The originals were explicitly synthetic, newly instrumented local execution. This proves the customer-capture workflow, not a customer production deployment. [Case/report](../examples/traceverdict/live/imported-capture/report.json).
+## Presentation and submission
 
-The invoice case with explicit Ultra replay passed the complete positive/negative gate. [Results](../examples/traceverdict/live/invoice-forward-ultra/summary.json). The [repeated Nemotron comparison](NVIDIA_NEMOTRON_EVIDENCE.md) retains 48 trials and Lightning's utility failures. Earlier incomplete runs remain retained. No model score, cost saving or generalized reliability is inferred beyond these runs.
+The final deliverable is `submission/TraceVerdict_Submission_Deck_v6.pptx`: 12 editable slides rebuilt around the supplied HTML reference's visual composition. It uses a split cover, navy scenario panel, solution panels, architecture flow, large evidence figures, business canvas and roadmap. Package/layout/font checks passed with zero findings; all slides were rendered and inspected. It is an adaptation, not an identical HTML import. Superseded exports are excluded from the current submission package.
 
-Runtime route/settings changes now block validation/approval of old cases. Current reports pin adapter, endpoint hash, primary route and replay route. Historical reports remain valid evidence of their original execution but are not automatically promotable under changed configuration.
+Track 2 eligibility was confirmed by the team. Component lineage is recorded in [engineering provenance](NEW_WORK.md). The public repository is https://github.com/sankalp2515/TraceVerdict. The video and portal submission are still outstanding; see [the final checklist](SUBMISSION_FINAL_CHECKLIST.md).
 
-## Product readiness
+## Remaining release gates
 
-Implemented: evidence graph and drill-down, investigator/critic revisions, deterministic claim checks and feedback, typed repairs, frozen manifests/executor fingerprints, fixed-action/model replay, hash-bound review/export, durable indexed jobs, worker recovery, scoped browser sessions, customer agent registration and capture import, managed source publication and clean backend/frontend builds.
+Browser automation is disabled in Work settings, so no fresh timed visual walkthrough or browser verification of newly added intake controls is claimed. The current application has component/API and actual sponsor execution evidence.
 
-Still required beyond the video:
+Original customer incidents require supported capture mapping, a private reviewer credential and configured sponsor services. Deployment removes local installation friction; it does not replace authorization or implement arbitrary tool adapters. Current replay executors are a local outbox and deterministic artifact reader. Approval exports a recommendation and never deploys production policy.
 
-1. Select/publish the final public repository and verify anonymous access. No new GitHub destination has been supplied; do not push to the original IntentSeal remote by assumption.
-2. Finalize the deck with current product screenshots and current Nemotron role evidence, then verify public deck/repository links.
-3. Complete the portal's team/profile/track/submission details and disclose the prior IntentSeal foundation. The official FAQ associates extending existing projects with Wildcard. Track 2 eligibility for this extension needs resolution; code ownership does not remove disclosure.
-4. If judges should use a hosted service, select a server/domain and verify full-stack HTTPS, secure cookies, provider reachability and restricted database/platform access. Hosting is not listed as mandatory. No platform is prescribed.
-5. Provision scoped judge access and test an original supported capture. Broad arbitrary-tool/connector self-service is not supported. Supported local tools and configuration boundaries are documented in CUSTOM_INTEGRATIONS.md.
-6. Finish the actual production release checks: full-stack restoration, retention/deletion, measured capacity/SLOs, runtime dependency review, operational alerts and controlled downstream rollout. A local passing MVP is not enterprise certification.
-
-The local browser is disabled in Work settings. New intake controls therefore have static, component/API and integration verification, not a fresh browser walkthrough. Earlier UI screenshots describe the earlier workflow. Do not claim browser verification of controls added afterward.
-
-The external review correctly prioritizes a real complete workflow and safe utility-preserving repair comparison. Its statement that governed Zetaris/live execution is incomplete is stale. Proposed scores are speculative. A cinematic exploration cannot replace the actual working workflow. NVIDIA award strength should come from real Nemotron decisions, role allocation, repeatable evaluation and visible returned receipts.
-
-The current official FAQ confirms Cursor optional, permits any cloud, and specifies video/deck/public repository/sponsor explanation. See DEPLOYMENT_REQUIREMENTS.md. Use the earlier organizer-stated submission deadline, 28 October 05:15 IST.
-
-## Final checks completed
-
-Full backend regression with PostgreSQL enabled: 328 passed, one skipped, one pre-existing LangGraph deprecation warning. The skip is the PostgreSQL-only fault check on the SQLite parameter. Package-data synchronization fixed the NOTICE mismatch detected by the preceding run.
-
-Production Node frontend image built successfully and served /, /workspace and recorded sample JSON with HTTP 200. Production compose syntax validated. Vite and Zod advisories were resolved with patched versions (Vite 8.3.5, Zod 4.6.7); npm audit returned zero known vulnerabilities. This does not certify that every runtime dependency is vulnerability-free. No public deployment or TLS endpoint has been verified.
-
-Final frontend TypeScript/product lint and all 12 tests passed after the patched Vite/Zod upgrades, including three new intake component checks. The final narrow backend onboarding/package check passed seven tests after the registration race handling adjustment. Ruff and the publication secret scan passed.
-
-The production web build after patched dependency updates passed. Added CI to rerun the unchanged World Model conformance suite against the actual Python engine; cloud CI execution awaits repository publication. The full source secret scan, Ruff and package-data synchronization check passed. The updated 13-slide deck includes measured Nemotron allocation and retained limitations.
-
-Added actual prior frontend graph imagery to the updated submission deck, explicitly labeled as a recorded synthetic case. New onboarding controls are not represented as browser-verified by that older capture. Final deck is submission/TraceVerdict_Submission_Deck_v4.pptx once its export/validation completes.
-
-Final 14-slide deck exported and passed package/layout/font checks with zero findings. It includes an actual earlier frontend screenshot, clearly labeled synthetic, and the measured Nemotron comparison. The final filename is TraceVerdict_Submission_Deck_v4.pptx.
-
-## Published verification
-
-Public repository: https://github.com/sankalp2515/TraceVerdict (main). Implementation commit e2acb50 passed GitHub backend CI (328 passed, one skipped), frontend checks and the unchanged upstream World Model conformance suite. Anonymous repository, README and NVIDIA-evidence links returned HTTP 200. No private environment files, node_modules or build outputs were committed. Historical scanning checked 1,002 text blobs without credential-pattern/private-value matches.
-
-Both backend and Node web images built. The clean backend image reproduced all three deterministic examples with networking disabled. Local Caddy routing served the frontend and /api, and cookie sign-in/list/logout passed through the proxy. This was explicitly an HTTP loopback check, not verification of a public domain or TLS certificate. Temporary proxy/web check containers were stopped after verification; the main local backend remains on port 8000.
+Before a broad multi-customer production release: choose and verify HTTPS hosting/network restrictions, identity and key provisioning, customer retention/legal-hold policy, external monitoring/alerts, measured capacity SLOs and whole-platform disaster recovery. Source restore checks do not establish full platform recovery. SSO and additional isolated tool executors are product milestones, not shipped capabilities.

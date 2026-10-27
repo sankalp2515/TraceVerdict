@@ -25,7 +25,7 @@ Pre-existing components: IntentSeal action guard, intent compiler, policy models
 - Final deck link/upload with frontend visuals where available.
 - Cursor is optional per the current official FAQ. This backend used Codex; mention Cursor only if actually used.
 - Confirm team roster before creating the first saved submission; the supplied guide says this locks the roster. Helios currently shows one member.
-- Track 2 eligibility remains subject to organizer rules for extending a pre-existing product.
+- Track 2 eligibility is confirmed by the team.
 
 No submission has been saved or sent. The organizer announcement says 23:45 UTC on 27 October. One dashboard tile says 23:59 UTC, so use the earlier 23:45 deadline.
 

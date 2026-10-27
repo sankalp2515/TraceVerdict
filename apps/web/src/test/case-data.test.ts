@@ -40,6 +40,23 @@ describe("Execution truth boundaries", () => {
     expect(executionState(recorded).label).toBe("Application-reported executed"));
 });
 describe("Recorded evidence integrity", () => {
+  it("serves the actual retained Nightshift run unchanged in the no-account workspace", () => {
+    const publicCase = readFileSync("public/samples/nemotron-live-world.json", "utf8").replaceAll(
+      "\r\n",
+      "\n",
+    );
+    const source = readFileSync(
+      "../../examples/traceverdict/live/docker-restart/case.json",
+      "utf8",
+    ).replaceAll("\r\n", "\n");
+    expect(publicCase).toBe(source);
+    const live = JSON.parse(publicCase) as CaseData;
+    expect(live.execution_mode).toBe("live");
+    expect(live.approvals).toHaveLength(0);
+    expect(live.errors).toHaveLength(0);
+    expect(publicCase).toContain("nvidia/nemotron-3-ultra-550b-a55b");
+    expect(publicCase).toContain("nvidia/nemotron-3.5-lightning-30b-a3b");
+  });
   it("resolves every graph endpoint and claim citation to an actual record", () => {
     const graph = deriveGraph(recorded);
     const ids = new Set(graph.nodes.map((n) => n.id));

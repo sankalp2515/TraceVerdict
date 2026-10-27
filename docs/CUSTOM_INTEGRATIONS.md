@@ -31,3 +31,13 @@ Replay supports local send_message outbox execution and deterministic document-r
 An external agent may use the existing IntentSeal SDK/action guard for enforcement, separately from uploading a TraceVerdict incident. Instrument the application to retain actual receipts and policy/model/build references. For a nonfixture case, the registered current policy must still match the historical base hash before approval. Approved recommendations require a separate controlled rollout.
 
 Operator-managed project/reviewer keys and tenant scopes are supported. Self-service accounts, enterprise SSO and customer-specific secret-vault provisioning are not implemented. Judges can run the reproducible local stack and import supported captures. A public multi-customer SaaS requires additional access provisioning and deployment verification.
+
+## Offline capture check and reviewer route
+
+Validate a capture before supplying any application credential or starting sponsor services:
+
+```powershell
+python scripts/traceverdict_import.py my-incident.json --check
+```
+
+This validates the strict capture schema and matching identities, not source authenticity or production integration readiness. Validation errors omit submitted values. The [judge quickstart](JUDGE_QUICKSTART.md) describes the credential-free recorded journey and the transition to original incident intake. The recording of the actual Nemotron run is available at `/workspace?mode=recorded&case=nemotron-live`; viewing it runs no new inference.

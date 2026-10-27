@@ -25,17 +25,11 @@ An AI agent reads an instruction hidden in a supplier document and attempts to c
 
 ## How it works
 
-```mermaid
-flowchart LR
-  E[Events and receipts] --> Z[Zetaris governed USL]
-  C[Historical configuration] --> Z
-  R[Trusted references] --> Z
-  Z --> G[World Model evidence graph]
-  G --> N[Nemotron investigator and critic through Nightshift]
-  N --> P[Typed policy repair]
-  P --> V[Safety and utility replay]
-  V --> H[Human review and recommendation export]
-```
+[![TraceVerdict implemented architecture](docs/images/traceverdict-architecture.svg)](docs/images/traceverdict-architecture.svg)
+
+*Open the diagram for full-size detail. It follows the reference design, updated to the implemented components and boundaries. These are logical layers; investigator, critic, planner and controller run within the case API, rather than separate deployed services.*
+
+The **evidence graph is a core component**: source-linked entities, claims and relationships retain provenance and content hashes. The Python World Model engine supplies canonical events and rebuilt reasoning context; the workspace exposes the graph for source inspection. Graph links alone do not prove causal influence. See the [architecture-to-code map](docs/ARCHITECTURE.md).
 
 1. **Collect:** load scope-filtered evidence through Zetaris and retain query receipts and source versions.
 2. **Explain:** link cited claims to graph evidence; a critic challenges unsupported conclusions. Missing evidence remains visible.
@@ -154,6 +148,10 @@ Public HTTPS deployment, self-service identities/connectors, SSO, monitoring, re
 
 ## Engineering provenance
 
-Reused components from our IntentSeal runtime: action guard, intent compiler, policy models, SDK and foundational gateway. TraceVerdict adds the investigation product, sponsor integrations, World Model graph, critic revision and repair-validation workflow. See [engineering provenance](docs/NEW_WORK.md).
+TraceVerdict builds on **our pre-existing IntentSeal runtime**, copied from the team's local checkout. Its action guard, intent compiler, policy models, Python SDK and foundational gateway are reused components. They provide the enforcement layer; they are not claimed as newly authored hackathon components.
+
+**Built for TraceVerdict:** the case investigation product and UI, immutable incident intake, Zetaris governed data access, Python World Model evidence graph, Nightshift/NVIDIA reasoning integration, critic revision loop, typed repair planning, safety-and-utility replay, hash-bound reviewer approval, recommendation export and product packaging. [Engineering provenance](docs/NEW_WORK.md) records the baseline and implementation details.
+
+**Why some commits predate the event:** the separate TraceVerdict checkout retained the local IntentSeal repository's Git history. Older commits describe the reused foundation, not when the new TraceVerdict investigation workflow was built. The [release source ZIP](https://github.com/sankalp2515/TraceVerdict/releases/tag/hackathon-2026-10-28) is an installation snapshot without Git metadata; it retains this component disclosure.
 
 Apache-2.0 · Helios · Open Agent Hackathon 2026 · Track 2: The Agent That Can Explain Why.

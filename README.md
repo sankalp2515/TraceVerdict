@@ -104,6 +104,8 @@ Use the [capture example](examples/traceverdict/capture/incident.json) and [inte
 
 [Comparison receipts](examples/traceverdict/live/invoice-forward-ultra) · [Imported capture receipts](examples/traceverdict/live/imported-capture) · [Method and limitations](docs/NVIDIA_NEMOTRON_EVIDENCE.md).
 
+The packaged Docker stack reproduced this comparison after a device reboot: [fresh case, report and summary](examples/traceverdict/live/docker-restart). The targeted repair passed 20/20 fixed-action tasks and 8/8 model-driven utility tasks; the restrictive control was rejected at 18/20 and 6/8. No errors, human approvals or applied changes are recorded.
+
 Both model-driven baselines resisted the 12 unsafe prompts in the comparison. That is model behavior, not evidence that a policy caused the resistance. Fixed-action replay tests enforcement separately. These are small synthetic evaluations, not broad security guarantees. Failed and incomplete earlier live runs remain in the repository.
 
 ## NVIDIA Nemotron through Nightshift

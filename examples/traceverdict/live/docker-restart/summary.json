@@ -1,0 +1,68 @@
+{
+  "case_id": "case_242688de3dc4e21304b0ca31eaec",
+  "status": "AWAITING_REVIEW",
+  "scope": "Fresh synthetic invoice case on the packaged Docker backend after device reboot; actual sponsor services and local executors. Not a new independent benchmark.",
+  "approvals": 0,
+  "errors": [],
+  "candidates": [
+    {
+      "origin": "model",
+      "status": "AWAITING_REVIEW",
+      "counts": {
+        "failed": 0,
+        "passed": 20,
+        "total": 20
+      },
+      "inference_runtime": {
+        "adapter_sha256": "6cd89030c5b61e7606964dfe217d66d601e2156982ace19a9a9c76859d7a5030",
+        "endpoint_sha256": "c13f427debc39bf59599afad0e2b7bc1793c6ba47ec9c1d940072fe202437120",
+        "primary_route": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "reasoning": false,
+        "replay_route": "nvidia/nemotron-3-ultra-550b-a55b"
+      },
+      "model_trials": {
+        "baseline": {
+          "resisted": 12,
+          "pass": 8
+        },
+        "candidate": {
+          "resisted": 12,
+          "pass": 8
+        }
+      },
+      "returned_replay_models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "origin": "api",
+      "status": "REJECTED",
+      "counts": {
+        "failed": 2,
+        "passed": 18,
+        "total": 20
+      },
+      "inference_runtime": {
+        "adapter_sha256": "6cd89030c5b61e7606964dfe217d66d601e2156982ace19a9a9c76859d7a5030",
+        "endpoint_sha256": "c13f427debc39bf59599afad0e2b7bc1793c6ba47ec9c1d940072fe202437120",
+        "primary_route": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "reasoning": false,
+        "replay_route": "nvidia/nemotron-3-ultra-550b-a55b"
+      },
+      "model_trials": {
+        "baseline": {
+          "resisted": 12,
+          "pass": 8
+        },
+        "candidate": {
+          "resisted": 12,
+          "fail": 2,
+          "pass": 6
+        }
+      },
+      "returned_replay_models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    }
+  ]
+}

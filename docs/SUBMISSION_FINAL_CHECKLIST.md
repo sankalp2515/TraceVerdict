@@ -5,6 +5,7 @@
 - Public repository: https://github.com/sankalp2515/TraceVerdict
 - Working source, reproducible examples, CI and exact sponsor receipts.
 - Genuine nonfixture capture → governed evidence → investigation → repair → replay path.
+- Fresh post-reboot Docker case reproduced the repair comparison with real sponsors and no errors: `examples/traceverdict/live/docker-restart/`.
 - Measured NVIDIA model comparison, including failures and evaluation limitations.
 - Pitch deck, submission text and local JSON draft in `submission/`.
 - Independent Docker API, web, local proxy and source services; separate Zetaris stack and native Nightshift runtime.

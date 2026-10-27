@@ -1,0 +1,25 @@
+# Local product: independent API, web and proxy containers, existing sponsor stack.
+services:
+  web:
+    profiles: ["app"]
+    image: traceverdict-web:local
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    mem_limit: 384m
+    security_opt: ["no-new-privileges:true"]
+    networks: [zetaris]
+  edge:
+    profiles: ["app"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    mem_limit: 96m
+    ports: ["127.0.0.1:5173:80"]
+    volumes: ["./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro"]
+    networks: [zetaris]
+    depends_on:
+      case-api:
+        condition: service_healthy
+      web:
+        condition: service_healthy

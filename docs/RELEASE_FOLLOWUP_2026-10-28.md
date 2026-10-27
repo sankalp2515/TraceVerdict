@@ -1,5 +1,17 @@
 # Release follow-up - 28 October 2026 IST
 
+## Latest restart and submission packaging
+
+The device reboot was followed by a fresh build/start of independent API, Node web, Caddy proxy and three PostgreSQL source services. Zetaris runs in its installed separate Compose stack; Nightshift resumed as its native desktop runtime. The full product is at http://localhost:5173, with API docs on port 8000. Session sign-in, HttpOnly/SameSite cookies, case listing and real authenticated database/Zetaris/Nightshift probes passed through the proxy. Source data and prior cases survived the reboot.
+
+The final restart command completed successfully with every live dependency online. Proxy logout without CSRF returned 403, valid logout returned 200 and subsequent case access returned 401. A fresh Nightshift NVIDIA completion returned the actual Lightning route (22 input tokens, 3 output tokens; HTTP 200). Five packaging checks and Ruff passed. Existing backend, frontend and conformance CI evidence remains the full regression record; these packaging changes do not claim a new full-suite run.
+
+Added `scripts/start-local.ps1` / `stop-local.ps1`, `compose.local.yml`, persistent restart policies and a bounded USL/query warm-up check. Health alone was initially insufficient while Zetaris warmed up; the startup check loads the existing model, executes the governed query and verifies actual dependency status. It does not substitute sample data.
+
+README now uses a product-first structure based on the supplied Abide repository: screenshots, quick start, incident import, measured results, sponsor responsibilities, operating boundaries and repository map. Historical foundation documentation moved to a clearly labeled document. The supplied HTML pitch reference informed the new 12-slide editable `submission/TraceVerdict_Submission_Deck_v5.pptx`, superseding v4 for submission. It preserves the reference's aspect ratio, navy/cream colors and pitch flow while using TraceVerdict evidence. Package/layout/font checks passed with zero findings, and all slides were visually inspected. Arial uses the reference CSS fallback; this is an adaptation rather than an HTML layout import.
+
+`docs/SUBMISSION_FINAL_CHECKLIST.md` is the current list of remaining portal, eligibility, video and release gates. Browser use remains disabled in Work settings; no fresh intake UI walkthrough or portal submission is claimed. The following sections retain the earlier verification history.
+
 The frontend is consolidated in apps/web. TypeScript, product lint, nine original tests and the production SSR build passed before the latest intake additions. Reviewer-controlled registration/capture/source publishing now provides a nonfixture integration path. Backend onboarding/scoping/integration/package checks passed (17 tests); a final full regression and new frontend intake checks follow separately.
 
 ## New live proof

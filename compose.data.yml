@@ -1,6 +1,7 @@
 name: traceverdict-data
 services:
   case-api:
+    restart: unless-stopped
     profiles: ["app"]
     image: traceverdict-backend:local
     build:
@@ -20,8 +21,13 @@ services:
     depends_on:
       tv-events:
         condition: service_healthy
+      tv-configuration:
+        condition: service_healthy
+      tv-reference:
+        condition: service_healthy
     mem_limit: 512m
   tv-events:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: events
@@ -37,6 +43,7 @@ services:
       timeout: 3s
       retries: 12
   tv-configuration:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: configuration
@@ -48,6 +55,7 @@ services:
     mem_limit: 192m
     healthcheck: *pg_health
   tv-reference:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: reference

@@ -1,0 +1,10 @@
+:80 {
+  bind 0.0.0.0
+  encode gzip
+  handle_path /api/* {
+    reverse_proxy case-api:8000
+  }
+  handle {
+    reverse_proxy web:3001
+  }
+}

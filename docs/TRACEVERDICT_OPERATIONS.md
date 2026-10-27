@@ -4,6 +4,12 @@ Local endpoints: Zetaris UI localhost:3000, API localhost:8888; Nightshift 127.0
 
 ## Startup
 
+For the packaged local product, use `./scripts/start-local.ps1 -Build` the first time, then `./scripts/start-local.ps1` after a reboot. Pass `-ZetarisPath` if your installed bundle is elsewhere. This starts the installed Zetaris stack, independent source databases, container API, production-built web service and Caddy proxy. Open http://localhost:5173. Nightshift stays in its supported native desktop runtime; start it with the existing NVIDIA configuration before the final readiness check.
+
+`compose.local.yml` overlays `compose.data.yml`; each application service has its own container and resource limit. Persistent source volumes survive stops. The restart script loads the existing Zetaris USL and probes a real governed query, then verifies authenticated sponsor readiness. Cold Spark startup can be slower than container health. The script reports failure if live dependencies remain unavailable; it does not silently select sample mode.
+
+Stop with `./scripts/stop-local.ps1 -IncludeZetaris`. This retains named volumes and does not affect unrelated projects. Nightshift can be quit separately. These local endpoints use HTTP on loopback; public deployment uses the separate HTTPS production overlay.
+
 Start Docker Desktop, then the installed Zetaris stack and wait for health. Start Nightshift with its NVIDIA provider configured. From the TraceVerdict directory:
 
 ```powershell

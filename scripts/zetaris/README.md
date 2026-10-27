@@ -1,35 +1,36 @@
-# Zetaris connection acceptance
+# Zetaris evidence layer
 
-## Current verified implementation
+Three independent PostgreSQL sources feed an activated native USL and native data-quality rule. Operational events/receipts, historical configuration and trusted references stay in separate databases. Zetaris reads each through a SELECT-only `tv_reader` account.
 
-The earlier pending checklist below is historical. Three independent PostgreSQL sources now feed an activated native USL and native quality rule. Run `provision.py init`, `provision.py register`, seed a case using `scripts/traceverdict_live.py`, then run `native_usl.py` and `provision.py verify`. Repeated registration preserves an activated USL view. Native DQ fails on empty data or invalid rows. Verification performs three exploratory queries per source and semantic summary, kind counts and completeness checks.
+The USL joins case membership across all three sources using tenant, agent and case IDs. The application queries `traceverdict.case_evidence` through a fixed scoped SELECT template. Models cannot submit SQL. Query receipts preserve request IDs and query/response hashes.
 
-Actual [native DDL/receipts](../../examples/traceverdict/zetaris/native-usl.json), [SQL](../../examples/traceverdict/zetaris/native-usl.sql), and [source/semantic checks](../../examples/traceverdict/zetaris/verification.json) are retained. The latest native rule returned 63 valid of 63 records and zero invalid. The real live case includes scoped query receipts and returned NVIDIA model evidence through Nightshift.
+## First installation
 
-The unified layer presents one scoped evidence contract while keeping operational actions/receipts distinct from historical configuration and trusted recipient reference data. Membership joins and SELECT scope predicates require tenant, agent and case agreement. Native DQ checks payload presence and kind; the completeness query checks all seven fixture kinds. These checks do not authenticate compromised producers or establish source truth. Sources are synthetic; connectivity and sponsor execution are real. Separate enterprise Zetaris role provisioning remains deployment work.
+Configure private owner/reader credentials and Zetaris REST credentials in the ignored project `.env`. Start the installed Zetaris platform and `compose.data.yml` sources, then use the configured Python environment:
 
-The backend uses one approved SELECT template against `ZETARIS_CASE_VIEW`, default `traceverdict.case_evidence`. The official REST contract was checked against Zetaris's getting-started `scripts/zetaris_sql.py`: POST `/sql-editor/sqls/run`, bearer credential, X-Org-ID, fresh X-Request-ID, and a body containing queryId, sql, source=SqlEditor and limit. Column-array results under `data` and a named `rows` wrapper are supported. The installed platform still needs a real connectivity and shape check.
+```powershell
+python scripts/zetaris/provision.py init
+python scripts/zetaris/provision.py register
+# Start the case API, create and seed the first synthetic live case:
+python scripts/traceverdict_live.py --run-key first-live-run --comparison-control
+python scripts/zetaris/native_usl.py
+python scripts/zetaris/provision.py verify
+```
 
-## Source preparation
+Initial registration creates a governed three-source view so the first case can be seeded. Native activation then replaces the application view with the activated USL path. Run a new case key to verify that full path. Repeated registration preserves an activated USL. See [setup](../../docs/GETTING_STARTED.md) and [custom capture import](../../docs/CUSTOM_INTEGRATIONS.md).
 
-Create a synthetic case in live mode through the API, then use the admin-only `/v1/cases/{id}/source-records` endpoint with `export_case_sources.py`. It generates three JSON groups: operational events/receipts, historical fixture policy/tool configuration, and the trusted reference directory. Exports contain synthetic fixture data; their local execution receipts describe a sandbox, not a production agent.
+## Restart an existing installation
 
-Register each group in storage reachable from Zetaris. Local Windows paths alone are not readable by the platform. Keep configuration and reference sources under administrator control. Register them using the installed platform's supported connectors and verify their schemas before creating a semantic view. A live investigation must query the actual Zetaris view; returning a local copy from this adapter is deliberately unsupported.
+Use `scripts/start-local.ps1` from the repository root. It retains data volumes, loads the existing USL, warms a real governed query and checks authenticated dependency status. No data is reseeded or replaced. Cold Spark queries can take longer than the container health checks. Nightshift must also be running with its provider configuration.
 
-Each registered group needs `tenant_id`, `agent_id`, `case_id`, `evidence_kind`, and `evidence_json`. The governed view must join case membership in operational data to the corresponding historical configuration and trusted reference record on all three scope fields. Preserve each group's evidence_json when projecting the unified evidence rows. A valid view supplies all seven fixture records; configuration and reference evidence must be independently traceable.
+## Retained acceptance evidence
 
-The exact registration and USL DDL is intentionally not guessed before the installed connector/version can be inspected. Once access is available, save the proven DDL, query outputs and data-quality rule execution here. Treat three groups/tables as three independent data sources only if their actual registrations and provenance support that statement.
+- [Native USL DDL and receipts](../../examples/traceverdict/zetaris/native-usl.json)
+- [USL SQL](../../examples/traceverdict/zetaris/native-usl.sql)
+- [Source queries and completeness checks](../../examples/traceverdict/zetaris/verification.json)
+- [Reader permission verification](../../examples/traceverdict/zetaris/reader-permissions.json)
+- [Nonfixture captured case through the live path](../../examples/traceverdict/live/imported-capture/report.json)
 
-## Live acceptance checklist
+The retained native DQ run returned 63 valid records and zero invalid; this is that run's count, not the current total. `provision.py verify` runs three exploratory queries per source, semantic summaries and a seven-kind case-completeness check. Native DQ validates nonempty payload and evidence kind. These rules do not establish producer authenticity or prove causal truth. Captures are operator-attested and published incidents are synthetic; sponsor execution is real.
 
-- [x] Verify authenticated SELECT 1 against the installed API with the user's token (27 October 2026).
-- [ ] Complete application source discovery and registration. An inspection of `traceverdict` returned no tables during assessment.
-- [ ] Register and inspect all three source groups, retaining locations and versions.
-- [ ] Execute two or three exploratory queries per source.
-- [ ] Create and retain a unified semantic layer and its DDL in Zetaris.
-- [ ] Execute the governed case join and confirm all scope predicates.
-- [ ] Execute at least one data-quality rule and two or three semantic-layer queries.
-- [ ] Run a live case report and retain the adapter query receipts and concrete model evidence.
-- [ ] Write a short reflection on the semantic layer's benefits and limitations, based on observed work.
-
-The source registration, semantic layer, quality and full case checks remain pending; mocked HTTP tests do not satisfy them. Basic connectivity passed using numeric organization ID `1` for this installation. Keep credentials private; the backend mapping is in its ignored `.env`.
+REST uses POST `/api/v1.0/sql-editor/sqls/run`, Bearer authentication, numeric `X-Org-ID`, a fresh request ID and `source=SqlEditor`. Credentials and credential-bearing DDL must never be printed or committed. Enterprise Zetaris role provisioning and whole-platform backup/recovery remain deployment responsibilities. Source restore verification is available in `backup_restore_check.py`.

@@ -1,5 +1,5 @@
-"""Pre-commit secret scan. Blocks a commit if a staged file contains a provider-key-shaped string
-or any value currently set in .env. Prints file and line only, never the matched value.
+"""Pre-commit secret scan. Blocks provider-key-shaped strings and private values from .env.
+Known public model-route metadata is excluded. Prints file and line only, never matched values.
 
 Install: python scripts/install_hooks.py
 """
@@ -30,7 +30,12 @@ def env_values() -> list[str]:
     vals = []
     for line in env.read_text(encoding="utf-8", errors="ignore").splitlines():
         if "=" in line and not line.lstrip().startswith("#"):
-            v = line.split("=", 1)[1].strip().strip('"').strip("'")
+            key, raw = line.split("=", 1)
+            v = raw.strip().strip('"').strip("'")
+            # Discovered route IDs are public attribution, including in evaluation reports.
+            # Only this known metadata field/route shape is exempt; tokens remain scanned.
+            if key.strip() in {"METERLESS_MODEL", "METERLESS_REPLAY_MODEL"} and re.fullmatch(r"(?:meterless|nvidia)/[A-Za-z0-9_.:-]+", v):
+                continue
             if len(v) >= 12:
                 vals.append(v)
     return vals

@@ -2,3 +2,8 @@ IntentSeal
 Copyright 2026 Sankalp Wanjari
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The unchanged World Model conformance runner under tools/world-model-conformance
+is from Meterless/Meterless, revision 1742dec56a66e58eef9dda2d2b865823758ca8cd.
+Its Apache-2.0 license is included alongside it. The Python implementation and
+bridge are TraceVerdict application work; attribution does not imply endorsement.

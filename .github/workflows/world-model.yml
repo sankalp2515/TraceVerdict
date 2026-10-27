@@ -1,0 +1,30 @@
+name: World Model conformance
+on:
+  push:
+    branches: [main]
+    paths: ["tools/world-model-conformance/**", "services/gateway/intentseal_gateway/cases/world_model.py", ".github/workflows/world-model.yml"]
+  pull_request:
+    paths: ["tools/world-model-conformance/**", "services/gateway/intentseal_gateway/cases/world_model.py", ".github/workflows/world-model.yml"]
+permissions:
+  contents: read
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/world-model-conformance/package-lock.json
+      - name: Install constrained application requirements
+        run: pip install -c requirements.lock ./packages/core ./packages/sdk ./agents ./services/gateway
+      - run: npm ci
+        working-directory: tools/world-model-conformance
+      - name: Execute unchanged upstream suite against the Python Engine
+        working-directory: tools/world-model-conformance
+        run: WORLD_MODEL_IMPL="$PWD/adapter.ts" WORLD_MODEL_PYTHON=python npm test

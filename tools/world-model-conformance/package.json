@@ -1,0 +1,7 @@
+{
+  "name": "traceverdict-world-model-conformance",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "tsx runner.ts" },
+  "devDependencies": { "tsx": "4.20.6" }
+}

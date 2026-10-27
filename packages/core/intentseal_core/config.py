@@ -186,4 +186,20 @@ def load_settings() -> Settings:
     load_env()
     url = os.environ.get("INTENTSEAL_DATABASE_URL", "").strip()
     db: Path | str = url or Path(os.environ.get("INTENTSEAL_DB_PATH") or repo_root() / "data" / "intentseal.db")
-    return Settings(providers=load_providers(), roles=load_roles(), db_path=db)
+    providers, roles = load_providers(), load_roles()
+    if os.environ.get("TRACEVERDICT_NIGHTSHIFT_ONLY", "").lower() == "true":
+        # Explicit hackathon runtime profile: every legacy role, including Investigator's
+        # otherwise implicit fallback, uses Nightshift. No direct-provider fallback.
+        base, token, model = (os.environ.get(k, "") for k in
+                              ("METERLESS_BASE_URL", "METERLESS_RUNTIME_TOKEN", "METERLESS_MODEL"))
+        if not all((base, token, model)):
+            raise ValueError("Nightshift-only profile requires Runtime URL, token and discovered route")
+        from .secrets import registry
+        registry.register(token)
+        key = ApiKey("nightshift#runtime", token)
+        providers = {"nightshift": ProviderConfig("nightshift", "openai_compatible", True, base.rstrip("/"), [key],
+                      timeout_s=40, extra_headers={"meterless-app": "traceverdict", "meterless-scope": "user"})}
+        names = set(roles) | {"investigator", "critic", "repair"}
+        roles = {name: RoleConfig(name, [ModelRef("nightshift", model)], cache=False,
+                    defaults=roles[name].defaults if name in roles else {"temperature": 0, "max_tokens": 2500}) for name in names}
+    return Settings(providers=providers, roles=roles, db_path=db)

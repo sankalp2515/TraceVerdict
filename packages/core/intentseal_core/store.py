@@ -11,6 +11,7 @@ logger (CORE-10) through `Store.ensure_schema`.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import re
 import sqlite3
 import threading
@@ -64,7 +65,8 @@ class Store:
         self.path = Path(path)
         if str(path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._transaction_depth = 0
         self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.row_factory = sqlite3.Row
@@ -82,6 +84,28 @@ class Store:
     def query(self, sql: str, params: tuple | list = ()) -> list[dict[str, Any]]:
         with self._lock:
             return [dict(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    @contextmanager
+    def transaction(self):
+        """Atomic case/index writes; the connection lock also excludes local threads."""
+        with self._lock:
+            if self.backend == "postgres" and self._conn.closed:
+                self._conn = self._connect()
+            self._transaction_depth += 1
+            try:
+                if self.backend == "postgres":
+                    with self._conn.transaction():
+                        yield self
+                else:
+                    self._conn.execute("BEGIN IMMEDIATE")
+                    try:
+                        yield self
+                        self._conn.execute("COMMIT")
+                    except BaseException:
+                        self._conn.execute("ROLLBACK")
+                        raise
+            finally:
+                self._transaction_depth -= 1
 
     def ping(self) -> bool:
         """Readiness: the database answers."""
@@ -156,7 +180,8 @@ class PostgresStore(Store):
         if m:
             registry.register(m.group(1))   # the password never reaches a log line
         self.path = Path("postgres")
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._transaction_depth = 0
         self._conn = self._connect()
         self.ensure_schema(_SCHEMA)
 
@@ -174,7 +199,7 @@ class PostgresStore(Store):
                     cur = self._conn.execute(self._sql(sql), tuple(params))
                     return [{k: _plain(v) for k, v in r.items()} for r in cur.fetchall()] if fetch else cur
                 except self._psycopg.OperationalError:
-                    if attempt == 2 or not self._conn.closed:
+                    if self._transaction_depth or attempt == 2 or not self._conn.closed:
                         raise
                     self._conn = self._connect()   # connection dropped: reopen once
 

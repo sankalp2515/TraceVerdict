@@ -1,0 +1,41 @@
+name: frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "package.json"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "package.json"
+      - ".github/workflows/frontend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm run frontend:install
+      - name: TypeScript, product lint and tests
+        run: npm run frontend:check
+      - name: Production SSR build
+        run: npm run frontend:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: traceverdict-web-build
+          path: apps/web/.output/
+          include-hidden-files: true
+          retention-days: 7

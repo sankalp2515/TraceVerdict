@@ -81,6 +81,10 @@ class KeyRing:
                 return p
         return None
 
+    def lookup_fingerprint(self, fingerprint: str) -> Principal | None:
+        """Internal session revalidation; fingerprints are never accepted as API keys."""
+        return self._keys.get(fingerprint)
+
     def allow(self, p: Principal, client: str = "") -> bool:
         now = time.time()
         bucket_id = f"{p.name}@{client}" if p.scope == "public" else p.name
@@ -107,7 +111,10 @@ def _key_from(request: Request) -> str | None:
 def require(scope: str):
     async def dep(request: Request) -> Principal:
         ring: KeyRing = request.app.state.keys
-        p = ring.lookup(_key_from(request))
+        credential = _key_from(request)
+        p = ring.lookup(credential)
+        if credential is None and hasattr(request.app.state, "sessions"):
+            p = request.app.state.sessions.authenticate(request)
         if p is None:
             raise HTTPException(401, "missing or invalid API key")
         if SCOPES[p.scope] < SCOPES[scope]:

@@ -100,7 +100,7 @@ def make_client(env, router: FakeRouter | None = None, judge: float = 0.0):
     router = router or FakeRouter()
     store = router.store
     engine = Engine(decision_model=StaticDecisionModel(judge, {"Indirect Prompt Injection": judge}),
-                    classifiers=[Scorer()], router=router, store=store)
+                    classifiers=[Scorer()], router=router, store=store, tier0_timeout_s=10)
     return TestClient(appmod.create_app(engine=engine, reports_dir=env / "reports"))
 
 

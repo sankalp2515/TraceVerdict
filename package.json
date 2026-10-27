@@ -1,0 +1,13 @@
+{
+  "name": "traceverdict",
+  "private": true,
+  "description": "Single-repository entry points for the TraceVerdict product frontend and backend.",
+  "engines": { "node": ">=22.14.0" },
+  "scripts": {
+    "frontend:install": "npm --prefix apps/web ci --legacy-peer-deps",
+    "frontend:dev": "npm --prefix apps/web run dev -- --host 127.0.0.1 --port 5173",
+    "frontend:check": "npm --prefix apps/web run check",
+    "frontend:build": "npm --prefix apps/web run build",
+    "frontend:preview": "npm --prefix apps/web run preview -- --host 127.0.0.1 --port 5173"
+  }
+}

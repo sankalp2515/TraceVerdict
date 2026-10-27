@@ -1,0 +1,17 @@
+[
+  {
+    "source": "events",
+    "select_records": 36,
+    "table_write_denied": true
+  },
+  {
+    "source": "configuration",
+    "select_records": 18,
+    "table_write_denied": true
+  },
+  {
+    "source": "reference",
+    "select_records": 9,
+    "table_write_denied": true
+  }
+]

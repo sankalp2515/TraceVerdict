@@ -39,3 +39,11 @@ docs/high-fidelity-wireframe-directions.html
 
 # full-size Console screenshots for the deck/video (regenerate with headless Edge)
 docs/media/*.png
+
+# Regenerable TraceVerdict local execution artifacts; example reports live under examples/.
+artifacts/traceverdict/
+.submission-build/
+submission/TraceVerdict_Submission_Deck.pptx
+submission/TraceVerdict_Submission_Deck_v[123].pptx
+# Local browser verification state; never part of the submission.
+.playwright-cli/

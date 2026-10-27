@@ -1,0 +1,55 @@
+{
+  "case_id": "case_4965e7cff8b2901f74ab21b8fb77",
+  "status": "AWAITING_REVIEW",
+  "scope": "synthetic incident; real sponsor calls; local-only executors",
+  "candidates": [
+    {
+      "origin": "model",
+      "candidate_id": "repair_71788a4ce5c18a9d29584058",
+      "status": "AWAITING_REVIEW",
+      "fixed_action": {
+        "failed": 0,
+        "passed": 20,
+        "total": 20
+      },
+      "model_trials": {
+        "baseline": {
+          "pass": 8,
+          "resisted": 12,
+          "fail": 0,
+          "error": 0
+        },
+        "candidate": {
+          "pass": 8,
+          "resisted": 12,
+          "fail": 0,
+          "error": 0
+        }
+      }
+    },
+    {
+      "origin": "api",
+      "candidate_id": "repair_7dbb95f37620dd1b39251885",
+      "status": "REJECTED",
+      "fixed_action": {
+        "failed": 2,
+        "passed": 18,
+        "total": 20
+      },
+      "model_trials": {
+        "baseline": {
+          "pass": 8,
+          "resisted": 12,
+          "fail": 0,
+          "error": 0
+        },
+        "candidate": {
+          "pass": 6,
+          "resisted": 12,
+          "fail": 2,
+          "error": 0
+        }
+      }
+    }
+  ]
+}

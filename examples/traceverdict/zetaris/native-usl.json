@@ -1,0 +1,151 @@
+[
+  {
+    "operation": "parent-namespace",
+    "sql": "CREATE NAMESPACE IF NOT EXISTS lightning.metastore",
+    "request_id": "0e689b7b-12a2-409d-b169-f6c17c2f043e",
+    "result": {
+      "headers": [
+        "Result"
+      ],
+      "data": [],
+      "total": 0,
+      "timeUsed": 264
+    }
+  },
+  {
+    "operation": "namespace",
+    "sql": "CREATE NAMESPACE IF NOT EXISTS lightning.metastore.traceverdict",
+    "request_id": "ad4752bb-eaec-4a52-a6be-5412f615affc",
+    "result": {
+      "headers": [
+        "Result"
+      ],
+      "data": [],
+      "total": 0,
+      "timeUsed": 122
+    }
+  },
+  {
+    "operation": "activate-three-source-usl",
+    "sql": "ACTIVATE USL TABLE lightning.metastore.traceverdict.cases.case_evidence AS SELECT u.tenant_id,u.agent_id,u.case_id,u.evidence_kind,u.evidence_json FROM (\n SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_events.evidence\n UNION ALL SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_configuration.evidence\n UNION ALL SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_reference.evidence\n) u\nJOIN tv_events.case_membership e ON u.tenant_id=e.tenant_id AND u.agent_id=e.agent_id AND u.case_id=e.case_id\nJOIN tv_configuration.case_membership c ON u.tenant_id=c.tenant_id AND u.agent_id=c.agent_id AND u.case_id=c.case_id\nJOIN tv_reference.case_membership r ON u.tenant_id=r.tenant_id AND u.agent_id=r.agent_id AND u.case_id=r.case_id",
+    "request_id": "5c593dd1-fe9f-4432-bcfd-fc7f477864ae",
+    "result": {
+      "headers": [
+        "registered"
+      ],
+      "data": [
+        [
+          "{\"name\":\"case_evidence\",\"query\":\"SELECT u.tenant_id,u.agent_id,u.case_id,u.evidence_kind,u.evidence_json FROM (\\n SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_events.evidence\\n UNION ALL SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_configuration.evidence\\n UNION ALL SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM tv_reference.evidence\\n) u\\nJOIN tv_events.case_membership e ON u.tenant_id=e.tenant_id AND u.agent_id=e.agent_id AND u.case_id=e.case_id\\nJOIN tv_configuration.case_membership c ON u.tenant_id=c.tenant_id AND u.agent_id=c.agent_id AND u.case_id=c.case_id\\nJOIN tv_reference.case_membership r ON u.tenant_id=r.tenant_id AND u.agent_id=r.agent_id AND u.case_id=r.case_id\"}"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 807
+    }
+  },
+  {
+    "operation": "list-rules",
+    "sql": "LIST DQ USL lightning.metastore.traceverdict.cases",
+    "request_id": "416c15bc-a305-4bc5-84a5-a2337812b49c",
+    "result": {
+      "headers": [
+        "name",
+        "table",
+        "type",
+        "expression"
+      ],
+      "data": [
+        [
+          "valid_evidence_payload",
+          "case_evidence",
+          "Custom Data Quality",
+          "evidence_json IS NOT NULL AND LENGTH(evidence_json)>2 AND evidence_kind IN ('task','document','action','receipt','policy','tools','reference','event')"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 58
+    }
+  },
+  {
+    "operation": "execute-native-quality-rule",
+    "sql": "RUN DQ valid_evidence_payload TABLE lightning.metastore.traceverdict.cases.case_evidence",
+    "request_id": "3035ea9e-a265-4dd2-821b-86fe86b198e3",
+    "result": {
+      "headers": [
+        "name",
+        "table",
+        "type",
+        "total_record",
+        "valid_record",
+        "invalid_record"
+      ],
+      "data": [
+        [
+          "valid_evidence_payload",
+          "case_evidence",
+          "Custom Data Quality",
+          "63",
+          "63",
+          "0"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 6981
+    }
+  },
+  {
+    "operation": "query-native-usl",
+    "sql": "SELECT evidence_kind,COUNT(*) AS records FROM lightning.metastore.traceverdict.cases.case_evidence GROUP BY evidence_kind",
+    "request_id": "abfd4fb4-35ea-4706-ad8a-4dc71b85e2e9",
+    "result": {
+      "headers": [
+        "evidence_kind",
+        "records"
+      ],
+      "data": [
+        [
+          "document",
+          "9"
+        ],
+        [
+          "action",
+          "9"
+        ],
+        [
+          "receipt",
+          "9"
+        ],
+        [
+          "task",
+          "9"
+        ],
+        [
+          "reference",
+          "9"
+        ],
+        [
+          "tools",
+          "9"
+        ],
+        [
+          "policy",
+          "9"
+        ]
+      ],
+      "total": 7,
+      "timeUsed": 4324
+    }
+  },
+  {
+    "operation": "application-usl-view",
+    "sql": "CREATE OR REPLACE SCHEMASTORE VIEW case_evidence WITH CONTAINER traceverdict AS SELECT tenant_id,agent_id,case_id,evidence_kind,evidence_json FROM lightning.metastore.traceverdict.cases.case_evidence",
+    "request_id": "8d8eb5fd-7e0d-4c03-8d33-90add9575ec6",
+    "result": {
+      "headers": [
+        "Result"
+      ],
+      "data": [],
+      "total": 0,
+      "timeUsed": 241
+    }
+  }
+]

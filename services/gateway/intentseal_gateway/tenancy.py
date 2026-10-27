@@ -31,7 +31,7 @@ def _orgs(request: Request) -> dict[str, str]:
     if cached and time.monotonic() - cached[0] < _TTL_S:
         return cached[1]
     engine = state.engine
-    agents = set(list_policies())
+    agents = set(engine.list_agents() if hasattr(engine, "list_agents") else list_policies())
     agents |= {r["agent_id"] for r in engine.store.query("SELECT DISTINCT agent_id FROM sessions") if r["agent_id"]}
     out: dict[str, str] = {}
     for agent in agents:

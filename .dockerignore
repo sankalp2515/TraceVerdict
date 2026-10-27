@@ -12,6 +12,14 @@
 !examples/assistant/
 examples/assistant/workspace/
 !apps/console/
+!apps/web/
+apps/web/node_modules/
+apps/web/.output/
+apps/web/.nitro/
+apps/web/.tanstack/
+apps/web/.wrangler/
+apps/web/docs/
+apps/web/*.local
 apps/console/node_modules/
 apps/console/dist/
 apps/console/*.tsbuildinfo

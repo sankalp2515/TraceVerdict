@@ -1,0 +1,656 @@
+[
+  {
+    "check": "events-count",
+    "sql": "SELECT COUNT(*) AS records FROM tv_events.evidence",
+    "request_id": "453c4cf9-2418-490d-af68-01667c08b580",
+    "result": {
+      "headers": [
+        "records"
+      ],
+      "data": [
+        [
+          "36"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 535
+    },
+    "duration_ms": 3468
+  },
+  {
+    "check": "events-kinds",
+    "sql": "SELECT evidence_kind,COUNT(*) AS records FROM tv_events.evidence GROUP BY evidence_kind",
+    "request_id": "c00ae1df-8e4c-4b35-96fa-3b662781c743",
+    "result": {
+      "headers": [
+        "evidence_kind",
+        "records"
+      ],
+      "data": [
+        [
+          "receipt",
+          "9"
+        ],
+        [
+          "action",
+          "9"
+        ],
+        [
+          "task",
+          "9"
+        ],
+        [
+          "document",
+          "9"
+        ]
+      ],
+      "total": 4,
+      "timeUsed": 526
+    },
+    "duration_ms": 3625
+  },
+  {
+    "check": "events-membership",
+    "sql": "SELECT tenant_id,agent_id,COUNT(*) AS cases FROM tv_events.case_membership GROUP BY tenant_id,agent_id",
+    "request_id": "ad0e7d12-5934-4ce6-b29e-46e12093924a",
+    "result": {
+      "headers": [
+        "tenant_id",
+        "agent_id",
+        "cases"
+      ],
+      "data": [
+        [
+          "default",
+          "research-agent",
+          "9"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 582
+    },
+    "duration_ms": 3532
+  },
+  {
+    "check": "configuration-count",
+    "sql": "SELECT COUNT(*) AS records FROM tv_configuration.evidence",
+    "request_id": "730bc69e-4b7d-40a1-b995-0fd71beb0c82",
+    "result": {
+      "headers": [
+        "records"
+      ],
+      "data": [
+        [
+          "18"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 232
+    },
+    "duration_ms": 3125
+  },
+  {
+    "check": "configuration-kinds",
+    "sql": "SELECT evidence_kind,COUNT(*) AS records FROM tv_configuration.evidence GROUP BY evidence_kind",
+    "request_id": "eae32033-f077-49eb-8aac-3a62c6dfa93b",
+    "result": {
+      "headers": [
+        "evidence_kind",
+        "records"
+      ],
+      "data": [
+        [
+          "policy",
+          "9"
+        ],
+        [
+          "tools",
+          "9"
+        ]
+      ],
+      "total": 2,
+      "timeUsed": 222
+    },
+    "duration_ms": 2968
+  },
+  {
+    "check": "configuration-membership",
+    "sql": "SELECT tenant_id,agent_id,COUNT(*) AS cases FROM tv_configuration.case_membership GROUP BY tenant_id,agent_id",
+    "request_id": "61211934-8588-463f-a6fb-a22a5a8599c9",
+    "result": {
+      "headers": [
+        "tenant_id",
+        "agent_id",
+        "cases"
+      ],
+      "data": [
+        [
+          "default",
+          "research-agent",
+          "9"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 331
+    },
+    "duration_ms": 3063
+  },
+  {
+    "check": "reference-count",
+    "sql": "SELECT COUNT(*) AS records FROM tv_reference.evidence",
+    "request_id": "3d9bcfcf-b686-4ef3-a86a-38d8a8a90721",
+    "result": {
+      "headers": [
+        "records"
+      ],
+      "data": [
+        [
+          "9"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 432
+    },
+    "duration_ms": 3266
+  },
+  {
+    "check": "reference-kinds",
+    "sql": "SELECT evidence_kind,COUNT(*) AS records FROM tv_reference.evidence GROUP BY evidence_kind",
+    "request_id": "e7769d83-e662-4b45-9416-d97a9260f197",
+    "result": {
+      "headers": [
+        "evidence_kind",
+        "records"
+      ],
+      "data": [
+        [
+          "reference",
+          "9"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 671
+    },
+    "duration_ms": 3984
+  },
+  {
+    "check": "reference-membership",
+    "sql": "SELECT tenant_id,agent_id,COUNT(*) AS cases FROM tv_reference.case_membership GROUP BY tenant_id,agent_id",
+    "request_id": "fbf754d2-aa9d-4e5a-84d7-ad6551f0bb29",
+    "result": {
+      "headers": [
+        "tenant_id",
+        "agent_id",
+        "cases"
+      ],
+      "data": [
+        [
+          "default",
+          "research-agent",
+          "9"
+        ]
+      ],
+      "total": 1,
+      "timeUsed": 521
+    },
+    "duration_ms": 3734
+  },
+  {
+    "check": "semantic-summary",
+    "sql": "SELECT tenant_id,agent_id,case_id,evidence_kind FROM traceverdict.case_evidence",
+    "request_id": "e00ce6d0-4e9a-4fec-94be-fb80f01bd46d",
+    "result": {
+      "headers": [
+        "tenant_id",
+        "agent_id",
+        "case_id",
+        "evidence_kind"
+      ],
+      "data": [
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_01ecfa1d3f4e5e88ded0bd09de06",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_34fd09efd773ab0915a7effff77e",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_3c48ee8f313bf60c6fccc3eb2a8b",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_4965e7cff8b2901f74ab21b8fb77",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_623aeff48a2a8df4f620bbdc7ad6",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_6ef8f3c8089b46633967b6ce1c37",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_a51388530efae5fc6cd83d6dbf7d",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_af77466aca1757e978dc0e321ec0",
+          "task"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "reference"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "tools"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "policy"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "receipt"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "action"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "document"
+        ],
+        [
+          "default",
+          "research-agent",
+          "case_bca86df113fb71b7495f0615c509",
+          "task"
+        ]
+      ],
+      "total": 63,
+      "timeUsed": 6580
+    },
+    "duration_ms": 9735
+  },
+  {
+    "check": "semantic-kind-counts",
+    "sql": "SELECT evidence_kind,COUNT(*) AS records FROM traceverdict.case_evidence GROUP BY evidence_kind",
+    "request_id": "fb20b381-bd75-4edc-8850-481ff1daf903",
+    "result": {
+      "headers": [
+        "evidence_kind",
+        "records"
+      ],
+      "data": [
+        [
+          "document",
+          "9"
+        ],
+        [
+          "action",
+          "9"
+        ],
+        [
+          "receipt",
+          "9"
+        ],
+        [
+          "task",
+          "9"
+        ],
+        [
+          "reference",
+          "9"
+        ],
+        [
+          "tools",
+          "9"
+        ],
+        [
+          "policy",
+          "9"
+        ]
+      ],
+      "total": 7,
+      "timeUsed": 4558
+    },
+    "duration_ms": 7422
+  },
+  {
+    "check": "case-completeness-quality-rule",
+    "sql": "SELECT tenant_id,agent_id,case_id,COUNT(*) AS row_count,\nCOUNT(DISTINCT evidence_kind) AS distinct_kinds\nFROM traceverdict.case_evidence GROUP BY tenant_id,agent_id,case_id\nHAVING COUNT(*) <> 7 OR COUNT(DISTINCT evidence_kind) <> 7",
+    "request_id": "741c062c-b5c2-4b9a-b3e5-5a2676d19be0",
+    "result": {
+      "headers": [
+        "tenant_id",
+        "agent_id",
+        "case_id",
+        "row_count",
+        "distinct_kinds"
+      ],
+      "data": [],
+      "total": 0,
+      "timeUsed": 6709
+    },
+    "duration_ms": 9875
+  }
+]

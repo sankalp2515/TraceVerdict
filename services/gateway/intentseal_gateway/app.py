@@ -123,11 +123,18 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
         app.state.started = time.time()
         from .investigator import Investigator
         app.state.investigator = Investigator(app.state.engine)
+        from .cases.service import CaseService
+        import asyncio
+        app.state.cases = CaseService(app.state.engine)
+        case_recovery = asyncio.create_task(app.state.cases.recover())
         watcher = None
         if engine is None and os.environ.get("INTENTSEAL_INVESTIGATOR_AUTO", "1") != "0":
             import asyncio
             watcher = asyncio.create_task(app.state.investigator.watch())   # sessions awaiting approval get triaged
         yield
+        case_recovery.cancel()
+        await asyncio.gather(case_recovery, return_exceptions=True)
+        await app.state.cases.close()
         if watcher is not None:
             watcher.cancel()
         router = getattr(app.state.engine, "router", None)
@@ -558,6 +565,8 @@ def create_app(engine: Engine | None = None, reports_dir: Path | None = None) ->
     app.include_router(gemini_router)
     from .setup import router as setup_router
     app.include_router(setup_router)
+    from .cases.api import router as cases_router
+    app.include_router(cases_router)
     # One-container setup: the built Console served from the gateway's own origin (the Docker image sets this).
     # Mounted last, so every API route above takes precedence.
     console_dir = os.environ.get("INTENTSEAL_CONSOLE_DIR")

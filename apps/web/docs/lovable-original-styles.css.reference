@@ -1,0 +1,276 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * TraceVerdict design system.
+ *
+ * Direction: "forensic dossier, precision instrument".
+ * - Ink navy is the voice of record: facts, structure, prose.
+ * - Warm paper is the ground: every finding is filed, never floats.
+ * - Signal orange is RESERVED for enforcement boundaries and gates
+ *   (guard decisions, awaiting-review, destructive confirms). Never decoration.
+ * - Verified green marks tested outcomes. Report blue marks what an
+ *   application claims. Uncertain amber marks gaps. Contradiction red marks conflict.
+ * - The palette descends from the architecture legend:
+ *   green = new work, blue/grey = existing foundation, orange = deterministic gate.
+ *
+ * All colors MUST use oklch format.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* TraceVerdict semantic inks */
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-verified: var(--verified);
+  --color-verified-soft: var(--verified-soft);
+  --color-reported: var(--reported);
+  --color-reported-soft: var(--reported-soft);
+  --color-uncertain: var(--uncertain);
+  --color-uncertain-soft: var(--uncertain-soft);
+  --color-contradiction: var(--contradiction);
+  --color-contradiction-soft: var(--contradiction-soft);
+  --color-dossier: var(--dossier);
+
+  /* Type system: case file (Spectral) meets instrument panel (IBM Plex) */
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+:root {
+  --radius: 0.375rem;
+
+  /* Motion tokens: evidence arrives, it never performs */
+  --dur-fast: 120ms;
+  --dur-base: 240ms;
+  --dur-slow: 480ms;
+  --ease-file: cubic-bezier(0.22, 0, 0, 1);
+
+  --background: oklch(0.977 0.008 84);
+  --foreground: oklch(0.25 0.05 262);
+  --card: oklch(0.995 0.005 90);
+  --card-foreground: oklch(0.25 0.05 262);
+  --popover: oklch(0.995 0.005 90);
+  --popover-foreground: oklch(0.25 0.05 262);
+  --primary: oklch(0.27 0.06 262);
+  --primary-foreground: oklch(0.977 0.008 84);
+  --secondary: oklch(0.935 0.014 84);
+  --secondary-foreground: oklch(0.27 0.06 262);
+  --muted: oklch(0.94 0.012 84);
+  --muted-foreground: oklch(0.47 0.03 260);
+  --accent: oklch(0.925 0.022 255);
+  --accent-foreground: oklch(0.27 0.06 262);
+  --destructive: oklch(0.5 0.19 27);
+  --destructive-foreground: oklch(0.977 0.008 84);
+  --border: oklch(0.885 0.014 84);
+  --input: oklch(0.885 0.014 84);
+  --ring: oklch(0.45 0.08 262);
+
+  /* Semantic inks */
+  --signal: oklch(0.62 0.185 42);
+  --signal-soft: oklch(0.94 0.045 55);
+  --verified: oklch(0.48 0.095 155);
+  --verified-soft: oklch(0.94 0.045 155);
+  --reported: oklch(0.45 0.09 255);
+  --reported-soft: oklch(0.92 0.035 255);
+  --uncertain: oklch(0.58 0.115 75);
+  --uncertain-soft: oklch(0.95 0.05 85);
+  --contradiction: oklch(0.5 0.19 27);
+  --contradiction-soft: oklch(0.93 0.04 35);
+  --dossier: oklch(0.22 0.055 262);
+
+  --chart-1: oklch(0.45 0.09 255);
+  --chart-2: oklch(0.48 0.095 155);
+  --chart-3: oklch(0.62 0.185 42);
+  --chart-4: oklch(0.58 0.115 75);
+  --chart-5: oklch(0.5 0.19 27);
+  --sidebar: oklch(0.995 0.005 90);
+  --sidebar-foreground: oklch(0.25 0.05 262);
+  --sidebar-primary: oklch(0.27 0.06 262);
+  --sidebar-primary-foreground: oklch(0.977 0.008 84);
+  --sidebar-accent: oklch(0.94 0.012 84);
+  --sidebar-accent-foreground: oklch(0.27 0.06 262);
+  --sidebar-border: oklch(0.885 0.014 84);
+  --sidebar-ring: oklch(0.45 0.08 262);
+}
+
+.dark {
+  --background: oklch(0.17 0.03 262);
+  --foreground: oklch(0.95 0.01 85);
+  --card: oklch(0.21 0.035 262);
+  --card-foreground: oklch(0.95 0.01 85);
+  --popover: oklch(0.21 0.035 262);
+  --popover-foreground: oklch(0.95 0.01 85);
+  --primary: oklch(0.93 0.02 85);
+  --primary-foreground: oklch(0.2 0.05 262);
+  --secondary: oklch(0.26 0.04 262);
+  --secondary-foreground: oklch(0.95 0.01 85);
+  --muted: oklch(0.26 0.04 262);
+  --muted-foreground: oklch(0.68 0.03 260);
+  --accent: oklch(0.28 0.05 255);
+  --accent-foreground: oklch(0.95 0.01 85);
+  --destructive: oklch(0.62 0.19 27);
+  --destructive-foreground: oklch(0.95 0.01 85);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.06 262);
+
+  --signal: oklch(0.68 0.17 45);
+  --signal-soft: oklch(0.3 0.06 45);
+  --verified: oklch(0.68 0.12 155);
+  --verified-soft: oklch(0.28 0.05 155);
+  --reported: oklch(0.68 0.1 255);
+  --reported-soft: oklch(0.27 0.05 255);
+  --uncertain: oklch(0.72 0.12 78);
+  --uncertain-soft: oklch(0.3 0.05 80);
+  --contradiction: oklch(0.64 0.18 27);
+  --contradiction-soft: oklch(0.28 0.06 30);
+  --dossier: oklch(0.14 0.03 262);
+
+  --chart-1: oklch(0.68 0.1 255);
+  --chart-2: oklch(0.68 0.12 155);
+  --chart-3: oklch(0.68 0.17 45);
+  --chart-4: oklch(0.72 0.12 78);
+  --chart-5: oklch(0.64 0.18 27);
+  --sidebar: oklch(0.21 0.035 262);
+  --sidebar-foreground: oklch(0.95 0.01 85);
+  --sidebar-primary: oklch(0.68 0.1 255);
+  --sidebar-primary-foreground: oklch(0.17 0.03 262);
+  --sidebar-accent: oklch(0.26 0.04 262);
+  --sidebar-accent-foreground: oklch(0.95 0.01 85);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.7 0.06 262);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-signal-soft);
+    color: var(--color-foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- Motion language ---------- */
+
+/* Inferred/context edges drift slowly: movement slow enough to read */
+@keyframes tv-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.tv-dash {
+  animation: tv-dash 1.6s linear infinite;
+}
+
+/* A status change pulses exactly once, then rests */
+@keyframes tv-pulse-once {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-signal) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+.tv-pulse-once {
+  animation: tv-pulse-once 900ms var(--ease-file) 1 both;
+}
+
+@keyframes tv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tv-rise {
+  animation: tv-rise var(--dur-slow) var(--ease-file) both;
+}
+
+/* Scroll reveal (driven by a tiny IntersectionObserver component) */
+.tv-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity var(--dur-slow) var(--ease-file),
+    transform var(--dur-slow) var(--ease-file);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.tv-reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-dash,
+  .tv-pulse-once,
+  .tv-rise {
+    animation: none;
+  }
+  .tv-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Paper grain for large inverted surfaces */
+.tv-grain {
+  background-image: radial-gradient(
+      oklch(1 0 0 / 4%) 1px,
+      transparent 1px
+    ),
+    radial-gradient(oklch(1 0 0 / 3%) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px;
+  background-position: 0 0, 12px 12px;
+}

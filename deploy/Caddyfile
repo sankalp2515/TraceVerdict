@@ -1,0 +1,14 @@
+{$TRACEVERDICT_DOMAIN:localhost} {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
+    }
+    handle_path /api/* {
+        reverse_proxy case-api:8000
+    }
+    handle {
+        reverse_proxy web:3001
+    }
+}

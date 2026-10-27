@@ -1,0 +1,91 @@
+{
+  "agent": "judge-import-agent",
+  "org": "default",
+  "mode": "enforce",
+  "task_scope": "",
+  "tools": {
+    "send_message": {
+      "risk": "low",
+      "failure": "open",
+      "pinned": [],
+      "escalate_if_uncertain": false,
+      "allowed_recipients": [],
+      "recipient_arg": "to",
+      "allowed_domains": [],
+      "url_arg": "url",
+      "path_arg": null,
+      "intent_terms": [],
+      "capability": "send"
+    },
+    "summarize": {
+      "risk": "low",
+      "failure": "open",
+      "pinned": [],
+      "escalate_if_uncertain": false,
+      "allowed_recipients": [],
+      "recipient_arg": "to",
+      "allowed_domains": [],
+      "url_arg": "url",
+      "path_arg": null,
+      "intent_terms": [],
+      "capability": "read"
+    }
+  },
+  "unknown_tools": "block",
+  "sensitive_data": {
+    "patterns": [
+      "api_key",
+      "credential"
+    ],
+    "canaries": [],
+    "drop_non_visible": true,
+    "strip_role_markers": true,
+    "drop_lookalike_text": true
+  },
+  "thresholds": {
+    "neutralise": 0.6,
+    "block": 0.85,
+    "escalate_band": [
+      0.5,
+      0.85
+    ],
+    "judge_untrusted": "classifier",
+    "judge_min_chars": 40
+  },
+  "session": {
+    "risk_decay_per_turn": 0.2,
+    "block_at": 1.5,
+    "escalate_at": 0.8
+  },
+  "budgets": {
+    "daily_tokens_tier2": null,
+    "on_exceeded": "rules_only_hold_high_risk"
+  },
+  "memory": {
+    "enabled": true,
+    "match_threshold": 0.6
+  },
+  "taint": {
+    "enabled": true,
+    "min_coverage": 0.3,
+    "flagged_to_high_risk": "escalate"
+  },
+  "contract": {
+    "mode": "off",
+    "require_mention": [
+      "send",
+      "submit",
+      "purchase",
+      "delete"
+    ],
+    "out_of_scope": "escalate"
+  },
+  "content_checks": "observe",
+  "upstream": {
+    "provider": null,
+    "model": null,
+    "key": "gateway"
+  },
+  "decision_model": "generative_free",
+  "version": "1"
+}

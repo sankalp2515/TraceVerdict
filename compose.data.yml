@@ -1,0 +1,68 @@
+name: traceverdict-data
+services:
+  case-api:
+    profiles: ["app"]
+    image: traceverdict-backend:local
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    env_file: .env
+    environment:
+      INTENTSEAL_HOME: /app
+      TRACEVERDICT_DB_URL: postgresql://tv_owner:${TV_EVENTS_PASSWORD}@tv-events:5432/events
+      TRACEVERDICT_EVENTS_WRITE_URL: postgresql://tv_owner:${TV_EVENTS_PASSWORD}@tv-events:5432/events
+      TRACEVERDICT_CONFIGURATION_WRITE_URL: postgresql://tv_owner:${TV_CONFIGURATION_PASSWORD}@tv-configuration:5432/configuration
+      TRACEVERDICT_REFERENCE_WRITE_URL: postgresql://tv_owner:${TV_REFERENCE_PASSWORD}@tv-reference:5432/reference
+      METERLESS_BASE_URL: ${METERLESS_DOCKER_BASE_URL:-http://host.docker.internal:8088/v1}
+      ZETARIS_REST_URL: http://api:8888/api/v1.0
+    ports: ["127.0.0.1:${TRACEVERDICT_API_PORT:-8000}:8000"]
+    networks: [zetaris]
+    depends_on:
+      tv-events:
+        condition: service_healthy
+    mem_limit: 512m
+  tv-events:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: events
+      POSTGRES_USER: tv_owner
+      POSTGRES_PASSWORD: ${TV_EVENTS_PASSWORD:?Set TV_EVENTS_PASSWORD privately}
+    ports: ["127.0.0.1:54331:5432"]
+    volumes: ["events:/var/lib/postgresql/data"]
+    networks: [zetaris]
+    mem_limit: 192m
+    healthcheck: &pg_health
+      test: ["CMD-SHELL", "pg_isready -U tv_owner"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  tv-configuration:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: configuration
+      POSTGRES_USER: tv_owner
+      POSTGRES_PASSWORD: ${TV_CONFIGURATION_PASSWORD:?Set TV_CONFIGURATION_PASSWORD privately}
+    ports: ["127.0.0.1:54332:5432"]
+    volumes: ["configuration:/var/lib/postgresql/data"]
+    networks: [zetaris]
+    mem_limit: 192m
+    healthcheck: *pg_health
+  tv-reference:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reference
+      POSTGRES_USER: tv_owner
+      POSTGRES_PASSWORD: ${TV_REFERENCE_PASSWORD:?Set TV_REFERENCE_PASSWORD privately}
+    ports: ["127.0.0.1:54333:5432"]
+    volumes: ["reference:/var/lib/postgresql/data"]
+    networks: [zetaris]
+    mem_limit: 192m
+    healthcheck: *pg_health
+volumes:
+  events:
+  configuration:
+  reference:
+networks:
+  zetaris:
+    external: true
+    name: ${ZETARIS_DOCKER_NETWORK:-zetaris_default}

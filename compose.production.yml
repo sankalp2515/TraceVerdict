@@ -1,0 +1,33 @@
+# Layer over compose.data.yml. Requires configured Zetaris and Nightshift.
+services:
+  case-api:
+    restart: unless-stopped
+    environment:
+      TRACEVERDICT_COOKIE_SECURE: "true"
+      INTENTSEAL_CORS_ORIGINS: https://${TRACEVERDICT_DOMAIN:?Set the real deployment domain}
+    ports: !reset []
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    networks: [zetaris]
+    mem_limit: 384m
+    security_opt: ["no-new-privileges:true"]
+  edge:
+    profiles: ["app"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      TRACEVERDICT_DOMAIN: ${TRACEVERDICT_DOMAIN:?Set the real deployment domain}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - edge-data:/data
+      - edge-config:/config
+    networks: [zetaris]
+    depends_on: [web, case-api]
+volumes:
+  edge-data:
+  edge-config:

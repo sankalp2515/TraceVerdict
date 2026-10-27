@@ -1,0 +1,18 @@
+# Backend-only image; does not build or copy the console.
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 INTENTSEAL_HOME=/app
+COPY requirements.lock ./
+COPY packages ./packages
+COPY agents ./agents
+COPY services ./services
+RUN pip install --no-cache-dir -c requirements.lock ./packages/core[engine,postgres] ./packages/sdk ./agents ./services/gateway
+COPY config ./config
+COPY policies ./policies
+RUN useradd --create-home --uid 1000 traceverdict && mkdir -p /app/data && chown traceverdict /app/data
+USER traceverdict
+EXPOSE 8000
+# Case-only service uses real sponsor adapters and explicit sample mode. Connected
+# applications retain the existing separate enforcement gateway/SDK boundary.
+HEALTHCHECK --interval=20s --timeout=5s --start-period=30s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz',timeout=4)"
+CMD ["python", "-m", "uvicorn", "intentseal_gateway.cases.app:app", "--host", "0.0.0.0", "--port", "8000"]

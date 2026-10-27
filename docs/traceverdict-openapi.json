@@ -1,0 +1,1843 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TraceVerdict case API",
+    "description": "Evidence-backed investigation, bounded sandbox repair validation, and human review. Approval exports a recommendation; it never deploys a production patch.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/v1/replay-snapshots": {
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Capture Snapshot",
+        "operationId": "capture_snapshot_v1_replay_snapshots_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayCapture"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "List Cases",
+        "operationId": "list_cases_v1_cases_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "default": "",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Create Case",
+        "operationId": "create_case_v1_cases_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCase"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Get Case",
+        "operationId": "get_case_v1_cases__cid__get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/graph": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Get Graph",
+        "operationId": "get_graph_v1_cases__cid__graph_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/evidence/{eid}": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Get Evidence",
+        "operationId": "get_evidence_v1_cases__cid__evidence__eid__get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          },
+          {
+            "name": "eid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Eid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/export": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Export",
+        "operationId": "export_v1_cases__cid__export_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/history/{version}": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "History",
+        "operationId": "history_v1_cases__cid__history__version__get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/source-records": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Source Records",
+        "description": "Registration material for sponsor onboarding; not a live investigation fallback.",
+        "operationId": "source_records_v1_cases__cid__source_records_get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/investigate": {
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Investigate",
+        "operationId": "investigate_v1_cases__cid__investigate_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/jobs/{jid}": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Job",
+        "operationId": "job_v1_cases__cid__jobs__jid__get",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          },
+          {
+            "name": "jid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/repairs": {
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Repairs",
+        "operationId": "repairs_v1_cases__cid__repairs_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/repairs/{rid}/validate": {
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Validate",
+        "operationId": "validate_v1_repairs__rid__validate_post",
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/validations/{vid}": {
+      "get": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Validation",
+        "operationId": "validation_v1_validations__vid__get",
+        "parameters": [
+          {
+            "name": "vid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/repairs/{rid}/approve": {
+      "post": {
+        "tags": [
+          "TraceVerdict"
+        ],
+        "summary": "Approve",
+        "operationId": "approve_v1_repairs__rid__approve_post",
+        "parameters": [
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "tags": [
+          "Workspace sessions"
+        ],
+        "summary": "Current",
+        "operationId": "current_v1_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspace sessions"
+        ],
+        "summary": "Login",
+        "operationId": "login_v1_auth_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Workspace sessions"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents": {
+      "get": {
+        "summary": "Agents",
+        "operationId": "agents_v1_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Integration onboarding"
+        ],
+        "summary": "Register Agent",
+        "operationId": "register_agent_v1_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRegistration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cases/{cid}/publish-source-records": {
+      "post": {
+        "tags": [
+          "Integration onboarding"
+        ],
+        "summary": "Publish Case",
+        "operationId": "publish_case_v1_cases__cid__publish_source_records_post",
+        "parameters": [
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Ready",
+        "operationId": "ready_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/connections": {
+      "get": {
+        "summary": "Connections",
+        "operationId": "connections_v1_connections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentPolicy": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "title": "Agent"
+          },
+          "org": {
+            "type": "string",
+            "title": "Org",
+            "default": "default"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "monitor"
+          },
+          "task_scope": {
+            "type": "string",
+            "title": "Task Scope",
+            "default": ""
+          },
+          "tools": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ToolPolicy"
+            },
+            "type": "object",
+            "title": "Tools"
+          },
+          "unknown_tools": {
+            "type": "string",
+            "title": "Unknown Tools",
+            "default": "block"
+          },
+          "sensitive_data": {
+            "$ref": "#/components/schemas/SensitiveData"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/Thresholds"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionPolicy"
+          },
+          "budgets": {
+            "$ref": "#/components/schemas/Budgets"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryPolicy"
+          },
+          "taint": {
+            "$ref": "#/components/schemas/TaintPolicy"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ContractPolicy"
+          },
+          "content_checks": {
+            "type": "string",
+            "title": "Content Checks",
+            "default": "on"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/UpstreamPolicy"
+          },
+          "decision_model": {
+            "type": "string",
+            "title": "Decision Model",
+            "default": "generative_free"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": "1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent"
+        ],
+        "title": "AgentPolicy"
+      },
+      "AgentRegistration": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+            "title": "Agent Id"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/AgentPolicy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "policy"
+        ],
+        "title": "AgentRegistration"
+      },
+      "ApprovalRequest": {
+        "properties": {
+          "base_policy_sha256": {
+            "type": "string",
+            "title": "Base Policy Sha256"
+          },
+          "patch_sha256": {
+            "type": "string",
+            "title": "Patch Sha256"
+          },
+          "validation_report_sha256": {
+            "type": "string",
+            "title": "Validation Report Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "base_policy_sha256",
+          "patch_sha256",
+          "validation_report_sha256"
+        ],
+        "title": "ApprovalRequest"
+      },
+      "Budgets": {
+        "properties": {
+          "daily_tokens_tier2": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Tokens Tier2"
+          },
+          "on_exceeded": {
+            "type": "string",
+            "title": "On Exceeded",
+            "default": "rules_only_hold_high_risk"
+          }
+        },
+        "type": "object",
+        "title": "Budgets"
+      },
+      "CandidateRequest": {
+        "properties": {
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Operations"
+          },
+          "rationale_claim_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Rationale Claim Ids"
+          },
+          "expected_control_effect": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Expected Control Effect"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operations",
+          "rationale_claim_ids",
+          "expected_control_effect"
+        ],
+        "title": "CandidateRequest"
+      },
+      "ContractPolicy": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "off"
+          },
+          "require_mention": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Require Mention"
+          },
+          "out_of_scope": {
+            "type": "string",
+            "title": "Out Of Scope",
+            "default": "escalate"
+          }
+        },
+        "type": "object",
+        "title": "ContractPolicy",
+        "description": "D-064 Intent contracts: each session gets a versioned contract compiled from the user's own words."
+      },
+      "CreateCase": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "title": "Agent Id"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Session Ids"
+          },
+          "fixture_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supplier-contact",
+                  "invoice-forward",
+                  "report-notify"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fixture Id"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^snapshot_[a-f0-9]{28}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "sample",
+              "live"
+            ],
+            "title": "Execution Mode"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "idempotency_key"
+        ],
+        "title": "CreateCase"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JobRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "JobRequest"
+      },
+      "Login": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "format": "password",
+            "title": "Api Key",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "api_key"
+        ],
+        "title": "Login"
+      },
+      "MemoryPolicy": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "match_threshold": {
+            "type": "number",
+            "title": "Match Threshold",
+            "default": 0.6
+          }
+        },
+        "type": "object",
+        "title": "MemoryPolicy"
+      },
+      "Operation": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "enum": [
+              "contract.mode",
+              "contract.out_of_scope",
+              "tools.send_message.allowed_recipients"
+            ],
+            "title": "Path"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "enforce",
+                  "block",
+                  "escalate"
+                ]
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "value"
+        ],
+        "title": "Operation"
+      },
+      "RecordedAction": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Event Id"
+          },
+          "tool": {
+            "type": "string",
+            "const": "send_message",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Args"
+          },
+          "enforced": {
+            "type": "string",
+            "enum": [
+              "ALLOW",
+              "BLOCK",
+              "ESCALATE",
+              "NEUTRALISE"
+            ],
+            "title": "Enforced"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "tool",
+          "args",
+          "enforced"
+        ],
+        "title": "RecordedAction"
+      },
+      "RecordedReceipt": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Event Id"
+          },
+          "receipt_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Receipt Id"
+          },
+          "executed": {
+            "type": "boolean",
+            "title": "Executed"
+          },
+          "executor": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Executor"
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Output",
+            "default": "application-reported"
+          },
+          "outbox_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbox Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "receipt_id",
+          "executed",
+          "executor"
+        ],
+        "title": "RecordedReceipt"
+      },
+      "ReplayCapture": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Agent Id"
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Task"
+          },
+          "document": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 1,
+            "title": "Document"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/AgentPolicy"
+          },
+          "approved_recipients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Approved Recipients"
+          },
+          "action": {
+            "$ref": "#/components/schemas/RecordedAction"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/RecordedReceipt"
+          },
+          "source_locator": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Source Locator"
+          },
+          "source_version": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source Version"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          },
+          "model_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Model Refs"
+          },
+          "tool_build_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Tool Build Ref"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayScenario"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "minItems": 2,
+            "title": "Scenarios"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "task",
+          "document",
+          "policy",
+          "approved_recipients",
+          "action",
+          "receipt",
+          "source_locator",
+          "source_version",
+          "captured_at",
+          "model_refs",
+          "tool_build_ref",
+          "scenarios"
+        ],
+        "title": "ReplayCapture"
+      },
+      "ReplayScenario": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "unsafe",
+              "utility"
+            ],
+            "title": "Category"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "development",
+              "acceptance"
+            ],
+            "title": "Split"
+          },
+          "family": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Family",
+            "default": "operator-capture"
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Task"
+          },
+          "tool": {
+            "type": "string",
+            "enum": [
+              "send_message",
+              "summarize"
+            ],
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 3,
+            "title": "Args"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "expected_output": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Output"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "split",
+          "task",
+          "tool",
+          "args",
+          "allowed"
+        ],
+        "title": "ReplayScenario"
+      },
+      "SensitiveData": {
+        "properties": {
+          "patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Patterns"
+          },
+          "canaries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Canaries"
+          },
+          "drop_non_visible": {
+            "type": "boolean",
+            "title": "Drop Non Visible",
+            "default": true
+          },
+          "strip_role_markers": {
+            "type": "boolean",
+            "title": "Strip Role Markers",
+            "default": true
+          },
+          "drop_lookalike_text": {
+            "type": "boolean",
+            "title": "Drop Lookalike Text",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "SensitiveData"
+      },
+      "SessionPolicy": {
+        "properties": {
+          "risk_decay_per_turn": {
+            "type": "number",
+            "title": "Risk Decay Per Turn",
+            "default": 0.2
+          },
+          "block_at": {
+            "type": "number",
+            "title": "Block At",
+            "default": 1.5
+          },
+          "escalate_at": {
+            "type": "number",
+            "title": "Escalate At",
+            "default": 0.8
+          }
+        },
+        "type": "object",
+        "title": "SessionPolicy"
+      },
+      "TaintPolicy": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "min_coverage": {
+            "type": "number",
+            "title": "Min Coverage",
+            "default": 0.3
+          },
+          "flagged_to_high_risk": {
+            "type": "string",
+            "title": "Flagged To High Risk",
+            "default": "escalate"
+          }
+        },
+        "type": "object",
+        "title": "TaintPolicy"
+      },
+      "Thresholds": {
+        "properties": {
+          "neutralise": {
+            "type": "number",
+            "title": "Neutralise",
+            "default": 0.6
+          },
+          "block": {
+            "type": "number",
+            "title": "Block",
+            "default": 0.85
+          },
+          "escalate_band": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Escalate Band",
+            "default": [
+              0.5,
+              0.85
+            ]
+          },
+          "judge_untrusted": {
+            "type": "string",
+            "title": "Judge Untrusted",
+            "default": "classifier"
+          },
+          "judge_min_chars": {
+            "type": "integer",
+            "title": "Judge Min Chars",
+            "default": 40
+          }
+        },
+        "type": "object",
+        "title": "Thresholds"
+      },
+      "ToolPolicy": {
+        "properties": {
+          "risk": {
+            "type": "string",
+            "title": "Risk",
+            "default": "low"
+          },
+          "failure": {
+            "type": "string",
+            "title": "Failure",
+            "default": "open"
+          },
+          "pinned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pinned"
+          },
+          "escalate_if_uncertain": {
+            "type": "boolean",
+            "title": "Escalate If Uncertain",
+            "default": false
+          },
+          "allowed_recipients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Recipients"
+          },
+          "recipient_arg": {
+            "type": "string",
+            "title": "Recipient Arg",
+            "default": "to"
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Domains"
+          },
+          "url_arg": {
+            "type": "string",
+            "title": "Url Arg",
+            "default": "url"
+          },
+          "path_arg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path Arg"
+          },
+          "intent_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Intent Terms"
+          },
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability"
+          }
+        },
+        "type": "object",
+        "title": "ToolPolicy"
+      },
+      "UpstreamPolicy": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "default": "gateway"
+          }
+        },
+        "type": "object",
+        "title": "UpstreamPolicy",
+        "description": "Where the LLM proxy forwards this agent's model calls (docs/INTEGRATION.md).\n\nprovider: a provider name from config/providers.yaml (openai, anthropic, gemini, groq, azure_openai, ollama, ...).\n          Unset: the gateway's own `proxy_upstream` role (free-tier models; demo and evaluation).\nmodel:    override the model the client asks for (unset: forward the client's model).\nkey:      \"gateway\" - the gateway's configured key for that provider; \"client\" - the agent's own provider key,\n          sent in the X-Upstream-Key header and never stored."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

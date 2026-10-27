@@ -42,3 +42,9 @@ The production web build after patched dependency updates passed. Added CI to re
 Added actual prior frontend graph imagery to the updated submission deck, explicitly labeled as a recorded synthetic case. New onboarding controls are not represented as browser-verified by that older capture. Final deck is submission/TraceVerdict_Submission_Deck_v4.pptx once its export/validation completes.
 
 Final 14-slide deck exported and passed package/layout/font checks with zero findings. It includes an actual earlier frontend screenshot, clearly labeled synthetic, and the measured Nemotron comparison. The final filename is TraceVerdict_Submission_Deck_v4.pptx.
+
+## Published verification
+
+Public repository: https://github.com/sankalp2515/TraceVerdict (main). Implementation commit e2acb50 passed GitHub backend CI (328 passed, one skipped), frontend checks and the unchanged upstream World Model conformance suite. Anonymous repository, README and NVIDIA-evidence links returned HTTP 200. No private environment files, node_modules or build outputs were committed. Historical scanning checked 1,002 text blobs without credential-pattern/private-value matches.
+
+Both backend and Node web images built. The clean backend image reproduced all three deterministic examples with networking disabled. Local Caddy routing served the frontend and /api, and cookie sign-in/list/logout passed through the proxy. This was explicitly an HTTP loopback check, not verification of a public domain or TLS certificate. Temporary proxy/web check containers were stopped after verification; the main local backend remains on port 8000.

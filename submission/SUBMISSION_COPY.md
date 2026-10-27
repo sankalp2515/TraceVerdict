@@ -20,7 +20,7 @@ Pre-existing components: IntentSeal action guard, intent compiler, policy models
 
 ## Items requiring final inputs
 
-- One public repository URL containing backend and the product frontend at `apps/web`, plus an unauthenticated access check. No second Lovable repository is required.
+- Repository completed: https://github.com/sankalp2515/TraceVerdict. Public access verified; backend and apps/web share this repository.
 - Real 1–4 minute demo video URL or file.
 - Final deck link/upload with frontend visuals where available.
 - Cursor is optional per the current official FAQ. This backend used Codex; mention Cursor only if actually used.

@@ -154,6 +154,6 @@ Public HTTPS deployment, self-service identities/connectors, SSO, monitoring, re
 
 ## Engineering provenance
 
-TraceVerdict builds on our IntentSeal runtime. The investigation product, sponsor integrations, World Model graph, critic revision and repair-validation workflow are documented in [engineering provenance](docs/NEW_WORK.md).
+Reused components from our IntentSeal runtime: action guard, intent compiler, policy models, SDK and foundational gateway. TraceVerdict adds the investigation product, sponsor integrations, World Model graph, critic revision and repair-validation workflow. See [engineering provenance](docs/NEW_WORK.md).
 
 Apache-2.0 · Helios · Open Agent Hackathon 2026 · Track 2: The Agent That Can Explain Why.
